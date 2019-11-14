@@ -656,7 +656,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             wmul(
                 DiamondExchange(exchange).varFee(),
                 min(sentV, buyV)),
-            DiamondExchange(exchange).fixFee());                             // fiat value in fiat
+            DiamondExchange(exchange).fixFee());                                        // fiat value in fiat
 
         feeDpt = wdivT(feeV, usdRate[dpt], dpt);                                        // the amount of DPT tokens to pay for fee
 
@@ -676,15 +676,15 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         feeSpentDptV = wmulV(feeSpentDpt, usdRate[dpt], dpt);
 
-        profitSellTokenT = erc20[sellToken] ?                // total amount of sellToken to pay for profit
+        profitSellTokenT = erc20[sellToken] ?                                           // total amount of sellToken to pay for profit
             wdivT(profitV, usdRate[sellToken], sellToken) :
             0;
 
         if (feeSpentDpt < feeDpt) {
 
-            restOfFeeV = wmulV(sub(feeDpt, feeSpentDpt), usdRate[dpt], dpt);                // fee that remains after paying (part of) it with user DPT
+            restOfFeeV = wmulV(sub(feeDpt, feeSpentDpt), usdRate[dpt], dpt);            // fee that remains after paying (part of) it with user DPT
 
-            restOfFeeDpt = sub(feeDpt, feeSpentDpt);                                        // fee in DPT that remains after paying (part of) with DPT
+            restOfFeeDpt = sub(feeDpt, feeSpentDpt);                                    // fee in DPT that remains after paying (part of) with DPT
 
             restOfFeeT = erc20[sellToken] ?
                 wdivT(restOfFeeV, usdRate[sellToken], sellToken) :
@@ -943,20 +943,32 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             add(balanceUserDecreaseV, feeSpentDptV));
     }
 
+    function b(address a) public pure returns(bytes32) {
+        return bytes32(uint(a));
+    }
+
+    function b(uint a) public pure returns(bytes32) {
+        return bytes32(a);
+    }
+
+    function b(bool a_) public pure returns(bytes32) {
+        return a_ ? bytes32(uint(1)) : bytes32(uint(0));
+    }
+
     /*
     * @dev Compare two numbers with round-off errors considered.
     * Assume that the numbers are 18 decimals precision.
     */
-    function assertEqDust(uint a, uint b) public {
-        assertEqDust(a, b, eth);
+    function assertEqDust(uint a_, uint b_) public {
+        assertEqDust(a_, b_, eth);
     }
 
     /*
     * @dev Compare two numbers with round-off errors considered.
     * Assume that the numbers have the decimals of token.
     */
-    function assertEqDust(uint a, uint b, address token) public {
-        uint diff = a - b;
+    function assertEqDust(uint a_, uint b_, address token) public {
+        uint diff = a_ - b_;
         require(dustSet[token], "Dust limit must be set to token.");
         uint dustT = dust[token];
         assertTrue(diff < dustT || uint(-1) - diff < dustT);
@@ -989,15 +1001,15 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
     *      token Value
     */
-    function wmulV(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wmul(toDecimals(a, getDecimals(token), 18), b);
+    function wmulV(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wmul(toDecimals(a_, getDecimals(token_), 18), b_);
     }
 
     /*
     * @dev calculates division with decimals adjusted to match to tokens precision
     */
-    function wdivT(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wdiv(a, toDecimals(b, 18, getDecimals(token)));
+    function wdivT(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wdiv(a_, toDecimals(b_, 18, getDecimals(token_)));
     }
 
     /**
@@ -2333,7 +2345,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
-
 
         doExchange(dpass, dpassId[user], dpass, dpassId[seller]);
     }
