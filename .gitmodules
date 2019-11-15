@@ -22,6 +22,3 @@
 [submodule "lib/ds-guard"]
 	path = lib/ds-guard
 	url = https://github.com/dapphub/ds-guard
-[submodule "lib/dpass"]
-	path = lib/dpass
-	url = https://github.com/Cdiamondcoin/dpass.git
