@@ -138,7 +138,7 @@ contract DiamondExchangeTester is Wallet {
 
             DiamondExchange(exchange)
             .buyTokensWithFee
-            .value(sellAmtOrId == uint(-1) ? address(this).balance : sellAmtOrId)
+            .value(sellAmtOrId == uint(-1) ? address(this).balance : sellAmtOrId > address(this).balance ? address(this).balance : sellAmtOrId)
             (sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
         } else {
@@ -299,7 +299,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     bytes32 constant public ANY = bytes32(uint(-1));
 
     function setUp() public {
-        cdc = address(new Cdc());
+        cdc = address(new Cdc("BR,VS,G,0.05", "CDC"));
+        emit log_named_uint("cdc supply", Cdc(cdc).totalSupply());
         dpass = address(new Dpass());
         dpt = address(new DSToken("DPT"));
         dai = address(new DSToken("DAI"));
@@ -315,7 +316,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         DSToken(dpt).mint(SUPPLY);
         DSToken(dai).mint(SUPPLY);
         DSToken(eng).mint(SUPPLY);
-        DSToken(cdc).mint(SUPPLY);
 
         usdRate[dpt] = 5 ether;
         usdRate[cdc] = 7 ether;
@@ -360,11 +360,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         asm = address(uint160(address(new SimpleAssetManagement())));
         guard = new DSGuard();
         SimpleAssetManagement(asm).setAuthority(guard);
+        DSToken(cdc).setAuthority(guard);
+        Dpass(dpass).setAuthority(guard);
         guard.permit(address(this), address(asm), ANY);
         guard.permit(address(asm), cdc, ANY);
         guard.permit(address(asm), dpass, ANY);
-        DSToken(cdc).setAuthority(guard);
-        Dpass(dpass).setAuthority(guard);
 
         custodian20[dpt] = asm;
         custodian20[cdc] = asm;
@@ -372,6 +372,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         custodian20[dai] = asm;
         custodian20[eng] = asm;
 
+        SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
         SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
         SimpleAssetManagement(asm).setConfig("priceFeed", b(dai), b(feed[dai]), "diamonds");
         SimpleAssetManagement(asm).setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
@@ -406,7 +407,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                             // asset management will handle this token
         // SimpleAssetManagement(asm).setAmtForSale(cdc, INITIAL_BALANCE);
-        Cdc(cdc).transfer(asm, INITIAL_BALANCE);
+        // Cdc(cdc).transfer(asm, INITIAL_BALANCE);
 
         liquidityContract = address(uint160(address(new DiamondExchangeTester(address(0xfa), dpt, cdc, dai)))); // FAKE DECLARATION, will overdeclare later
         DSToken(dpt).transfer(liquidityContract, INITIAL_BALANCE);
@@ -468,6 +469,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         DiamondExchange(exchange).setConfig("decimals", eng, 18);
         DiamondExchange(exchange).setConfig("custodian20", eng, custodian20[eng]);
 
+        guard.permit(exchange, asm, ANY);
         liquidityContract = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
         DSToken(dpt).transfer(liquidityContract, INITIAL_BALANCE);
         DiamondExchangeTester(liquidityContract).doApprove(dpt, exchange, uint(-1));
@@ -476,6 +478,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         user = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
         seller = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
+        SimpleAssetManagement(asm).setConfig("custodians", b(seller), b(true), "diamonds");
         fca = address(uint160(address(new TestFeeCalculator())));
 
         Cdc(cdc).approve(exchange, uint(-1));
@@ -498,7 +501,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             "20191101"
         );
         SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice);
-        DiamondExchangeTester(user).approve(dpass, exchange, dpassId[user]);
+        DiamondExchangeTester(user).approve721(dpass, exchange, dpassId[user]);
 
         bytes32[] memory attributes1 = new bytes32[](5);
         attributes1[0] = "round";
@@ -522,11 +525,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         );
 
         SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[seller], dpassOwnerPrice);
-        SimpleAssetManagement(asm).approve(dpass, exchange, dpassId[seller]);
+        SimpleAssetManagement(asm).approve721(dpass, exchange, dpassId[seller]);
         // Prepare seller of DPT fees
 
         user.transfer(INITIAL_BALANCE);
-        Cdc(cdc).transfer(user, INITIAL_BALANCE);
         DSToken(dai).transfer(user, INITIAL_BALANCE);
         DSToken(eng).transfer(user, INITIAL_BALANCE);
 
@@ -560,6 +562,43 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         emit log_named_address("wal", wal);
         emit log_named_address("liq", liquidityContract);
         emit log_named_address("burner", burner);
+    }
+
+    function createDiamond(uint price_) public {
+        uint id_;
+        Dpass(dpass).setCccc("BR,VVS1,G,10.00", true);
+        id_ = Dpass(dpass).mintDiamondTo(
+            asm,                                                                // address _to,
+            seller,                                                             // address _custodian,
+            "gia",                                                              // bytes32 _issuer,
+            "44444444",                                                         // bytes32 _report,
+            "sale",                                                             // bytes32 _state,
+            "BR,VVS1,G,10.00",
+            10.1 * 100,
+            bytes32(0xac5c1daab5131326b23d7f3a4b79bba9f236d227338c5b0fb17494defc319886), // bytes32 _attributesHash
+            "20191101"
+        );
+
+        SimpleAssetManagement(asm).setBasePrice(dpass, id_, price_);
+    }
+
+    function sendSomeCdcToUser() public {
+        createDiamond(500000 ether);
+        SimpleAssetManagement(asm).mint(cdc, user, wdiv(
+            add(
+                wdiv(
+                    dpassOwnerPrice, 
+                    sub(1 ether, varFee)),
+                fixFee),
+            usdRate[cdc]));
+        balance[user][cdc] = DSToken(cdc).balanceOf(user);
+    }
+
+    function sendSomeCdcToUser(uint256 amt) public {
+        createDiamond(500000 ether);
+        require(amt <= SimpleAssetManagement(asm).getAmtForSale(cdc), "test-can-not-mint-that-much");
+        SimpleAssetManagement(asm).mint(cdc, user, amt);
+        balance[user][cdc] = DSToken(cdc).balanceOf(user);
     }
 
     function doExchange(address sellToken, uint256 sellAmtOrId, address buyToken, uint256 buyAmtOrId) public {
@@ -1366,7 +1405,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1379,7 +1418,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1391,7 +1430,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1403,7 +1442,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1416,7 +1455,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1428,7 +1467,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1440,7 +1479,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 1001 ether;  // has only 1000 eth balance
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1564,7 +1603,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1577,7 +1616,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1589,7 +1628,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1601,7 +1640,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1614,7 +1653,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1626,7 +1665,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1638,7 +1677,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = 1001 ether;  // has only 1000 eth balance
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1765,7 +1804,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1780,7 +1819,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1794,7 +1833,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1808,7 +1847,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1823,7 +1862,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1837,7 +1876,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1851,7 +1890,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 1001 ether;  // has only 1000 eth balance
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
@@ -1882,8 +1921,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailForFixEthBuyFixCdcUserHasNoDptBothTooMuchAllFeeInDptDex() public {
 
         userDpt = 123 ether; // this can be changed
-        uint buyAmtOrId = INITIAL_BALANCE + 1 ether; // DO NOT CHANGE THIS!!!
-        uint sellAmtOrId = DSToken(cdc).balanceOf(custodian20[cdc]) + 1 ether; // DO NOT CHANGE THIS!!!
+        uint buyAmtOrId = 17.79 ether + 1 ether; // DO NOT CHANGE THIS!!!
+        uint sellAmtOrId = user.balance + 1 ether; // DO NOT CHANGE THIS!!!
 
         if (wdivT(wmulV(buyAmtOrId, usdRate[cdc], cdc), usdRate[eth], eth) <= sellAmtOrId) {
             sendToken(dpt, user, userDpt);
@@ -1946,7 +1985,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dpt;
         uint sellAmtOrId = uint(-1);
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1961,7 +2000,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dpt;
         uint sellAmtOrId = sellDpt;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1973,7 +2012,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -1990,7 +2029,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -2007,7 +2046,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -2024,7 +2063,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -2041,7 +2080,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = dai;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -2053,7 +2092,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = eth;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, 0, buyToken, buyAmtOrId);
     }
@@ -2068,7 +2107,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
         address buyToken = cdc;
-        uint buyAmtOrId = 47 ether;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
@@ -2224,6 +2263,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2235,6 +2275,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2246,6 +2287,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2257,6 +2299,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 7 ether;
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2268,6 +2311,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 10 ether;
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2279,6 +2323,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 10 ether;
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2294,9 +2339,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
-
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2307,6 +2352,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2317,6 +2363,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2576,6 +2623,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2589,6 +2637,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2602,6 +2651,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2665,7 +2715,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
-
+        sendSomeCdcToUser(); 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
 
@@ -2678,6 +2728,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
+        sendSomeCdcToUser(); 
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
@@ -2691,6 +2742,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
+        sendSomeCdcToUser(); 
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }

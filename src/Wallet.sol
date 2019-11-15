@@ -19,6 +19,18 @@ contract TrustedErc20Wallet {
     ) public returns (bool);
 }
 
+contract TrustedErci721Wallet {
+    function balanceOf(address guy) public view returns (uint);
+    function ownerOf(uint256 tokenId) public view returns (address);
+    function approve(address to, uint256 tokenId) public;
+    function getApproved(uint256 tokenId) public view returns (address);
+    function setApprovalForAll(address to, bool approved) public;
+    function isApprovedForAll(address owner, address operator) public view returns (bool);
+    function transferFrom(address from, address to, uint256 tokenId) public;
+    function safeTransferFrom(address from, address to, uint256 tokenId) public;
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public;
+}
+
 
 contract Wallet is DSAuth, DSStop, DSMath {
     // TODO: remove all following LogTest()
@@ -44,7 +56,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
 
     function totalSupply(address token) public view returns (uint){
         if (token == eth) {
-            require(false, "No total supply for Ether");
+            require(false, "wal-no-total-supply-for-ether");
         } else {
             return TrustedErc20Wallet(token).totalSupply();
         }
@@ -61,7 +73,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     function allowance(address token, address src, address guy)
     public view returns (uint) {
         if( token == eth) {
-            require(false, "No allowance for Ether");
+            require(false, "wal-no-allowance-for-ether");
         } else {
             return TrustedErc20Wallet(token).allowance(src, guy);
         }
@@ -70,10 +82,50 @@ contract Wallet is DSAuth, DSStop, DSMath {
     function approve(address token, address guy, uint wad)
     public auth returns (bool) {
         if( token == eth) {
-            require(false, "Can't approve Ether");
+            require(false, "wal-can-not-approve-ether");
         } else {
             return TrustedErc20Wallet(token).approve(guy, wad);
         }
+    }
+
+    function balanceOf721(address token, address guy) public view returns (uint) {
+        return TrustedErci721Wallet(token).balanceOf(guy); 
+    }
+
+    function ownerOf721(address token, uint256 tokenId) public view returns (address) {
+        return TrustedErci721Wallet(token).ownerOf(tokenId);
+    }
+
+    function approve721(address token, address to, uint256 tokenId) public {
+        TrustedErci721Wallet(token).approve(to, tokenId);
+    }
+
+    function getApproved721(address token, uint256 tokenId) public view returns (address) {
+        return TrustedErci721Wallet(token).getApproved(tokenId);
+    }
+
+    function setApprovalForAll721(address token, address to, bool approved) public {
+        TrustedErci721Wallet(token).setApprovalForAll(to, approved);
+    }
+
+    function isApprovedForAll721(address token, address owner, address operator) public view returns (bool) {
+        return TrustedErci721Wallet(token).isApprovedForAll(owner, operator);
+    }
+
+    function transferFrom721(address token, address from, address to, uint256 tokenId) public {
+        TrustedErci721Wallet(token).transferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom721(address token, address from, address to, uint256 tokenId) public {
+        TrustedErci721Wallet(token).safeTransferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom721(address token, address from, address to, uint256 tokenId, bytes memory _data) public {
+        TrustedErci721Wallet(token).safeTransferFrom(from, to, tokenId, _data);
+    }
+
+    function transfer721(address token, address to, uint tokenId) public {
+        TrustedErci721Wallet(token).transferFrom(msg.sender, to, tokenId);
     }
 
     /**
@@ -87,7 +139,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     ) internal returns (bool){
         TrustedErc20Wallet erc20 = TrustedErc20Wallet(token);
         if (token == eth && amount > 0) {
-            require(src == address(this), "Ether transfer invalid src");
+            require(src == address(this), "wal-ether-transfer-invalid-src");
             dst.transfer(amount);
             emit LogTransferEth(src, dst, amount);
         } else {
@@ -96,3 +148,4 @@ contract Wallet is DSAuth, DSStop, DSMath {
         return true;
     }
 }
+// TODO: write tests for erc721 functions

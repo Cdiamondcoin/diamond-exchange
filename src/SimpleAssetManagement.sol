@@ -57,6 +57,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool public locked;                                     // variable prevents to exploit by recursively calling funcions
     address public currDcdc;                                // the current dcdc token to update the price for
+    address eth = address(0xee);                            // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
     /**
      * @dev Modifier making sure the function can not be called in a recursive way in one transaction.
      */
@@ -84,7 +85,14 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
             rate[token] = value;
         } else if (what_ == "priceFeed") {
             require(addr(value1_) != address(address(0x0)), "asm-wrong-pricefeed-address");
+            require(addr(value_) != address(address(0x0)), "asm-wrong-token-address");
             priceFeed[addr(value_)] = addr(value1_);
+        } else if (what_ == "manualRate") {
+            address token = addr(value_);
+            bool enable = uint(value1_) > 0;
+            require(token != address(address(0x0)), "asm-wrong-token-address");
+            require(priceFeed[token] != address(address(0x0)), "asm-priceFeed-first");
+            manualRate[token] = enable;
         } else if (what_ == "dpasses") {
             bytes32 domain = value2_;
             address dpass = addr(value_);
@@ -152,91 +160,91 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     /**
      * @dev Returns true if custodian is a valid custodian.
      */
-    function isCustodian(address custodian) public view returns(bool) {
-        return custodians[custodian];
+    function isCustodian(address custodian_) public view returns(bool) {
+        return custodians[custodian_];
     }
 
     /**
      * @dev Return the total value of all dpass tokens at custodians.
      */
-    function getTotalDpassCustV(address custodian) public view returns(uint256) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        return totalDpassCustV[custodian];
+    function getTotalDpassCustV(address custodian_) public view returns(uint256) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        return totalDpassCustV[custodian_];
     }
 
     /**
      * @dev Get newest rate in base currency from priceFeed for token.
      */
-    function getRateNewest(address token) public view auth returns (uint) {
-        return _getNewRate(token);
+    function getRateNewest(address token_) public view auth returns (uint) {
+        return _getNewRate(token_);
     }
 
     /**
      * @dev Get currently stored rate in base currency from priceFeed for token.
      */
-    function getRate(address token) public view auth returns (uint) {
-        return rate[token];
+    function getRate(address token_) public view auth returns (uint) {
+        return rate[token_];
     }
 
     /**
      * @dev Get currently stored value in base currency of cdc token.
      */
-    function getCdcValues(address cdc) public view returns(uint256) {
-        require(cdcs[cdc], "asm-token-not-listed");
-        return cdcValues[cdc];
+    function getCdcValues(address cdc_) public view returns(uint256) {
+        require(cdcs[cdc_], "asm-token-not-listed");
+        return cdcValues[cdc_];
     }
 
     /**
      * @dev Get currently stored total value of dcdc token.
      */
-    function getDcdcValues(address dcdc) public view returns(uint256) {
-        require(dcdcs[dcdc], "asm-token-not-listed");
-        return dcdcValues[dcdc];
+    function getDcdcValues(address dcdc_) public view returns(uint256) {
+        require(dcdcs[dcdc_], "asm-token-not-listed");
+        return dcdcValues[dcdc_];
     }
 
     /**
      * @dev Get the currently stored total value in base currency of all dcdc tokens at a custodian.
      */
-    function getTotalDcdcCustV(address custodian) public view returns(uint256) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        return totalDcdcCustV[custodian];
+    function getTotalDcdcCustV(address custodian_) public view returns(uint256) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        return totalDcdcCustV[custodian_];
     }
 
     /**
      * @dev Get the currently sotored total value in base currency of a certain dcdc token at a custodian.
      */
-    function getDcdcCustV(address custodian, address dcdc) public view returns(uint256) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        require(dcdcs[dcdc], "asm-not-a-dcdc-token");
-        return dcdcCustV[dcdc][custodian];
+    function getDcdcCustV(address custodian_, address dcdc_) public view returns(uint256) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
+        return dcdcCustV[dcdc_][custodian_];
     }
 
     /**
      * @dev Returns true if token can be used as a payment token.
      */
-    function isPayToken(address payToken) public view returns(bool) {
-        return payTokens[payToken];
+    function isPayToken(address payToken_) public view returns(bool) {
+        return payTokens[payToken_];
     }
 
     /**
      * @dev Returns true if token is a valid dpass token.
      */
-    function isDpass(address dpass) public view returns(bool) {
-        return dpasses[dpass];
+    function isDpass(address dpass_) public view returns(bool) {
+        return dpasses[dpass_];
     }
 
     /**
      * @dev Returns true if token is a valid dcdc token.
      */
-    function isDcdc(address dcdc) public view returns(bool) {
-        return dcdcs[dcdc];
+    function isDcdc(address dcdc_) public view returns(bool) {
+        return dcdcs[dcdc_];
     }
 
     /**
      * @dev Returns true if token is a valid cdc token.
      */
-    function isCdc(address cdc) public view returns(bool) {
-        return cdcs[cdc];
+    function isCdc(address cdc_) public view returns(bool) {
+        return cdcs[cdc_];
     }
 
     /**
@@ -271,27 +279,27 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
            different tokens several times to asm. Their price in terms of
            base currency is varying. This function returns the avarage value of the token.
     */
-    function getTokenPurchaseRate(address token) public view returns(uint256) {
-        require(payTokens[token], "asm-token-not-listed");
-        return tokenPurchaseRate[token];
+    function getTokenPurchaseRate(address token_) public view returns(uint256) {
+        require(payTokens[token_], "asm-token-not-listed");
+        return tokenPurchaseRate[token_];
     }
 
     /**
     * @dev  Returns the total value that has been paid out for a custodian
             for its services. The value is calculated in terms of base currency.
     */
-    function getTotalPaidV(address custodian) public view returns(uint256) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        return totalPaidV[custodian];
+    function getTotalPaidV(address custodian_) public view returns(uint256) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        return totalPaidV[custodian_];
     }
 
     /**
     * @dev  Returns the total value of all the dpass diamonds sold by a custodian.
             The value is calculated in base currency.
     */
-    function getTotalDpassSoldV(address custodian) public view returns(uint256) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        return totalDpassSoldV[custodian];
+    function getTotalDpassSoldV(address custodian_) public view returns(uint256) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        return totalDpassSoldV[custodian_];
     }
 
     /*
@@ -304,120 +312,124 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     /**
     * @dev Returns the base price of a diamond. This price is the final value of the diamond. Asset management uses this price to define total collateral value.
     */
-    function getBasePrice(address token, uint256 tokenId) public view returns(uint) {
-        require(dpasses[token], "asm-invalid-token-address");
-        return basePrice[token][tokenId];
+    function getBasePrice(address token_, uint256 tokenId_) public view returns(uint) {
+        require(dpasses[token_], "asm-invalid-token-address");
+        return basePrice[token_][tokenId_];
     }
 
     /**
-    * @dev Set base price for a diamond. This function should be used by oracles to update values of diamonds for sale.
+    * @dev Set base price_ for a diamond. This function should be used by oracles to update values of diamonds for sale.
     */
-    function setBasePrice(address token, uint256 tokenId, uint256 price) public auth {
-        require(dpasses[token], "asm-invalid-token-address");
+    function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public auth {
+        require(dpasses[token_], "asm-invalid-token-address");
 
-        if(Dpass(token).ownerOf(tokenId) == address(this)) {
-            _updateCollateralDpass(price, basePrice[token][tokenId], Dpass(token).getCustodian(tokenId));
+        if(Dpass(token_).ownerOf(tokenId_) == address(this)) {
+            _updateCollateralDpass(price_, basePrice[token_][tokenId_], Dpass(token_).getCustodian(tokenId_));
         }
 
-        basePrice[token][tokenId] = price;
+        basePrice[token_][tokenId_] = price_;
     }
 
     /**
-    * @dev Returns the total value of all the dpass tokens in a domain.
+    * @dev Returns the total value of all the dpass tokens in a domain_.
     */
-    function getTotalDpassV(bytes32 domain) public view returns(uint) {
-        return totalDpassV[domain];
+    function getTotalDpassV(bytes32 domain_) public view returns(uint) {
+        return totalDpassV[domain_];
     }
 
     /**
-    * @dev Returns the total value of all the dcdc tokens in a domain.
+    * @dev Returns the total value of all the dcdc tokens in a domain_.
     */
-    function getTotalDcdcV(bytes32 domain) public view returns(uint) {
-        return totalDcdcV[domain];
+    function getTotalDcdcV(bytes32 domain_) public view returns(uint) {
+        return totalDcdcV[domain_];
     }
 
     /**
-    * @dev Returns the total value of all the cdc tokens in a domain.
+    * @dev Returns the total value of all the cdc tokens in a domain_.
     */
-    function getTotalCdcV(bytes32 domain) public view returns(uint) {
-        return totalCdcV[domain];
+    function getTotalCdcV(bytes32 domain_) public view returns(uint) {
+        return totalCdcV[domain_];
     }
 
     /**
-    * @dev Returns the required of overcollaterization ratio that is required. The total value of cdc tokens in a domain should be less than total value of dpass tokens plus total value of dcdc tokens divided by overcollatrization ratio.
+    * @dev Returns the required of overcollaterization ratio that is required. The total value of cdc tokens in a domain_ should be less than total value of dpass tokens plus total value of dcdc tokens divided by overcollatrization ratio.
     */
-    function getOverCollRatio(bytes32 domain) public view returns(uint) {
-        return overCollRatio[domain];
+    function getOverCollRatio(bytes32 domain_) public view returns(uint) {
+        return overCollRatio[domain_];
     }
 
     /**
-    * @dev Updates value of cdc token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc value in the system.
+    * @dev Updates value of cdc_ token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc_ value in the system.
     */
-    function updateCdcValue(address cdc) public stoppable {
-        _updateCdcValue(cdc);
+    function updateCdcValue(address cdc_) public stoppable {
+        _updateCdcValue(cdc_);
     }
 
     /**
-    * @dev Updates value of a dcdc token. This function should be called by oracles but anyone can call it.
+    * @dev Updates value of a dcdc_ token. This function should be called by oracles but anyone can call it.
     */
-    function updateTotalDcdcValue(address dcdc) public stoppable {
-        _updateTotalDcdcValue(dcdc);
+    function updateTotalDcdcValue(address dcdc_) public stoppable {
+        _updateTotalDcdcValue(dcdc_);
     }
 
     /**
-    * @dev Updates value of a dcdc token belonging to a custodian. This function should be called by oracles or custodians but anyone can call it.
-    * @param dcdc address the dcdc token we want to update the value for
-    * @param custodian address the custodian whose total dcdc values will be updated.
+    * @dev Updates value of a dcdc_ token belonging to a custodian_. This function should be called by oracles or custodians but anyone can call it.
+    * @param dcdc_ address the dcdc_ token we want to update the value for
+    * @param custodian_ address the custodian_ whose total dcdc_ values will be updated.
     */
-    function updateDcdcValue(address dcdc, address custodian) public stoppable {
-        _updateDcdcValue(dcdc, custodian);
+    function updateDcdcValue(address dcdc_, address custodian_) public stoppable {
+        _updateDcdcValue(dcdc_, custodian_);
     }
 
     /**
-    * @dev Allows asset management to be notified about a token transfer. If system would get undercollaterized because of transfer it will be reverted.
-    * @param token address the token that has been sent during transaction
-    * @param src address the source address the token has been sent from
-    * @param dst address the destination address the token has been sent to
-    * @param amtOrId uint the amount of tokens sent if token is a DSToken or the id of token if token is a Dpass token.
+    * @dev Allows asset management to be notified about a token_ transfer. If system would get undercollaterized because of transfer it will be reverted.
+    * @param token_ address the token_ that has been sent during transaction
+    * @param src_ address the source address the token_ has been sent from
+    * @param dst_ address the destination address the token_ has been sent to
+    * @param amtOrId_ uint the amount of tokens sent if token_ is a DSToken or the id of token_ if token_ is a Dpass token_.
     */
-    function notifyTransferFrom(address token, address src, address dst, uint256 amtOrId) external nonReentrant auth {
+    function notifyTransferFrom(address token_, address src_, address dst_, uint256 amtOrId_) external nonReentrant auth {
         uint balance;
         address custodian;
-        bytes32 domain = domains[token];
+        bytes32 domain = domains[token_];
 
-        require(dpasses[token] || cdcs[token] || payTokens[token], "asm-invalid-token");
+        require(dpasses[token_] || cdcs[token_] || payTokens[token_], "asm-invalid-token");
 
-        if(dpasses[token] && src == address(this)) {                        // custodian sells dpass to user
-            custodian = Dpass(token).getCustodian(amtOrId);
-            _updateCollateralDpass(0, basePrice[token][amtOrId], custodian);
-            totalDpassSoldV[custodian] = add(totalDpassSoldV[custodian], basePrice[token][amtOrId]);
+        if(dpasses[token_] && src_ == address(this)) {                        // custodian sells dpass to user
+            custodian = Dpass(token_).getCustodian(amtOrId_);
+            _updateCollateralDpass(0, basePrice[token_][amtOrId_], custodian);
+            totalDpassSoldV[custodian] = add(totalDpassSoldV[custodian], basePrice[token_][amtOrId_]);
 
             _requireCustodianCollaterized(custodian, _getCustodianCdcV(domain, custodian));
             _requireSystemCollaterized(domain);
 
-        } else if (dst == address(this) && !dpasses[token]) {                                  // user sells ERC20 token to sellers
-            require(payTokens[token], "asm-we-dont-accept-this-token");
+        } else if (dst_ == address(this) && !dpasses[token_]) {                                  // user sells ERC20 token_ to sellers
+            require(payTokens[token_], "asm-we-dont-accept-this-token");
 
-            if (cdcs[token]) {                                              //
-                _burn(token, amtOrId);
+            if (cdcs[token_]) {
+                _burn(token_, amtOrId_);
             } else {
-                balance = sub(DSToken(token).balanceOf(address(this)), amtOrId); // this assumes that first tokens are sent, than notifyTransferFrom is called, if it is the other way around then amtOrId must not be subrtacted from current balance
-                tokenPurchaseRate[token] = wdiv(
+                balance = sub(
+                    token_ == eth ? 
+                        address(this).balance : 
+                        DSToken(token_).balanceOf(address(this)),
+                    amtOrId_);                                              // this assumes that first tokens are sent, than notifyTransferFrom is called, if it is the other way around then amtOrId_ must not be subrtacted from current balance
+                tokenPurchaseRate[token_] = wdiv(
                     add(
                         wmulV(
-                            tokenPurchaseRate[token],
+                            tokenPurchaseRate[token_],
                             balance,
-                            token),
-                        wmulV(_updateRate(token), amtOrId, token)),
-                    add(balance, amtOrId));
+                            token_),
+                        wmulV(_updateRate(token_), amtOrId_, token_)),
+                    add(balance, amtOrId_));
             }
 
 
-        } else if (dpasses[token]) {                                        // user sells erc721 token to custodian
+        } else if (dpasses[token_]) {                                        // user sells erc721 token_ to custodian
 
-            require(payTokens[token], "asm-token-not-accepted");
+            require(payTokens[token_], "asm-token-not-accepted");
 
-            _updateCollateralDpass(basePrice[token][amtOrId], 0, Dpass(token).getCustodian(amtOrId));
+            _updateCollateralDpass(basePrice[token_][amtOrId_], 0, Dpass(token_).getCustodian(amtOrId_));
 
         } else {
             require(false, "asm-unsupported-tx");
@@ -426,86 +438,96 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
 
     /**
     * @dev Burns cdc tokens when users pay with them. Also updates system collaterization.
-    * @param token address cdc token that needs to be burnt
-    * @param amt uint the amount to burn.
+    * @param token_ address cdc token_ that needs to be burnt
+    * @param amt_ uint the amount to burn.
     */
-    function burn(address token, uint256 amt) public nonReentrant auth {
-        _burn(token, amt);
+    function burn(address token_, uint256 amt_) public nonReentrant auth {
+        _burn(token_, amt_);
     }
 
     /**
     * @dev Mints cdc tokens when users buy them. Also updates system collaterization.
-    * @param token address cdc token that needs to be minted
-    * @param dst address the address for whom cdc token will be minted for.
+    * @param token_ address cdc token_ that needs to be minted
+    * @param dst_ address the address for whom cdc token_ will be minted for.
     */
-    function mint(address token, address dst, uint256 amt) public nonReentrant auth {
-        bytes32 domain = domains[token];
-        require(cdcs[token], "asm-token-is-not-cdc");
-        DSToken(token).mint(dst, amt);
-        _updateCdcValue(token);
+    function mint(address token_, address dst_, uint256 amt_) public nonReentrant auth {
+        bytes32 domain = domains[token_];
+        require(cdcs[token_], "asm-token-is-not-cdc");
+        DSToken(token_).mint(dst_, amt_);
+        _updateCdcValue(token_);
         _requireSystemCollaterized(domain);
     }
 
     /**
     * @dev Mints cdc tokens when users buy them. Also updates system collaterization.
-    * @param token address cdc token that needs to be minted
-    * @param dst address the address for whom cdc token will be minted for.
-    * @param amt uint amount to be minted
+    * @param token_ address cdc token_ that needs to be minted
+    * @param dst_ address the address for whom cdc token_ will be minted for.
+    * @param amt_ uint amount to be minted
     */
-    function mintDcdc(address token, address dst, uint256 amt) public nonReentrant auth {
-        require(!custodians[msg.sender] || dst == msg.sender, "asm-can-not-mint-for-dst");
-        require(dcdcs[token], "asm-token-is-not-cdc");
+    function mintDcdc(address token_, address dst_, uint256 amt_) public nonReentrant auth {
+        require(!custodians[msg.sender] || dst_ == msg.sender, "asm-can-not-mint-for-dst");
+        require(dcdcs[token_], "asm-token-is-not-cdc");
         require(custodians[msg.sender], "asm-dst-not-a-custodian");
-        DSToken(token).mint(dst, amt);
-        _updateDcdcValue(token, dst);
+        DSToken(token_).mint(dst_, amt_);
+        _updateDcdcValue(token_, dst_);
     }
 
-    function burnDcdc(address token, address src, uint256 amt) public nonReentrant auth {
-        bytes32 domain = domains[token];
+    function burnDcdc(address token_, address src_, uint256 amt_) public nonReentrant auth {
+        bytes32 domain = domains[token_];
 
-        uint custodianCdcV = _getCustodianCdcV(domain, src);
+        uint custodianCdcV = _getCustodianCdcV(domain, src_);
 
-        require(dcdcs[token], "asm-token-is-not-cdc");
-        require(custodians[src], "asm-dst-not-a-custodian");
-        DSToken(token).burn(src, amt);
-        _updateDcdcValue(token, src);
+        require(dcdcs[token_], "asm-token-is-not-cdc");
+        require(custodians[src_], "asm-dst-not-a-custodian");
+        DSToken(token_).burn(src_, amt_);
+        _updateDcdcValue(token_, src_);
 
-        _requireCustodianCollaterized(src, custodianCdcV);
+        _requireCustodianCollaterized(src_, custodianCdcV);
         _requireSystemCollaterized(domain);
-        _requirePaidLessThanSold(src, custodianCdcV);
+        _requirePaidLessThanSold(src_, custodianCdcV);
     }
 
-    function getWithdrawValue(address custodian) public view returns(uint) {
-        require(custodians[custodian], "asm-not-a-custodian");
-        uint custodianCdcV = _getCustodianCdcV(domains[custodian], custodian);
+    function getWithdrawValue(address custodian_) public view returns(uint) {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        uint custodianCdcV = _getCustodianCdcV(domains[custodian_], custodian_);
         uint totalSoldV = add(
             custodianCdcV,
-            totalDpassSoldV[custodian]);
-        if (add(totalSoldV, dust) > totalPaidV[custodian]) {
-            return sub(totalSoldV, totalPaidV[custodian]);
+            totalDpassSoldV[custodian_]);
+        if (add(totalSoldV, dust) > totalPaidV[custodian_]) {
+            return sub(totalSoldV, totalPaidV[custodian_]);
         } else {
             return 0;
         }
     }
 
-    function withdraw(address token, uint256 amt) public nonReentrant auth {
+    function withdraw(address token_, uint256 amt_) public nonReentrant auth {
         address custodian = msg.sender;
         bytes32 domain = domains[custodian];
         require(custodians[custodian], "asm-not-a-custodian");
-        require(payTokens[token], "asm-cant-withdraw-token");
-        require(tokenPurchaseRate[token] > 0, "asm-token-purchase-rate-invalid");
+        require(payTokens[token_], "asm-cant-withdraw-token");
+        require(tokenPurchaseRate[token_] > 0, "asm-token-purchase-rate-invalid");
 
-        uint tokenV = wmulV(tokenPurchaseRate[token], amt, token);
+        uint tokenV = wmulV(tokenPurchaseRate[token_], amt_, token_);
 
         totalPaidV[msg.sender] = add(totalPaidV[msg.sender], tokenV);
         _requirePaidLessThanSold(custodian, _getCustodianCdcV(domain, custodian));
 
-        sendToken(token, address(this), msg.sender, amt);
+        sendToken(token_, address(this), msg.sender, amt_);
     }
 
-    function getAmtForSale(address token) external view returns(uint256) {
-        bytes32 domain = domains[token];
-        require(cdcs[token], "asm-token-is-not-cdc");
+    function getAmtForSale(address token_) external returns(uint256) {
+        bytes32 domain = domains[token_];
+        require(cdcs[token_], "asm-token-is-not-cdc");
+        emit LogTest("totalDpassV[domain]");
+        emit LogTest(totalDpassV[domain]);
+        emit LogTest("totalDcdcV[domain]");
+        emit LogTest(totalDcdcV[domain]);
+        emit LogTest("overCollRatio[domain]");
+        emit LogTest(overCollRatio[domain]);
+        emit LogTest("totalCdcV[domain]");
+        emit LogTest(totalCdcV[domain]);
+        emit LogTest("_getNewRate(token_)");
+        emit LogTest(_getNewRate(token_));
         return wdivT(
             sub(
                 wdiv(
@@ -514,90 +536,90 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
                         totalDcdcV[domain]),
                     overCollRatio[domain]),
                 totalCdcV[domain]),
-            _getNewRate(token),
-            token);
+            _getNewRate(token_),
+            token_);
     }
 
     /*
     * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
     *      token Value
     */
-    function wmulV(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wdiv(wmul(a, b), decimals[token]);
+    function wmulV(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wdiv(wmul(a_, b_), decimals[token_]);
     }
 
     /*
     * @dev calculates division with decimals adjusted to match to tokens precision
     */
-    function wdivT(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wmul(wdiv(a,b), decimals[token]);
+    function wdivT(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wmul(wdiv(a_,b_), decimals[token_]);
     }
 
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens at custodian.
     */
-    function updateCollateralDpass(uint positiveV, uint negativeV, address custodian) public auth {
-        _updateCollateralDpass(positiveV, negativeV, custodian);
-        emit LogUpdateCollateral(positiveV, negativeV, custodian);
+    function updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
+        _updateCollateralDpass(positiveV_, negativeV_, custodian_);
+        emit LogUpdateCollateral(positiveV_, negativeV_, custodian_);
     }
 
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens custodian.
     */
-    function updateCollateralDcdc(uint positiveV, uint negativeV, address custodian) public auth {
-        _updateCollateralDcdc(positiveV, negativeV, custodian);
-        emit LogUpdateCollateral(positiveV, negativeV, custodian);
+    function updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
+        _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
+        emit LogUpdateCollateral(positiveV_, negativeV_, custodian_);
     }
 
     function () external payable {
     }
 
-    function _burn(address token, uint256 amt) internal {
-        require(cdcs[token], "asm-token-is-not-cdc");
-        DSToken(token).burn(amt);
-        _updateCdcValue(token);
+    function _burn(address token_, uint256 amt_) internal {
+        require(cdcs[token_], "asm-token-is-not-cdc");
+        DSToken(token_).burn(amt_);
+        _updateCdcValue(token_);
     }
 
     /**
     * @dev Get exchange rate for a token
     */
-    function _updateRate(address token) internal returns (uint256 rate_) {
-        require((rate_ = _getNewRate(token)) > 0, "asm-updateRate-rate-gt-zero");
-        rate[token] = rate_;
+    function _updateRate(address token_) internal returns (uint256 rate_) {
+        require((rate_ = _getNewRate(token_)) > 0, "asm-updateRate-rate-gt-zero");
+        rate[token_] = rate_;
     }
 
-    function _updateCdcValue(address cdc) internal {
-        require(cdcs[cdc], "asm-not-a-cdc-token");
-        bytes32 domain = domains[cdc];
-        uint newValue = wmulV(DSToken(cdc).totalSupply(), _updateRate(cdc), cdc);
+    function _updateCdcValue(address cdc_) internal {
+        require(cdcs[cdc_], "asm-not-a-cdc-token");
+        bytes32 domain = domains[cdc_];
+        uint newValue = wmulV(DSToken(cdc_).totalSupply(), _updateRate(cdc_), cdc_);
 
-        totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcValues[cdc]);
+        totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcValues[cdc_]);
 
-        cdcValues[cdc] = newValue;
+        cdcValues[cdc_] = newValue;
     }
 
-    function _updateTotalDcdcValue(address dcdc) internal {
-        require(dcdcs[dcdc], "asm-not-a-dcdc-token");
-        bytes32 domain = domains[dcdc];
-        uint newValue = wmulV(DSToken(dcdc).totalSupply(), _updateRate(dcdc), dcdc);
-        totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcValues[dcdc]);
-        dcdcValues[dcdc] = newValue;
+    function _updateTotalDcdcValue(address dcdc_) internal {
+        require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
+        bytes32 domain = domains[dcdc_];
+        uint newValue = wmulV(DSToken(dcdc_).totalSupply(), _updateRate(dcdc_), dcdc_);
+        totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcValues[dcdc_]);
+        dcdcValues[dcdc_] = newValue;
     }
 
-    function _updateDcdcValue(address dcdc, address custodian) internal {
-        require(dcdcs[dcdc], "asm-not-a-dcdc-token");
-        require(custodians[custodian], "asm-not-a-custodian");
-        uint newValue = wmulV(DSToken(dcdc).balanceOf(custodian), _updateRate(dcdc), dcdc);
+    function _updateDcdcValue(address dcdc_, address custodian_) internal {
+        require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
+        require(custodians[custodian_], "asm-not-a-custodian");
+        uint newValue = wmulV(DSToken(dcdc_).balanceOf(custodian_), _updateRate(dcdc_), dcdc_);
 
-        totalDcdcCustV[custodian] = sub(
+        totalDcdcCustV[custodian_] = sub(
             add(
-                totalDcdcCustV[custodian],
+                totalDcdcCustV[custodian_],
                 newValue),
-            dcdcCustV[dcdc][custodian]);
+            dcdcCustV[dcdc_][custodian_]);
 
-        dcdcCustV[dcdc][custodian] = newValue;
+        dcdcCustV[dcdc_][custodian_] = newValue;
 
-        _updateTotalDcdcValue(dcdc);
+        _updateTotalDcdcValue(dcdc_);
     }
 
     /**
@@ -622,47 +644,47 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         }
     }
 
-    function _getCustodianCdcV(bytes32 domain, address custodian) internal view returns(uint) {
+    function _getCustodianCdcV(bytes32 domain_, address custodian_) internal view returns(uint) {
         return wmul(
-            totalCdcV[domain],
-            add(totalDpassV[domain], totalDcdcV[domain]) > 0 ?
+            totalCdcV[domain_],
+            add(totalDpassV[domain_], totalDcdcV[domain_]) > 0 ?
                 wdiv(
                     add(
-                        totalDpassCustV[custodian],
-                        totalDcdcCustV[custodian]),
+                        totalDpassCustV[custodian_],
+                        totalDcdcCustV[custodian_]),
                     add(
-                        totalDpassV[domain],
-                        totalDcdcV[domain])):
+                        totalDpassV[domain_],
+                        totalDcdcV[domain_])):
                 1 ether);
     }
     /**
     * @dev System must be overcollaterized at all time. Whenever collaterization shrinks this function must be called.
     */
     
-    function _requireSystemCollaterized(bytes32 domain) internal view returns(uint) {
+    function _requireSystemCollaterized(bytes32 domain_) internal view returns(uint) {
         require(
             add(
                 add(
-                    totalDpassV[domain],
-                    totalDcdcV[domain]),
+                    totalDpassV[domain_],
+                    totalDcdcV[domain_]),
                 dust) >=
             wmul(
-                overCollRatio[domain],
-                totalCdcV[domain])
+                overCollRatio[domain_],
+                totalCdcV[domain_])
             , "asm-system-undercollaterized");
     }
 
     /**
     * @dev Custodian's total collateral value must be more or equal than proportional cdc value and dpasses sold
     */
-    function _requireCustodianCollaterized(address custodian, uint256 custodianCdcV) internal view {
+    function _requireCustodianCollaterized(address custodian_, uint256 custodianCdcV_) internal view {
         require(                                    
-            custodianCdcV
+            custodianCdcV_
                  <=
             add(
                 add(
-                    totalDpassCustV[custodian],
-                    totalDcdcCustV[custodian]),
+                    totalDpassCustV[custodian_],
+                    totalDcdcCustV[custodian_]),
                 dust)
             , "asm-custodian-undercollaterized");
     }
@@ -670,53 +692,55 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     /**
     * @dev The total value paid to custodian must be less then the total value of sold assets
     */
-    function _requirePaidLessThanSold(address custodian, uint256 custodianCdcV) internal view returns(uint) {
+    function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view returns(uint) {
         require(
             add(
                 add(
-                    custodianCdcV,
-                    totalDpassSoldV[custodian]),
+                    custodianCdcV_,
+                    totalDpassSoldV[custodian_]),
                 dust) >=
-                totalPaidV[custodian]
+                totalPaidV[custodian_]
             , "asm-too-much-withdrawn");
     }
 
-    function _updateCollateralDpass(uint positiveV, uint negativeV, address custodian) internal {
-        require(custodians[custodian], "asm-not-a-custodian");
-        bytes32 domain = domains[custodian];
+    function _updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) internal {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        bytes32 domain = domains[custodian_];
 
-        totalDpassCustV[custodian] = sub(
+        totalDpassCustV[custodian_] = sub(
             add(
-                totalDpassCustV[custodian],
-                positiveV),
-            negativeV);
+                totalDpassCustV[custodian_],
+                positiveV_),
+            negativeV_);
 
         totalDpassV[domain] = sub(
             add(
                 totalDpassV[domain],
-                positiveV),
-            negativeV);
+                positiveV_),
+            negativeV_);
     }
 
-    function _updateCollateralDcdc(uint positiveV, uint negativeV, address custodian) internal {
-        require(custodians[custodian], "asm-not-a-custodian");
-        bytes32 domain = domains[custodian];
+    function _updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) internal {
+        require(custodians[custodian_], "asm-not-a-custodian");
+        bytes32 domain = domains[custodian_];
 
-        totalDcdcCustV[custodian] = sub(
+        totalDcdcCustV[custodian_] = sub(
             add(
-                totalDcdcCustV[custodian],
-                positiveV),
-            negativeV);
+                totalDcdcCustV[custodian_],
+                positiveV_),
+            negativeV_);
 
         totalDcdcV[domain] = sub(
             add(
                 totalDcdcV[domain],
-                positiveV),
-            negativeV);
+                positiveV_),
+            negativeV_);
     }
 }
-// TODO: do function attributes variable_ notation
 // TODO: document functions
 // TODO: emit events
 // TODO: remove LogTest
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him 
+// TODO: if dpass is created the wrong way asset management must be able to invalidate it.
+// TODO: update Wallet.sol to handle dpass tokens as well
+// TODO: order setConfig values gas decreasing order
