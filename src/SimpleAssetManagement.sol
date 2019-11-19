@@ -37,7 +37,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     mapping(
         address => mapping(
             address => uint)) public dcdcCustV;             // dcdcCustV[dcdc][custodian] value of dcdc at custodian
-    mapping(address => bool) payTokens;                    // returns true for tokens allowed to make payment to custodians with
+    mapping(address => bool) payTokens;                     // returns true for tokens allowed to make payment to custodians with
     mapping(address => bool) dpasses;                       // returns true for dpass tokens allowed in this contract
     mapping(address => bool) dcdcs;                         // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
     mapping(address => bool) cdcs;                          // returns true for cdc tokens allowed in this contract
