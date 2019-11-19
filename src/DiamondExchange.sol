@@ -125,7 +125,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     mapping(
         address => mapping(
             address => mapping(
-                uint => uint))) public sellPrice;           // sellPrice[token][owner][tokenId] price of dpass token defined by owner of dpass token
+                uint => uint))) public buyPrice;           // buyPrice[token][owner][tokenId] price of dpass token defined by owner of dpass token
 
     TrustedFeeCalculator public fca;        // fee calculator contract
 
@@ -175,7 +175,6 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         setConfig("canBuyErc20", cdc_, true);
         setConfig("canSellErc20", eth, true);
         setConfig("canBuyErc721", dpass_, true);
-        setConfig("canSellErc721", dpass_, true);
         setConfig("decimals", dpt_, 18);
         setConfig("decimals", cdc_, 18);
         setConfig("decimals", eth, 18);
@@ -503,7 +502,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         require(buyToken != eth, "dex-we-do-not-sell-ether");           // we can not sell Ether with this smart contract currently
         require(sellToken == eth || msg.value == 0,                     // we don't accept ETH if user wants to sell other token
-                "dex-really-want-to-send-ether");
+                "dex-do-not-send-ether");
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
@@ -580,7 +579,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                 buyAmtOrId);
 
         } else {
-            require(false, "dex-token-not-allowed-to-be-bought");           // token can not be bought here
+            require(false, "dex-token-not-allowed-to-be-bought");       // token can not be bought here
         }
 
     }
@@ -638,7 +637,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         feeTakenV = sellToken != dpt ?                      // if sellToken is not dpt then try to take fee in DPT
             takeFeeInDptFromUser(fee) :
             0;
-
+        emit LogTest("fee");
+        emit LogTest(fee);
+        emit LogTest("feeTakenV");
+        emit LogTest(feeTakenV);
         if (fee - feeTakenV > dust                          // if we could not take all fees from user in ...
             && fee - feeTakenV <= fee) {                    // ... DPT (with round-off errors considered)
 
@@ -684,6 +686,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
             } else {
 
                 require(false, "dex-no-token-to-get-fee-from"); // not allowed to have both buy and sell tokens to be ERC721
+                                                                // we should never end up here since dex-one-of-tokens-must-be-erc20 will be fired first. It is here for precaution.
 
             }
 
@@ -703,7 +706,11 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                 amtT);
 
         } else {                                            // no fee must be payed with sellToken
-
+            emit LogTest("dex-not-enough-funds");
+            emit LogTest("buyV");
+            emit LogTest(buyV);
+            emit LogTest("sellV");
+            emit LogTest(sellV);
             require(buyV <= sellV || canBuyErc20[buyToken],
                 "dex-not-enough-funds");
 
@@ -753,44 +760,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         address payable payTo;
         //TODO: it would be great to send sellTokens first and then send buyTokens as this way it would work in edge cases where there is not enough CDC amount
 
-        if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
-            if (canBuyErc20[buyToken]) {                                // if buyToken is a valid ERC20 token
+        if (canBuyErc20[buyToken]) {
 
-                if (handledByAsm[buyToken]) {                           // if token belongs to Asset Management
-                    payTo = address(uint160(address(asm)));
-
-                    asm.mint(buyToken, msg.sender, buyT);               // send token from Asset Management to user
-
-                } else {
-
-                    payTo = custodian20[buyToken];
-                    
-                    sendToken(buyToken, payTo,                          // send buyToken from custodian to user
-                              msg.sender, buyT);
-                }
-
-            }  else {                                                   // if buyToken is a valid ERC721 token
-
-                payTo = address(uint160(address(asm)));                 // we pay not to custodian but to asm
-
-                asm.notifyTransferFrom(                                 // notify Asset management about the transfer
-                                       buyToken,
-                                       payTo,
-                                       msg.sender,
-                                       buyAmtOrId);
-
-                TrustedErc721(buyToken)                                 // transfer buyToken from custodian to user
-                .transferFrom(
-                    payTo,
-                    msg.sender,
-                    buyAmtOrId);
-
-            }
-
-        }  else {                                                       // if sellToken is a valid ERC721 token
-
-            if (handledByAsm[buyToken]) {                               // if token belongs to Asset Management
+            if(handledByAsm[buyToken]) {                               // if token belongs to Asset Management
 
                 payTo = address(uint160(address(asm)));                 // we pay not to custodian but to asm
 
@@ -801,8 +774,35 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                 payTo = custodian20[buyToken];
 
                 sendToken(buyToken, payTo, msg.sender, buyT);           // send buyToken from custodian to user
-                          
+
             }
+        }
+
+        if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
+
+            if (canBuyErc721[buyToken]) {                               // if buyToken is a valid ERC721 token
+
+                payTo = address(uint160(address(                        // we pay to owner
+                    Dpass(buyToken).ownerOf(buyAmtOrId))));
+
+                asm.notifyTransferFrom(                                 // notify Asset management about the transfer
+                    buyToken,
+                    payTo,
+                    msg.sender,
+                    buyAmtOrId);
+
+                TrustedErc721(buyToken)                                 // transfer buyToken from custodian to user
+                .transferFrom(
+                    payTo,
+                    msg.sender,
+                    buyAmtOrId);
+
+
+            }
+
+            sendToken(sellToken, msg.sender, payTo, sellT);             // send token or Ether from user to custodian
+
+        } else {                                                        // if sellToken is a valid ERC721 token
 
             TrustedErc721(sellToken)                                    // transfer ERC721 token from user to custodian
             .transferFrom(
@@ -814,9 +814,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         }
 
         require(!denyToken[payTo][sellToken],
-            "dex-token-denied-by-payto");
-
-        sendToken(sellToken, msg.sender, payTo, sellT);                 // send token or Ether from user to custodian
+            "dex-token-denied-by-seller");
 
         if (payTo == address(asm) ||
             (canSellErc721[sellToken] && handledByAsm[buyToken]))
@@ -849,7 +847,6 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         return handledByAsm[token];
     }
 
-    // TODO: test
     function getDiamondInfo(address token, uint256 tokenId) 
     public view returns(
         address[2] memory ownerCustodian,
@@ -858,7 +855,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         uint price
     ) {
         require(asm.isDpass(token), "dex-token-not-a-dpass-token");
-        (ownerCustodian, attrs, carat) = Dpass(token).getDiamondAll(tokenId);
+        (ownerCustodian, attrs, carat) = Dpass(token).getDiamondInfo(tokenId);
         price = getPrice(token, tokenId);
     }
 
@@ -866,35 +863,33 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     /**
     * @dev Get sell price of dpass token
     */
-    // TODO: test
-    function getSellPrice(address token, uint256 tokenId) public view returns(uint256) {
-        require(canSellErc721[token], "dex-token-not-for-sale");
-        return sellPrice[token][TrustedErc721(token).ownerOf(tokenId)][tokenId];
+    function getBuyPrice(address token, uint256 tokenId) public view returns(uint256) {
+        require(canBuyErc721[token], "dex-token-not-for-sale");
+        return buyPrice[token][TrustedErc721(token).ownerOf(tokenId)][tokenId];
     }
 
     /**
-    * @dev Get sell price of dpass token if price 0 return 
+    * @dev Get sell price of dpass token if price 0 return
     */
-    // TODO: test
-    function setSellPrice(address token, uint256 tokenId, uint256 price) public {
-        require(canSellErc721[token], "dex-token-not-for-sale");
-        sellPrice[token][msg.sender][tokenId] = price;
+    function setBuyPrice(address token, uint256 tokenId, uint256 price) public {
+        require(canBuyErc721[token], "dex-token-not-for-sale");
+        buyPrice[token][msg.sender][tokenId] = price;
     }
 
     /**
     * @dev Get price of dpass token 
     */
-    // TODO: test
     function getPrice(address token, uint256 tokenId) public view returns(uint256) {
         uint basePrice;
         address owner = TrustedErc721(token).ownerOf(tokenId);
-        require(canSellErc721[token], "dex-token-not-for-sale");
-        if(sellPrice[token][owner][tokenId] == 0) {
+        uint buyPrice_ = buyPrice[token][owner][tokenId];
+        require(canBuyErc721[token], "dex-token-not-for-sale");
+        if( buyPrice_ == 0 || buyPrice_ == uint(-1)) {
             basePrice = asm.getBasePrice(token, tokenId);
             require(basePrice != 0, "dex-zero-price-not-allowed");
             return basePrice;
         } else {
-            return sellPrice[token][owner][tokenId];
+            return buyPrice[token][owner][tokenId];
         }
     }
 
@@ -1030,7 +1025,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         } else {
 
-            require(manualRate[token_], "dex-manual-rate-not-allowed");     // if feed invalid revert if manualEthRate is NOT allowed
+            require(manualRate[token_], "dex-feed-provides-invalid-data");     // if feed invalid revert if manualEthRate is NOT allowed
 
             rate_ = rate[token_];
         }
@@ -1238,3 +1233,6 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
 // TODO: write varname_ notation for functions
 // TODO: remark formatting to align all
+// TODO: put the setting of kyc[user] variable to another function
+// TODO: make lot of tests with dpass as sellToken
+// TODO: tests with user sell to other user dpass token
