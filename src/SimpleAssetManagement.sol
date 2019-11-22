@@ -20,10 +20,11 @@ contract TrustedFeedLike {
 contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
     event LogUpdateCollateral(uint256 positiveV, uint256 negativeV, address custodian);
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
+    // Commented due fit to code size limit 24,576 bytes
+    // event LogTest(uint256 what);
+    // event LogTest(bool what);
+    // event LogTest(address what);
+    // event LogTest(bytes32 what);
     mapping(
         address => mapping(
             uint => uint)) private basePrice;               // the base price used for collateral valuation
@@ -410,8 +411,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
                 _burn(token_, amtOrId_);
             } else {
                 balance = sub(
-                    token_ == eth ? 
-                        address(this).balance : 
+                    token_ == eth ?
+                        address(this).balance :
                         DSToken(token_).balanceOf(address(this)),
                     amtOrId_);                                              // this assumes that first tokens are sent, than notifyTransferFrom is called, if it is the other way around then amtOrId_ must not be subrtacted from current balance
                 tokenPurchaseRate[token_] = wdiv(
@@ -518,16 +519,17 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     function getAmtForSale(address token_) external returns(uint256) {
         bytes32 domain = domains[token_];
         require(cdcs[token_], "asm-token-is-not-cdc");
-        emit LogTest("totalDpassV[domain]");
-        emit LogTest(totalDpassV[domain]);
-        emit LogTest("totalDcdcV[domain]");
-        emit LogTest(totalDcdcV[domain]);
-        emit LogTest("overCollRatio[domain]");
-        emit LogTest(overCollRatio[domain]);
-        emit LogTest("totalCdcV[domain]");
-        emit LogTest(totalCdcV[domain]);
-        emit LogTest("_getNewRate(token_)");
-        emit LogTest(_getNewRate(token_));
+        // Commented due fit to code size limit 24,576 bytes
+        // emit LogTest("totalDpassV[domain]");
+        // emit LogTest(totalDpassV[domain]);
+        // emit LogTest("totalDcdcV[domain]");
+        // emit LogTest(totalDcdcV[domain]);
+        // emit LogTest("overCollRatio[domain]");
+        // emit LogTest(overCollRatio[domain]);
+        // emit LogTest("totalCdcV[domain]");
+        // emit LogTest(totalCdcV[domain]);
+        // emit LogTest("_getNewRate(token_)");
+        // emit LogTest(_getNewRate(token_));
         return wdivT(
             sub(
                 wdiv(
@@ -660,7 +662,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     /**
     * @dev System must be overcollaterized at all time. Whenever collaterization shrinks this function must be called.
     */
-    
+
     function _requireSystemCollaterized(bytes32 domain_) internal view returns(uint) {
         require(
             add(
@@ -678,7 +680,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     * @dev Custodian's total collateral value must be more or equal than proportional cdc value and dpasses sold
     */
     function _requireCustodianCollaterized(address custodian_, uint256 custodianCdcV_) internal view {
-        require(                                    
+        require(
             custodianCdcV_
                  <=
             add(
@@ -740,7 +742,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
 // TODO: document functions
 // TODO: emit events
 // TODO: remove LogTest
-// TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him 
+// TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: if dpass is created the wrong way asset management must be able to invalidate it.
 // TODO: update Wallet.sol to handle dpass tokens as well
 // TODO: order setConfig values gas decreasing order
