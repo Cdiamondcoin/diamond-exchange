@@ -17,14 +17,6 @@ contract TrustedFeedLikeDex {
 
 
 
-/**
-* @dev Contract to get ETH/USD price
-*/
-contract TrustedKycLike {
-    function isEnabled(address user) external view returns (bool);
-}
-
-
 contract TrustedDSAuthority is DSAuthority {
     function stub() external;
 }
@@ -111,7 +103,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
     mapping(address => uint256) private rate;               // exchange rate for a token
     mapping(address => bool) public manualRate;             // manualRate is allowed for a token (if feed invalid)
-    mapping(address => TrustedFeedLikeDex) public priceFeed;   // price feed address for token
+
+    mapping(address => TrustedFeedLikeDex) 
+    public priceFeed;                                       // price feed address for token
+    
     mapping(address => bool) public canBuyErc20;            // stores allowed ERC20 tokens to buy
     mapping(address => bool) public canSellErc20;           // stores allowed ERC20 tokens to sell
     mapping(address => bool) public canBuyErc721;           // stores allowed ERC20 tokens to buy
@@ -125,34 +120,34 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     mapping(
         address => mapping(
             address => mapping(
-                uint => uint))) public buyPrice;           // buyPrice[token][owner][tokenId] price of dpass token defined by owner of dpass token
+                uint => uint))) public buyPrice;            // buyPrice[token][owner][tokenId] price of dpass token defined by owner of dpass token
 
-    TrustedFeeCalculator public fca;        // fee calculator contract
+    TrustedFeeCalculator public fca;                        // fee calculator contract
 
-    address payable public liq;             // contract providing DPT liquidity to pay for fee
-    address payable public wal;             // wallet address, where we keep all the tokens we received as fee
-    address payable public burner;          // contract where accured fee of DPT is stored before being burned
-    TrustedAsm public asm;                  // Asset Management contract
-    uint256 public fixFee;                  // Fixed part of fee charged for buying 18 decimals precision in base currency
-    uint256 public varFee;                  // Variable part of fee charged for buying 18 decimals precision in base currency
-    uint256 public profitRate;              // the percentage of profit that is burned on all fees received. 18 decimals precision
-    uint256 public callGas = 2500;          // using this much gas when Ether is transferred
-    uint256 public txId;                    // Unique id of each transaction.
-    bool public takeProfitOnlyInDpt = true; // If true, it takes cost + profit in DPT, if false only profit in DPT
+    address payable public liq;                             // contract providing DPT liquidity to pay for fee
+    address payable public wal;                             // wallet address, where we keep all the tokens we received as fee
+    address payable public burner;                          // contract where accured fee of DPT is stored before being burned
+    TrustedAsm public asm;                                  // Asset Management contract
+    uint256 public fixFee;                                  // Fixed part of fee charged for buying 18 decimals precision in base currency
+    uint256 public varFee;                                  // Variable part of fee charged for buying 18 decimals precision in base currency
+    uint256 public profitRate;                              // the percentage of profit that is burned on all fees received. 18 decimals precision
+    uint256 public callGas = 2500;                          // using this much gas when Ether is transferred
+    uint256 public txId;                                    // Unique id of each transaction.
+    bool public takeProfitOnlyInDpt = true;                 // If true, it takes cost + profit in DPT, if false only profit in DPT
 
-    uint256 public dust = 10000;            // Numbers below this amount are considered 0. Can only be used ...
-                                            // ... along with 18 decimal precisions numbers.
+    uint256 public dust = 10000;                            // Numbers below this amount are considered 0. Can only be used ...
+                                                            // ... along with 18 decimal precisions numbers.
 
-    bool liqBuysDpt;                        // if true then liq contract is called directly to buy necessary dpt, otherwise we...
-                                            // ... just send DPT from liq contracts address to burner.
+    bool liqBuysDpt;                                        // if true then liq contract is called directly to buy necessary dpt, otherwise we...
+                                                            // ... just send DPT from liq contracts address to burner.
 
-    bool locked;                            // protect against reentrancy attacks
-    address eth = address(0xee);            // to handle ether the same way as tokens we associate a fake address to it
-    bool kycEnabled;                        // if true then user must be on the kyc list in order to use the system
-    mapping(address => bool) public kyc;    // kyc list of users that are allowed to exchange tokens
+    bool locked;                                            // protect against reentrancy attacks
+    address eth = address(0xee);                            // to handle ether the same way as tokens we associate a fake address to it
+    bool kycEnabled;                                        // if true then user must be on the kyc list in order to use the system
+    mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
 
     constructor(
-        address cdc_,
+  /*      address cdc_,
         address dpt_,
         address dpass_,
         address ethPriceFeed_,
@@ -164,11 +159,11 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         uint fixFee_,
         uint varFee_,
         uint profitRate_,
-        address wal_
+        address wal_ */
     ) public {
 
     // default exchage rates must be set manually as constructor can not set more variables
-
+/*
         setConfig("canSellErc20", dpt_, true);
         setConfig("canBuyErc20", dpt_, true);
         setConfig("canSellErc20", cdc_, true);
@@ -192,7 +187,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         setConfig("fixFee", fixFee_, "");
         setConfig("varFee", varFee_, "");
         setConfig("profitRate", profitRate_, "");
-        setConfig("wal", wal_, "");
+        setConfig("wal", wal_, ""); */
     }
 
     modifier nonReentrant {
@@ -452,9 +447,9 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         uint sellT;
         uint buyT;
 
-        updateRates(sellToken, buyToken);               // update currency rates
+        _updateRates(sellToken, buyToken);              // update currency rates
 
-        (buyV, sellV) = getValues(                      // calculate highest possible buy and sell values (here they might not match)
+        (buyV, sellV) = _getValues(                     // calculate highest possible buy and sell values (here they might not match)
             sellToken,
             sellAmtOrId,
             buyToken,
@@ -468,7 +463,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
             buyToken,
             buyAmtOrId);
 
-        (sellT, buyT) = takeFee(                        // takes the calculated fee from user in DPT or sellToken ...
+        (sellT, buyT) = _takeFee(                       // takes the calculated fee from user in DPT or sellToken ...
             feeV,                                       // ... calculates final sell and buy values (in base currency)
             sellV,
             buyV,
@@ -477,7 +472,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
             buyToken,
             buyAmtOrId);
 
-        transferTokens(                                 // transfers tokens to user and seller
+        _transferTokens(                                // transfers tokens to user and seller
             sellT,
             buyT,
             sellToken,
@@ -490,7 +485,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     /**
     * @dev Get sell and buy token values in base currency
     */
-    function getValues(
+    function _getValues(
         address sellToken,
         uint256 sellAmtOrId,
         address buyToken,
@@ -581,7 +576,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         } else {
             require(false, "dex-token-not-allowed-to-be-bought");       // token can not be bought here
         }
-
+emit LogTest("buyV");
+emit LogTest(buyV);
+emit LogTest("sellV");
+emit LogTest(sellV);
     }
 
     /**
@@ -599,7 +597,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         if (fca == TrustedFeeCalculator(0)) {
 
-            return fixFee + wmul(varFee, value_);                        // calculate proportional fee locally
+            return fixFee + wmul(varFee, value_);                       // calculate proportional fee locally
 
         } else {
 
@@ -617,7 +615,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     * @dev Taking fee from user. If user has DPT takes it, if there is none buys it for user.
     * @return the amount of remaining ETH after buying fee if it was required
     */
-    function takeFee(
+    function _takeFee(
         uint256 fee,
         uint256 sellV,
         uint256 buyV,
@@ -635,7 +633,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         uint restFeeV;
 
         feeTakenV = sellToken != dpt ?                      // if sellToken is not dpt then try to take fee in DPT
-            takeFeeInDptFromUser(fee) :
+            _takeFeeInDptFromUser(fee) :
             0;
         emit LogTest("fee");
         emit LogTest(fee);
@@ -685,8 +683,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
             } else {
 
-                require(false, "dex-no-token-to-get-fee-from"); // not allowed to have both buy and sell tokens to be ERC721
-                                                                // we should never end up here since dex-one-of-tokens-must-be-erc20 will be fired first. It is here for precaution.
+                require(false,                              // not allowed to have both buy and sell tokens to be ERC721. ...
+                    "dex-no-token-to-get-fee-from");        // ... We should never end up here since dex-one-of-tokens-must-be-erc20 ...
+                                                            // ... will be fired first. It is here for precaution. 
+                                                            
 
             }
 
@@ -698,7 +698,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                 token != sellToken ||
                 buyV <= add(sellV, dust));
 
-            takeFeeInToken(                                 // send profit and costs in sellToken
+            _takeFeeInToken(                                // send profit and costs in sellToken
                 restFeeV,
                 feeTakenV,
                 token,
@@ -737,7 +737,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                 rate[sellToken],
                 sellToken);
 
-            sendToken(
+            _sendToken(
                 eth,
                 address(this),
                 msg.sender,
@@ -748,7 +748,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     /**
     * @dev Transfer sellToken from user and buyToken to user
     */
-    function transferTokens(
+    function _transferTokens(
         uint256 sellT,                                                  // sell token amount
         uint256 buyT,                                                   // buy token amount
         address sellToken,                                              // token sold by user
@@ -763,19 +763,11 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         if (canBuyErc20[buyToken]) {
 
-            if(handledByAsm[buyToken]) {                               // if token belongs to Asset Management
+            payTo = handledByAsm[buyToken] ? 
+                address(uint160(address(asm))):
+                custodian20[buyToken];                                  // we pay not to custodian but to asm
 
-                payTo = address(uint160(address(asm)));                 // we pay not to custodian but to asm
-
-                asm.mint(buyToken, msg.sender, buyT);                   // send token from Asset Management to user
-
-            } else {
-
-                payTo = custodian20[buyToken];
-
-                sendToken(buyToken, payTo, msg.sender, buyT);           // send buyToken from custodian to user
-
-            }
+            _sendToken(buyToken, payTo, msg.sender, buyT);              // send buyToken from custodian to user
         }
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
@@ -800,7 +792,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
             }
 
-            sendToken(sellToken, msg.sender, payTo, sellT);             // send token or Ether from user to custodian
+            _sendToken(sellToken, msg.sender, payTo, sellT);            // send token or Ether from user to custodian
 
         } else {                                                        // if sellToken is a valid ERC721 token
 
@@ -825,13 +817,14 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
                                payTo,
                                sellT);
 
-        logTrade(sellToken, sellT, buyToken, buyT, buyAmtOrId, feeV);
+        _logTrade(sellToken, sellT, buyToken, buyT, buyAmtOrId, feeV);
     }
 
     /*
     * @dev Token sellers can deny accepting any token
     */
     function setDenyToken(address token, bool denyOrAccept) public {
+        require(canSellErc20[token] || canSellErc721[token], "dex-can-not-use-anyway");
         denyToken[msg.sender][token] = denyOrAccept;
     }
 
@@ -918,13 +911,12 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     * @dev Return true if token is allowed to exchange.
     * @param token the token addres in question
     * @param buy if true we ask if user can buy the token from exchange, otherwise if user can sell to exchange
-    * @param erc20 if token is an erc20 token, otherwise if it is an erc721 token
     */
-    function getAllowedToken(address token, bool buy, bool erc20) public view auth returns(bool) {
+    function getAllowedToken(address token, bool buy) public view auth returns(bool) {
         if (buy) {
-            return erc20 ? canBuyErc20[token] : canBuyErc721[token];
+            return canBuyErc20[token] || canBuyErc721[token];
         } else {
-            return erc20 ? canSellErc20[token] : canSellErc721[token];
+            return canSellErc20[token] || canSellErc721[token];
         }
     }
 
@@ -994,38 +986,39 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     */
     function toDecimals(uint256 amt_, uint8 srcDec_, uint8 dstDec_) public pure returns (uint256) {
 
-        if (srcDec_ == dstDec_) return amt_;                                        // no change
+        if (srcDec_ == dstDec_) return amt_;                                    // no change
 
-        if (srcDec_ < dstDec_) return mul(amt_, 10 ** uint256(dstDec_ - srcDec_));  // add zeros to the right
+        if (srcDec_ < dstDec_) 
+            return mul(amt_, 10 ** uint256(dstDec_ - srcDec_));                 // add zeros to the right
 
-        return amt_ / 10 ** uint256(srcDec_ - dstDec_);                             // remove digits
+        return amt_ / 10 ** uint256(srcDec_ - dstDec_);                         // remove digits
     }
 
     function getRate(address token) public view auth returns (uint) {
-        return getNewRate(token);
+        return _getNewRate(token);
     }
 
     /**
     * @dev Get token_ / quote_currency rate from priceFeed
     * Revert transaction if not valid feed and manual value not allowed
     */
-    function getNewRate(address token_) private view returns (uint rate_) {
+    function _getNewRate(address token_) internal view returns (uint rate_) {
         bool feedValid;
         bytes32 usdRateBytes;
 
         require(
-            TrustedFeedLikeDex(address(0x0)) != priceFeed[token_],         // require token to have a price feed
+            TrustedFeedLikeDex(address(0x0)) != priceFeed[token_],              // require token to have a price feed
             "dex-no-price-feed-for-token");
 
-        (usdRateBytes, feedValid) = priceFeed[token_].peek();           // receive DPT/USD price
+        (usdRateBytes, feedValid) = priceFeed[token_].peek();                   // receive DPT/USD price
 
-        if (feedValid) {                                                // if feed is valid, load DPT/USD rate from it
+        if (feedValid) {                                                        // if feed is valid, load DPT/USD rate from it
 
             rate_ = uint(usdRateBytes);
 
         } else {
 
-            require(manualRate[token_], "dex-feed-provides-invalid-data");     // if feed invalid revert if manualEthRate is NOT allowed
+            require(manualRate[token_], "dex-feed-provides-invalid-data");      // if feed invalid revert if manualEthRate is NOT allowed
 
             rate_ = rate[token_];
         }
@@ -1050,25 +1043,25 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     // internal functions
     //
 
-    function updateRates(address sellToken, address buyToken) internal {
+    function _updateRates(address sellToken, address buyToken) internal {
         if (canSellErc20[sellToken]) {
             require(decimalsSet[sellToken], "dex-selltoken-decimals-not-set");
-            updateRate(sellToken);
+            _updateRate(sellToken);
         }
 
         if (canBuyErc20[buyToken]){
             require(decimalsSet[buyToken], "dex-buytoken-decimals-not-set");
-            updateRate(buyToken);
+            _updateRate(buyToken);
         }
 
         require(decimalsSet[dpt], "dex-dpt-decimals-not-set");
-        updateRate(dpt);
+        _updateRate(dpt);
     }
 
     /*
     * @dev log the trade event
     */
-    function logTrade(
+    function _logTrade(
         address sellToken,
         uint256 sellT,
         address buyToken,
@@ -1097,20 +1090,20 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     /**
     * @dev Get exchange rate for a token
     */
-    function updateRate(address token) internal returns (uint256 rate_) {
-        require((rate_ = getNewRate(token)) > 0, "dex-rate-must-be-greater-than-0");
+    function _updateRate(address token) internal returns (uint256 rate_) {
+        require((rate_ = _getNewRate(token)) > 0, "dex-rate-must-be-greater-than-0");
         rate[token] = rate_;
     }
 
     /**
     * @dev Calculate and send profit and cost
     */
-    function takeFeeInToken(
-        uint256 fee,                                            // fee that user still owes to CDiamondCoin after paying fee in DPT
-        uint256 feeTaken,                                       // fee already taken from user in DPT
-        address token,                                          // token that must be sent as fee
-        address src,                                            // source of token sent
-        uint256 amountToken                                     // total amount of tokens the user wanted to pay initially
+    function _takeFeeInToken(
+        uint256 fee,                                                // fee that user still owes to CDiamondCoin after paying fee in DPT
+        uint256 feeTaken,                                           // fee already taken from user in DPT
+        address token,                                              // token that must be sent as fee
+        address src,                                                // source of token sent
+        uint256 amountToken                                         // total amount of tokens the user wanted to pay initially
     ) internal {
         uint profitV;
         uint profitDpt;
@@ -1120,24 +1113,24 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         totalProfitV = wmul(add(fee, feeTaken), profitRate);
 
-        profitPaidV = takeProfitOnlyInDpt ?                     // profit value paid already in base currency
+        profitPaidV = takeProfitOnlyInDpt ?                         // profit value paid already in base currency
             feeTaken :
             wmul(feeTaken, profitRate);
 
-        profitV = sub(totalProfitV, profitPaidV);               // profit value still to be paid in base currency
+        profitV = sub(totalProfitV, profitPaidV);                   // profit value still to be paid in base currency
 
-        profitDpt = wdivT(profitV, rate[dpt], dpt);             // profit in DPT still to be paid
+        profitDpt = wdivT(profitV, rate[dpt], dpt);                 // profit in DPT still to be paid
 
-        feeT = wdivT(fee, rate[token], token);                 // convert fee from base currency to token amount
+        feeT = wdivT(fee, rate[token], token);                      // convert fee from base currency to token amount
 
         require(
-            feeT < amountToken,                                // require that the cost we pay is less than user intended to pay
+            feeT < amountToken,                                     // require that the cost we pay is less than user intended to pay
             "dex-not-enough-token-to-pay-fee");
 
         if (token == dpt) {
-            sendToken(dpt, src, burner, profitDpt);
+            _sendToken(dpt, src, burner, profitDpt);
 
-            sendToken(dpt, src, wal, sub(feeT, profitDpt));
+            _sendToken(dpt, src, wal, sub(feeT, profitDpt));
 
         } else {
 
@@ -1147,10 +1140,10 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
             } else {
 
-                sendToken(dpt, liq, burner, profitDpt);             // if liq contract stores DPT that can be sent to burner by us
+                _sendToken(dpt, liq, burner, profitDpt);            // if liq contract stores DPT that can be sent to burner by us
             }
 
-            sendToken(token, src, wal, feeT);                       // send user token to wallet
+            _sendToken(token, src, wal, feeT);                      // send user token to wallet
         }
     }
 
@@ -1159,7 +1152,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     * @param fee the fee amount in base currency
     * @return the remaining fee amount in DPT
     */
-    function takeFeeInDptFromUser(
+    function _takeFeeInDptFromUser(
         uint256 fee                                                 // total fee to be paid
     ) internal returns(uint256 feeTaken) {
         TrustedErc20 dpt20 = TrustedErc20(dpt);
@@ -1185,17 +1178,17 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
                 profitDpt = min(wmul(feeDpt, profitRate), minDpt);
 
-                sendToken(dpt, msg.sender, burner, profitDpt);      // only profit is put to the burner
+                _sendToken(dpt, msg.sender, burner, profitDpt);     // only profit is put to the burner
 
             } else {
 
                 profitDpt = wmul(minDpt, profitRate);
 
-                sendToken(dpt, msg.sender, burner, profitDpt);      // send profit to burner
+                _sendToken(dpt, msg.sender, burner, profitDpt);     // send profit to burner
 
                 costDpt = sub(minDpt, profitDpt);
 
-                sendToken(dpt, msg.sender, wal, costDpt);           // send cost
+                _sendToken(dpt, msg.sender, wal, costDpt);          // send cost
             }
 
             feeTakenDpt = add(profitDpt, costDpt);                  // total fee taken in DPT
@@ -1208,7 +1201,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
     /**
     * &dev send token or ether to destination
     */
-    function sendToken(
+    function _sendToken(
         address token,
         address src,
         address payable dst,
@@ -1217,7 +1210,8 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         TrustedErc20 erc20 = TrustedErc20(token);
 
         if (token == eth && amount > dust) {                        // if token is Ether and amount is higher than dust limit
-            require(src == msg.sender || src == address(this), "dex-wrong-src-address-provided");
+            require(src == msg.sender || src == address(this), 
+                    "dex-wrong-src-address-provided");
             // TODO: do it with call.value() to use gas as needed
             dst.transfer(amount);
 
@@ -1225,7 +1219,13 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 
         } else {
 
-            if (amount > 0) erc20.transferFrom(src, dst, amount);   // transfer all of token to dst
+            if (amount > 0) {
+                if( token == address(cdc) && src == address(asm)) {
+                    asm.mint(token, dst, amount);
+                } else {
+                    erc20.transferFrom(src, dst, amount);           // transfer all of token to dst
+                }
+            }
         }
         return true;
     }
@@ -1236,3 +1236,7 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
 // TODO: put the setting of kyc[user] variable to another function
 // TODO: make lot of tests with dpass as sellToken
 // TODO: tests with user sell to other user dpass token
+// TODO: remove LogTest()
+// TODO: rewrite to use multiple cdc tokens
+// TODO: rewrite to use multiple dpass tokens
+// TODO: write test for getters
