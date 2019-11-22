@@ -89,10 +89,6 @@ contract DiamondExchangeEvents {
 
     event LogTransferEth(address src, address dst, uint256 val);
     // TODO: remove below in production 
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
 }
 
 // TODO: wallet functionality, proxy Contracts
@@ -423,14 +419,14 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         emit LogConfigChange(what_, value_, value1_);
     }
 
-    function setConfig(bytes32 what_, address value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
+    /*function setConfig(bytes32 what_, address value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
     function setConfig(bytes32 what_, address value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_); }
     function setConfig(bytes32 what_, address value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
     function setConfig(bytes32 what_, uint256 value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
     function setConfig(bytes32 what_, uint256 value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_); }
     function setConfig(bytes32 what_, uint256 value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
     function setConfig(bytes32 what_, address value_, bool value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
-
+*/
     /**
     * @dev Тoken purchase with fee. (If user has DPT he must approve this contract,
     * otherwise transaction will fail.)
@@ -576,10 +572,6 @@ contract DiamondExchange is DSAuth, DSStop, DSMath, DiamondExchangeEvents {
         } else {
             require(false, "dex-token-not-allowed-to-be-bought");       // token can not be bought here
         }
-emit LogTest("buyV");
-emit LogTest(buyV);
-emit LogTest("sellV");
-emit LogTest(sellV);
     }
 
     /**
@@ -635,10 +627,6 @@ emit LogTest(sellV);
         feeTakenV = sellToken != dpt ?                      // if sellToken is not dpt then try to take fee in DPT
             _takeFeeInDptFromUser(fee) :
             0;
-        emit LogTest("fee");
-        emit LogTest(fee);
-        emit LogTest("feeTakenV");
-        emit LogTest(feeTakenV);
         if (fee - feeTakenV > dust                          // if we could not take all fees from user in ...
             && fee - feeTakenV <= fee) {                    // ... DPT (with round-off errors considered)
 
@@ -706,11 +694,6 @@ emit LogTest(sellV);
                 amtT);
 
         } else {                                            // no fee must be payed with sellToken
-            emit LogTest("dex-not-enough-funds");
-            emit LogTest("buyV");
-            emit LogTest(buyV);
-            emit LogTest("sellV");
-            emit LogTest(sellV);
             require(buyV <= sellV || canBuyErc20[buyToken],
                 "dex-not-enough-funds");
 
@@ -1236,7 +1219,6 @@ emit LogTest(sellV);
 // TODO: put the setting of kyc[user] variable to another function
 // TODO: make lot of tests with dpass as sellToken
 // TODO: tests with user sell to other user dpass token
-// TODO: remove LogTest()
 // TODO: rewrite to use multiple cdc tokens
 // TODO: rewrite to use multiple dpass tokens
 // TODO: write test for getters
