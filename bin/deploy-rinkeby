@@ -23,7 +23,7 @@ export ETH_GAS=9999001
 
 # 1000000000 wei = 1 gwei
 # export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
-export ETH_GAS_PRICE=400000000000
+export ETH_GAS_PRICE=50000000000
 
 # export ETH_FROM=$(seth rpc eth_coinbase)
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
@@ -37,6 +37,8 @@ hevm flatten --source-file src/Liquidity.sol --json-file out/dapp.sol.json > out
 hevm flatten --source-file src/Wallet.sol --json-file out/dapp.sol.json > out/Wallet-flatt.sol
 hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Burner-flatt.sol
 hevm flatten --source-file src/SimpleAssetManagement.sol --json-file out/dapp.sol.json > out/SimpleAssetManagement-flatt.sol
+hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc-flatt.sol
+
 
 # # ETH feed
 # export RATE=120
