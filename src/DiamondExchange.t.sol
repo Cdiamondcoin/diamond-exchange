@@ -214,10 +214,6 @@ contract DiamondExchangeTester is Wallet, DSTest {
         return address(uint160(uint256(b)));
     }
 
-    function doToDecimals(uint256 amt_, uint8 srcDec_, uint8 dstDec_) public view returns (uint256) {
-        return DiamondExchange(exchange).toDecimals(amt_, srcDec_, dstDec_);
-    }
-
     function doCalculateFee(
         address sender_,
         uint256 value_,
@@ -271,7 +267,7 @@ contract TrustedDiamondExchange {
         address buyToken,                                               // token bought by user
         uint256 buyAmtOrId,                                             // buy amount or buy id
         uint256 feeV                                                    // value of total fees in base currency
-    ) external;  
+    ) external;
 
     function _getNewRate(address token_) external view returns (uint rate_);
     function _updateRates(address sellToken, address buyToken) external;
@@ -286,7 +282,7 @@ contract TrustedDiamondExchange {
     ) external;
 
     function _updateRate(address token) external returns (uint256 rate_);
-    
+
     function _takeFeeInToken(
         uint256 fee,                                                // fee that user still owes to CDiamondCoin after paying fee in DPT
         uint256 feeTaken,                                           // fee already taken from user in DPT
@@ -537,7 +533,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig("decimals", b(eth), b(18));
         DiamondExchange(exchange).setConfig("dpt", b(dpt), b(""));
         DiamondExchange(exchange).setConfig("cdc", b(cdc), b(""));
-        DiamondExchange(exchange).setConfig("dpass", b(dpass), b(""));
         DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(true));
         DiamondExchange(exchange).setConfig("handledByAsm", b(dpass), b(true));
         DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(feed[dpt]));
@@ -3505,7 +3500,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 //--------------------------------
 
     function testFailSellDpassForFixCdcUserHasNoDptFullFeeInDptDex() public {
-        // error Revert ("dex-not-enough-tokens-to-buy") 
+        // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
         SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
@@ -3785,6 +3780,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).getRate(cdc);
     }
 
+    function testFailAuthCheckSetKycDex() public {
+        DiamondExchange(exchange).setOwner(user);
+        DiamondExchange(exchange).setKyc(user, true);
+    }
+
     function testFailAuthCheck_getNewRateDex() public view {
         TrustedDiamondExchange(exchange)._getNewRate(eth);
     }
@@ -3811,6 +3811,111 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testFailAuthCheck_sendTokenDex() public {
         TrustedDiamondExchange(exchange)._sendToken(dpt, address(this), user, 1 ether);
+    }
+
+    function testKycDex() public {
+        DiamondExchange(exchange).setKyc(user, true);
+        DiamondExchange(exchange).setConfig("kycEnabled", b(true), "");
+        testForFixEthBuyAllCdcUserHasNoDptDex();
+    }
+
+    function testFailKycDex() public {
+        // error Revert ("dex-you-are-not-on-kyc-list")
+        DiamondExchange(exchange).setKyc(user, false);
+        DiamondExchange(exchange).setConfig("kycEnabled", b(true), "");
+        testForFixEthBuyAllCdcUserHasNoDptDex();
+    }
+
+    function testFailDenyTokenDex() public {
+        DiamondExchange(exchange).setDenyToken(cdc, true);
+        testForFixCdcBuyUserDpassUserHasNoDptDex();
+    }
+
+    function testDenyTokenDex() public {
+        DiamondExchange(exchange).setDenyToken(cdc, true);
+        DiamondExchange(exchange).setDenyToken(cdc, false);
+        testForFixCdcBuyUserDpassUserHasNoDptDex();
+    }
+
+    function testSellerAcceptsToken() public {
+        DiamondExchange(exchange).setDenyToken(cdc, true);
+        assertTrue(
+            !DiamondExchange(exchange).sellerAcceptsToken(cdc, address(this)));
+        DiamondExchange(exchange).setDenyToken(cdc, false);
+        assertTrue(
+            DiamondExchange(exchange).sellerAcceptsToken(cdc, address(this)));
+    }
+
+    function testIsHandledByAsm() public {
+        assertTrue(DiamondExchange(exchange).isHandledByAsm(cdc));
+        DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(false));
+        assertTrue(!DiamondExchange(exchange).isHandledByAsm(cdc));
+    }
+
+    function testSetPriceFeedDex() public {
+        // error Revert ("dex-wrong-pricefeed-address")
+        address token = eth;
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
+        assertEqLog(
+            "set-pricefeed-is-returned",
+            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(feed[token]));
+
+        token = dai;
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
+        assertEqLog(
+            "set-pricefeed-is-returned",
+            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(feed[token]));
+
+        token = cdc;
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
+        assertEqLog(
+            "set-pricefeed-is-returned",
+            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(feed[token]));
+    }
+
+    function testGetAllowedTokenDex() public {
+        assertTrue(DiamondExchange(exchange).getAllowedToken(cdc, true));
+        assertTrue(DiamondExchange(exchange).getAllowedToken(cdc, false));
+
+        DiamondExchange(exchange).setConfig("canBuyErc20",b(cdc), b(false));
+        DiamondExchange(exchange).setConfig("canSellErc20",b(cdc), b(false));
+
+        assertTrue(!DiamondExchange(exchange).getAllowedToken(cdc, true));
+        assertTrue(!DiamondExchange(exchange).getAllowedToken(cdc, false));
+    }
+
+    function testGetDecimalsSetDex() public {
+        assertTrue(DiamondExchange(exchange).getDecimalsSet(cdc));
+        address token1 = address(new DSToken("TEST"));
+        assertTrue(!DiamondExchange(exchange).getDecimalsSet(token1));
+        DiamondExchange(exchange).setConfig("decimals",b(token1), b(18));
+        assertTrue(DiamondExchange(exchange).getDecimalsSet(token1));
+    }
+
+    function testGetCustodian20() public {
+        assertEqLog(
+            "default custodian is asm",
+            DiamondExchange(exchange).getCustodian20(cdc),
+            custodian20[cdc]
+        );
+        address token1 = address(new DSToken("TEST"));
+        assertEqLog(
+            "any token custodian is unset",
+            DiamondExchange(exchange).getCustodian20(token1),
+            address(0)
+        );
+    }
+
+    function testAddrDex() public {
+        address someAddress = address(0xee);
+        assertEqLog(
+            "address eq address",
+            DiamondExchange(exchange).addr(b(someAddress)),
+            someAddress
+        );
     }
 }
 
