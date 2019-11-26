@@ -72,14 +72,12 @@ contract DiamondExchangeEvents {
         uint256 feeValue
     );
 
-    //TODO: set what indexed after testing
     event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1);
 
     event LogTransferEth(address src, address dst, uint256 val);
 
 }
 
-// TODO: wallet functionality, proxy Contracts
 contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     TrustedDSToken public cdc;                              // CDC token contract
     address public dpt;                                     // DPT token contract
@@ -692,8 +690,6 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint256 feeV_                                                   // value of total fees in base currency
     ) internal {
         address payable payTo_;
-        //TODO: it would be great to send sellTokens first and then send buyTokens as this way it would work in edge cases where there is not enough CDC amount
-
 
         if (canBuyErc20[buyToken_]) {
 
@@ -1154,7 +1150,6 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         if (token_ == eth && amount_ > dust) {                          // if token_ is Ether and amount_ is higher than dust limit
             require(src_ == msg.sender || src_ == address(this),
                     "dex-wrong-src-address-provided");
-            // TODO: do it with call.value() to use gas as needed
             dst_.transfer(amount_);
 
             emit LogTransferEth(src_, dst_, amount_);
