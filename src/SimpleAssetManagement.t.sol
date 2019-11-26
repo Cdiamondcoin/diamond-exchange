@@ -208,7 +208,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function setUp() public {
+        uint ourGas = gasleft();
         asm = new SimpleAssetManagement();
+        emit LogTest("cerate SimpleAssetManagement");
+        emit LogTest(ourGas - gasleft());
         guard = new DSGuard();
         asm.setAuthority(guard);
         user = address(new TrustedSASMTester(address(asm)));
@@ -932,7 +935,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
-        asm.setConfig("setApprovalForAll", b(exchange), b(dpass), b(true));
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
         assertTrue(Dpass(dpass).isApprovedForAll(address(asm), exchange));
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
@@ -955,7 +958,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
-        asm.setConfig("setApprovalForAll", b(exchange), b(dpass), b(true));
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
         assertTrue(Dpass(dpass).isApprovedForAll(address(asm), exchange));
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
@@ -1041,7 +1044,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         Dpass(dpass).setCccc(cccc_, true);
         Dpass(dpass).setCccc(cccc1_, true);
-        asm.setConfig("setApprovalForAll", b(exchange), b(dpass), b(true));
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
 
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
@@ -1082,7 +1085,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         Dpass(dpass).setCccc(cccc_, true);
         Dpass(dpass).setCccc(cccc1_, true);
-        asm.setConfig("setApprovalForAll", b(exchange), b(dpass), b(true));
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
 
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
@@ -1180,7 +1183,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
-        asm.setConfig("setApprovalForAll", b(exchange), b(dpass), b(true));
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);

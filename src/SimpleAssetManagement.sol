@@ -21,10 +21,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
     event LogUpdateCollateral(uint256 positiveV, uint256 negativeV, address custodian);
     // Commented due fit to code size limit 24,576 bytes
-    // event LogTest(uint256 what);
-    // event LogTest(bool what);
-    // event LogTest(address what);
-    // event LogTest(bytes32 what);
     mapping(
         address => mapping(
             uint => uint)) private basePrice;               // the base price used for collateral valuation
@@ -116,8 +112,9 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
             address newDcdc = addr(value_);
             bool enable = uint(value1_) > 0;
             if(enable) domains[newDcdc] = domain;
-            require(priceFeed[newDcdc] != address(0), "asm-add-pricefeed-first");
             require(newDcdc != address(0), "asm-dcdc-address-zero");
+            require(priceFeed[newDcdc] != address(0), "asm-add-pricefeed-first");
+            require(decimalsSet[newDcdc],"asm-no-decimals-set-for-token");
             dcdcs[newDcdc] = enable;
             _updateTotalDcdcValue(newDcdc);
         } else if (what_ == "custodians") {
@@ -127,12 +124,19 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
             if(enable) domains[custodian] = domain;
             require(custodian != address(0), "asm-custodian-zero-address");
             custodians[addr(value_)] = enable;
-        } else if (what_ == "setApprovalForAll") {
-            address dst = addr(value_);
-            address token = addr(value1_);
+        } else if (what_ == "approve") {
+            address token = addr(value_);
+            address dst = addr(value1_);
+            uint value = uint(value2_);
+            require(decimalsSet[token],"asm-no-decimals-set-for-token");
+            require(dst != address(0), "asm-dst-zero-address");
+            DSToken(token).approve(dst, value);
+        }  else if (what_ == "setApproveForAll") {
+            address token = addr(value_);
+            address dst = addr(value1_);
             bool enable = uint(value2_) > 0;
             require(dpasses[token],"asm-not-a-dpass-token");
-            require(dst != address(0), "asm-custodian-zero-address");
+            require(dst != address(0), "asm-dst-zero-address");
             Dpass(token).setApprovalForAll(dst, enable);
         } else if (what_ == "overCollRatio") {
             bytes32 domain = value2_;
@@ -150,9 +154,9 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
             decimals[token] = 10 ** decimal;
             decimalsSet[token] = true;
         } else if (what_ == "dust") {
-
             dust = uint256(value_);
-
+        } else {
+            require(false, "asm-wrong-config-option");
         }
 
         emit LogConfigChange(msg.sender, what_, value_, value1_);
@@ -516,20 +520,10 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         sendToken(token_, address(this), msg.sender, amt_);
     }
 
-    function getAmtForSale(address token_) external returns(uint256) {
+    function getAmtForSale(address token_) external view returns(uint256) {
         bytes32 domain = domains[token_];
         require(cdcs[token_], "asm-token-is-not-cdc");
         // Commented due fit to code size limit 24,576 bytes
-        // emit LogTest("totalDpassV[domain]");
-        // emit LogTest(totalDpassV[domain]);
-        // emit LogTest("totalDcdcV[domain]");
-        // emit LogTest(totalDcdcV[domain]);
-        // emit LogTest("overCollRatio[domain]");
-        // emit LogTest(overCollRatio[domain]);
-        // emit LogTest("totalCdcV[domain]");
-        // emit LogTest(totalCdcV[domain]);
-        // emit LogTest("_getNewRate(token_)");
-        // emit LogTest(_getNewRate(token_));
         return wdivT(
             sub(
                 wdiv(
@@ -741,7 +735,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
 }
 // TODO: document functions
 // TODO: emit events
-// TODO: remove LogTest
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: if dpass is created the wrong way asset management must be able to invalidate it.
 // TODO: update Wallet.sol to handle dpass tokens as well

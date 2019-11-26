@@ -128,12 +128,20 @@ contract DiamondExchangeTester is Wallet, DSTest {
         DSToken(token).transferFrom(from, to, amount);
     }
 
+    function doTransfer721(address token, address to, uint id) public {
+        Dpass(token).transferFrom(address(this), to, id);
+    }
+
+    function doTransferFrom721(address token, address from, address to, uint amount) public {
+        Dpass(token).transferFrom(from, to, amount);
+    }
+
     function doSetBuyPrice(address token, uint256 tokenId, uint256 price) public {
-        DiamondExchange(exchange).setBuyPrice(token, tokenId, price);    
+        DiamondExchange(exchange).setBuyPrice(token, tokenId, price);
     }
 
     function doGetBuyPrice(address token, uint256 tokenId) public view returns(uint256) {
-        return DiamondExchange(exchange).getBuyPrice(token, tokenId);    
+        return DiamondExchange(exchange).getBuyPrice(token, tokenId);
     }
 
     function doBuyTokensWithFee(
@@ -231,7 +239,78 @@ contract DiamondExchangeTester is Wallet, DSTest {
 
 }
 
-contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
+
+
+
+contract TrustedDiamondExchange {
+
+    function _getValues(
+        address sellToken,
+        uint256 sellAmtOrId,
+        address buyToken,
+        uint256 buyAmtOrId
+    ) external returns (uint256 buyV, uint256 sellV);
+
+    function _takeFee(
+        uint256 fee,
+        uint256 sellV,
+        uint256 buyV,
+        address sellToken,
+        uint256 sellAmtOrId,
+        address buyToken,
+        uint256 buyAmtOrId
+    )
+    external
+    returns(uint256 sellT, uint256 buyT);
+
+    function _transferTokens(
+        uint256 sellT,                                                  // sell token amount
+        uint256 buyT,                                                   // buy token amount
+        address sellToken,                                              // token sold by user
+        uint256 sellAmtOrId,                                            // sell amount or sell token id
+        address buyToken,                                               // token bought by user
+        uint256 buyAmtOrId,                                             // buy amount or buy id
+        uint256 feeV                                                    // value of total fees in base currency
+    ) external;  
+
+    function _getNewRate(address token_) external view returns (uint rate_);
+    function _updateRates(address sellToken, address buyToken) external;
+
+    function _logTrade(
+        address sellToken,
+        uint256 sellT,
+        address buyToken,
+        uint256 buyT,
+        uint256 buyAmtOrId,
+        uint256 fee
+    ) external;
+
+    function _updateRate(address token) external returns (uint256 rate_);
+    
+    function _takeFeeInToken(
+        uint256 fee,                                                // fee that user still owes to CDiamondCoin after paying fee in DPT
+        uint256 feeTaken,                                           // fee already taken from user in DPT
+        address token,                                              // token that must be sent as fee
+        address src,                                                // source of token sent
+        uint256 amountToken                                         // total amount of tokens the user wanted to pay initially
+    ) external;
+
+    function _takeFeeInDptFromUser(
+        uint256 fee                                                 // total fee to be paid
+    ) external returns(uint256 feeTaken);
+
+    function _sendToken(
+        address token,
+        address src,
+        address payable dst,
+        uint256 amount
+    ) external returns(bool);
+}
+
+
+
+
+contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     event LogUintIpartUintFpart(bytes32 key, uint val, uint val1);
     event LogTest(uint256 what);
     event LogTest(bool what);
@@ -271,6 +350,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     mapping(address => bool) public erc20;                      // tells if token is ERC20 ( eth considered ERC20 here)
     mapping(address => uint) dust;
     mapping(address => bool) dustSet;
+    mapping(address => uint) public dpassOwnerPrice;
 
     uint public fixFee = 0 ether;
     uint public varFee = .2 ether;          // variable fee is 20% of value
@@ -278,6 +358,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     bool public takeProfitOnlyInDpt = true; // take only profit or total fee (cost + profit) in DPT
 
     // variables for calculating expected behaviour --------------------------
+    address origBuyer;
     uint userDpt;
     uint feeDpt;
     uint feeSellTokenT;
@@ -302,7 +383,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     uint balanceUserIncreaseV;
     uint balanceUserDecreaseT;
     uint balanceUserDecreaseV;
-    uint dpassOwnerPrice;
     uint actual;
     uint expected;
     address actualA;
@@ -310,6 +390,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     bool showActualExpected;
     DSGuard public guard;
     bytes32 constant public ANY = bytes32(uint(-1));
+    address origSellerBuyToken;
+    address origSellerSellToken;
 
     function setUp() public {
         cdc = address(new Cdc("BR,VS,G,0.05", "CDC"));
@@ -353,12 +435,14 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         dust[eth] = 10000;
         dust[dai] = 10000;
         dust[eng] = 10;
+        dust[dpass] = 10000;
 
         dustSet[dpt] = true;
         dustSet[cdc] = true;
         dustSet[eth] = true;
         dustSet[dai] = true;
         dustSet[eng] = true;
+        dustSet[dpass] = true;
 
         feed[eth] = address(new TestFeedLike(usdRate[eth], true));
         feed[dpt] = address(new TestFeedLike(usdRate[dpt], true));
@@ -404,7 +488,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         SimpleAssetManagement(asm).setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
         SimpleAssetManagement(asm).setConfig("decimals", b(eng), b(decimals[eng]), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                             
+        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");
         SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");
         SimpleAssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");
         SimpleAssetManagement(asm).setConfig("payTokens", b(dai), b(true), "diamonds");
@@ -424,9 +508,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         liquidityContract = address(uint160(address(new DiamondExchangeTester(address(0xfa), dpt, cdc, dai)))); // FAKE DECLARATION, will overdeclare later
         DSToken(dpt).transfer(liquidityContract, INITIAL_BALANCE);
-
+        uint ourGas = gasleft();
         exchange = address(uint160(address(new DiamondExchange(
-            cdc,
+           /* cdc,
             dpt,
             dpass,
             feed[eth],
@@ -438,55 +522,81 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             fixFee,
             varFee,
             profitRate,
-            wal
+            wal*/
         ))));
+        emit LogTest("cerate DiamondExchange");
+        emit LogTest(ourGas - gasleft());
+        DiamondExchange(exchange).setConfig("canSellErc20", b(dpt), b(true));
+        DiamondExchange(exchange).setConfig("canBuyErc20", b(dpt), b(true));
+        DiamondExchange(exchange).setConfig("canSellErc20", b(cdc), b(true));
+        DiamondExchange(exchange).setConfig("canBuyErc20", b(cdc), b(true));
+        DiamondExchange(exchange).setConfig("canSellErc20", b(eth), b(true));
+        DiamondExchange(exchange).setConfig("canBuyErc721", b(dpass), b(true));
+        DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));
+        DiamondExchange(exchange).setConfig("decimals", b(cdc), b(18));
+        DiamondExchange(exchange).setConfig("decimals", b(eth), b(18));
+        DiamondExchange(exchange).setConfig("dpt", b(dpt), b(""));
+        DiamondExchange(exchange).setConfig("cdc", b(cdc), b(""));
+        DiamondExchange(exchange).setConfig("dpass", b(dpass), b(""));
+        DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(true));
+        DiamondExchange(exchange).setConfig("handledByAsm", b(dpass), b(true));
+        DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(feed[dpt]));
+        DiamondExchange(exchange).setConfig("priceFeed", b(eth), b(feed[eth]));
+        DiamondExchange(exchange).setConfig("priceFeed", b(cdc), b(feed[cdc]));
+        DiamondExchange(exchange).setConfig("liq", b(liquidityContract), b(""));
+        DiamondExchange(exchange).setConfig("burner", b(burner), b(""));
+        DiamondExchange(exchange).setConfig("asm", b(asm), b(""));
+        DiamondExchange(exchange).setConfig("fixFee", b(fixFee), b(""));
+        DiamondExchange(exchange).setConfig("varFee", b(varFee), b(""));
+        DiamondExchange(exchange).setConfig("profitRate", b(profitRate), b(""));
+        DiamondExchange(exchange).setConfig("wal", b(wal), b(""));
 
-        DiamondExchange(exchange).setConfig("canSellErc20", dai, true);
-        DiamondExchange(exchange).setConfig("priceFeed", dai, feed[dai]);
-        DiamondExchange(exchange).setConfig("rate", dai, usdRate[dai]);
-        DiamondExchange(exchange).setConfig("manualRate", dai, true);
-        DiamondExchange(exchange).setConfig("decimals", dai, 18);
-        DiamondExchange(exchange).setConfig("custodian20", dai, custodian20[dai]);
-        // DiamondExchange(exchange).setConfig("handledByAsm", dai, true);      // set true if token can be bougt by user and asm should handle it
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(dai), b(true));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(dai), b(feed[dai]));
+        DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(usdRate[dai]));
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(dai), b(18));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(dai), b(custodian20[dai]));
+        // DiamondExchange(exchange).setConfig(b("handledByAsm"), b(dai), b(true));      // set true if token can be bougt by user and asm should handle it
 
-        DiamondExchange(exchange).setConfig("canSellErc20", eth, true);
-        DiamondExchange(exchange).setConfig("priceFeed", eth, feed[eth]);
-        DiamondExchange(exchange).setConfig("rate", eth, usdRate[eth]);
-        DiamondExchange(exchange).setConfig("manualRate", eth, true);
-        DiamondExchange(exchange).setConfig("decimals", eth, 18);
-        DiamondExchange(exchange).setConfig("custodian20", eth, custodian20[eth]);
-        // DiamondExchange(exchange).setConfig("handledByAsm", eth, true);      // set true if token can be bougt by user and asm should handle it
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(eth), b(true));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(eth), b(feed[eth]));
+        DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(usdRate[eth]));
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(true));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(eth), b(18));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(eth), b(custodian20[eth]));
+        // DiamondExchange(exchange).setConfig(b("handledByAsm"), b(eth), b(true));      // set true if token can be bougt by user and asm should handle it
 
-        DiamondExchange(exchange).setConfig("canSellErc20", cdc, true);
-        DiamondExchange(exchange).setConfig("canBuyErc20", cdc, true);
-        DiamondExchange(exchange).setConfig("custodian20", cdc, custodian20[cdc]);
-        DiamondExchange(exchange).setConfig("priceFeed", cdc, feed[cdc]);
-        DiamondExchange(exchange).setConfig("rate", cdc, usdRate[cdc]);
-        DiamondExchange(exchange).setConfig("manualRate", cdc, true);
-        DiamondExchange(exchange).setConfig("decimals", cdc, 18);
-        DiamondExchange(exchange).setConfig("handledByAsm", cdc, true);
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(cdc), b(true));
+        DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(cdc), b(true));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(cdc), b(custodian20[cdc]));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(cdc), b(feed[cdc]));
+        DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(usdRate[cdc]));
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(true));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(cdc), b(18));
+        DiamondExchange(exchange).setConfig(b("handledByAsm"), b(cdc), b(true));
 
-        DiamondExchange(exchange).setConfig("canSellErc20", dpt, true);
-        DiamondExchange(exchange).setConfig("custodian20", dpt, asm);
-        DiamondExchange(exchange).setConfig("priceFeed", dpt, feed[dpt]);
-        DiamondExchange(exchange).setConfig("rate", dpt, usdRate[dpt]);
-        DiamondExchange(exchange).setConfig("manualRate", dpt, true);
-        DiamondExchange(exchange).setConfig("decimals", dpt, 18);
-        DiamondExchange(exchange).setConfig("custodian20", dpt, custodian20[dpt]);
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(takeProfitOnlyInDpt), "");
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(dpt), b(true));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(dpt), b(asm));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(dpt), b(feed[dpt]));
+        DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(usdRate[dpt]));
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(dpt), b(18));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(dpt), b(custodian20[dpt]));
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(takeProfitOnlyInDpt)), b(""));
 
-        DiamondExchange(exchange).setConfig("canSellErc20", eng, true);
-        DiamondExchange(exchange).setConfig("priceFeed", eng, feed[eng]);
-        DiamondExchange(exchange).setConfig("rate", eng, usdRate[eng]);
-        DiamondExchange(exchange).setConfig("manualRate", eng, true);
-        DiamondExchange(exchange).setConfig("decimals", eng, 8);
-        DiamondExchange(exchange).setConfig("custodian20", eng, custodian20[eng]);
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(eng), b(true));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(eng), b(feed[eng]));
+        DiamondExchange(exchange).setConfig(b("rate"), b(eng), b(usdRate[eng]));
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(eng), b(true));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(eng), b(8));
+        DiamondExchange(exchange).setConfig(b("custodian20"), b(eng), b(custodian20[eng]));
 
         guard.permit(exchange, asm, ANY);
         liquidityContract = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
         DSToken(dpt).transfer(liquidityContract, INITIAL_BALANCE);
         DiamondExchangeTester(liquidityContract).doApprove(dpt, exchange, uint(-1));
-        DiamondExchange(exchange).setConfig("liq", liquidityContract, "");
+        DiamondExchange(exchange).setConfig(b("liq"), b(liquidityContract), b(""));
         DiamondExchangeTester(liquidityContract).setOwner(exchange);
 
         user = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
@@ -500,7 +610,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         DSToken(eng).approve(exchange, uint(-1));
 
         // Prepare dpass tokens
-        dpassOwnerPrice = 137 ether;
+        dpassOwnerPrice[user] = 53 ether;
         Dpass(dpass).setCccc("BR,IF,F,0.01", true);
         dpassId[user] = Dpass(dpass).mintDiamondTo(
             user,                                                               // address _to,
@@ -513,8 +623,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             bytes32(uint(0xc0a5d062e13f99c8f70d19dc7993c2f34020a7031c17f29ce2550315879006d7)), // bytes32 _attributesHash
             "20191101"
         );
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice);
-        DiamondExchangeTester(user).approve721(dpass, exchange, dpassId[user]);
+        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[user]);
 
         bytes32[] memory attributes1 = new bytes32[](5);
         attributes1[0] = "round";
@@ -524,6 +633,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         attributes1[4] = "";
 
 
+        dpassOwnerPrice[asm] = 137 ether;
         Dpass(dpass).setCccc("BR,VVS1,F,3.00", true);
         dpassId[seller] = Dpass(dpass).mintDiamondTo(
             asm,                                                                // address _to,
@@ -537,8 +647,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             "20191101"
         );
 
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[seller], dpassOwnerPrice);
-        SimpleAssetManagement(asm).approve721(dpass, exchange, dpassId[seller]);
+        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[seller], dpassOwnerPrice[asm]);
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         // Prepare seller of DPT fees
 
         user.transfer(INITIAL_BALANCE);
@@ -603,7 +713,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         SimpleAssetManagement(asm).mint(cdc, user, wdiv(
             add(
                 wdiv(
-                    dpassOwnerPrice, 
+                    dpassOwnerPrice[asm],
                     sub(1 ether, varFee)),
                 fixFee),
             usdRate[cdc]));
@@ -617,47 +727,52 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         balance[user][cdc] = DSToken(cdc).balanceOf(user);
     }
 
+    function balanceOf(address token, address holder) public view returns (uint256) {
+        return token == eth ? holder.balance :  DSToken(token).balanceOf(holder);
+    }
+
     function doExchange(address sellToken, uint256 sellAmtOrId, address buyToken, uint256 buyAmtOrId) public {
         uint origUserBalanceT;
         uint buyT;
         uint buyV;
         bool _takeProfitOnlyInDpt = DiamondExchange(exchange).takeProfitOnlyInDpt();
+        uint fixFee_;
+        uint varFee_;
+        origSellerBuyToken = erc20[buyToken] ? address(0) : Dpass(buyToken).ownerOf(buyAmtOrId);
+        origSellerSellToken = erc20[sellToken] ? address(0) : Dpass(sellToken).ownerOf(sellAmtOrId);
 
-        if (sellToken == eth) {
-            origUserBalanceT = user.balance;
-        } else {
-            origUserBalanceT = DSToken(sellToken).balanceOf(user);
-        }
+        origUserBalanceT = balanceOf(sellToken, user);
 
         sentV = sellAmtOrId == uint(-1) ?                                               // sent value in fiat currency
             wmulV(origUserBalanceT, usdRate[sellToken], sellToken) :
             erc20[sellToken] ?
                 wmulV(min(sellAmtOrId, origUserBalanceT), usdRate[sellToken], sellToken) :
-                dpassOwnerPrice;
+                dpassOwnerPrice[origSellerSellToken];
 
         buyT = erc20[buyToken] ?                                                        // total amount of token available to buy (or tokenid)
             DiamondExchange(exchange).isHandledByAsm(buyToken) ?
                 min(buyAmtOrId, SimpleAssetManagement(asm).getAmtForSale(buyToken)) :
                 min(
-                    buyAmtOrId, 
-                    buyToken == eth ? 
-                        custodian20[buyToken].balance : 
-                        DSToken(buyToken).balanceOf(custodian20[buyToken])) :
+                    buyAmtOrId,
+                    balanceOf(buyToken, custodian20[buyToken])) :
             buyAmtOrId;
 
         buyV = erc20[buyToken] ?                                                        // total value of tokens available to buy (or tokenid)
             wmulV(buyT, usdRate[buyToken], buyToken) :
-            dpassOwnerPrice;
+            DiamondExchange(exchange).getPrice(buyToken, buyAmtOrId);
 
         buySellTokenT = erc20[sellToken] ?                                              // the amount of sellToken to pay for buy token
             wdivT(buyV, usdRate[sellToken], sellToken) :
             0;
 
+        fixFee_ = DiamondExchange(exchange).fixFee();
+        varFee_ = DiamondExchange(exchange).varFee();
+
         feeV = add(
             wmul(
-                DiamondExchange(exchange).varFee(),
+                varFee_,
                 min(sentV, buyV)),
-            DiamondExchange(exchange).fixFee());                                        // fiat value in fiat
+            fixFee_);                                        // fiat value in fiat
 
         feeDpt = wdivT(feeV, usdRate[dpt], dpt);                                        // the amount of DPT tokens to pay for fee
 
@@ -689,7 +804,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
             restOfFeeT = erc20[sellToken] ?
                 wdivT(restOfFeeV, usdRate[sellToken], sellToken) :
-                0;                                                                      // amount of sellToken to pay for remaining fee
+                wdivT(restOfFeeV, usdRate[buyToken], buyToken) ;                                                                      // amount of sellToken or buyToken to pay for remaining fee
         }
 
         finalSellV = sentV;
@@ -714,6 +829,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
             emit LogTest("user.balance");
             emit LogTest(user.balance);
+
+        if(erc20[buyToken]) {
+            origBuyer = DiamondExchange(exchange).isHandledByAsm(buyToken) ? asm : custodian20[buyToken];
+        } else {
+            origBuyer = Dpass(buyToken).ownerOf(buyAmtOrId);
+        }
+
         DiamondExchangeTester(user).doBuyTokensWithFee(
             sellToken,
             sellAmtOrId,
@@ -725,34 +847,29 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         balanceUserIncreaseT = erc20[buyToken] ?
             sub(
-                (buyToken == eth ?
-                    user.balance :
-                    DSToken(buyToken).balanceOf(user)),
+                balanceOf(buyToken, user) ,
                 balance[user][buyToken]) :
-            0;
+            1;
 
         balanceUserIncreaseV = erc20[buyToken] ?
             wmulV(
                 balanceUserIncreaseT,
                 usdRate[buyToken],
                 buyToken) :
-            dpassOwnerPrice;
-        emit LogTest("balance[user]");
-        emit LogTest(balance[user][sellToken]);
+            dpassOwnerPrice[origSellerBuyToken];
+
         balanceUserDecreaseT = erc20[sellToken] ?
             sub(
                 balance[user][sellToken],
-                (sellToken == eth ?
-                    user.balance :
-                    DSToken(sellToken).balanceOf(user))) :
-            0;
+                balanceOf(sellToken, user)) :
+            1;
 
         balanceUserDecreaseV = erc20[sellToken] ?
             wmulV(
                 balanceUserDecreaseT,
                 usdRate[sellToken],
                 sellToken) :
-            dpassOwnerPrice;
+            dpassOwnerPrice[origSellerSellToken];
 
         emit log_named_uint("---------takeProfitOnlyInDpt", takeProfitOnlyInDpt ? 1 : 0);
         emit log_named_bytes32("----------------sellToken", getName(sellToken));
@@ -763,6 +880,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         logUint("---------------sentV", sentV, 18);
         logUint("---------------buyV:", buyV, 18);
         logUint("------buySellTokenT:", buySellTokenT, 18);
+        logUint("-----feeFixV(fixFee)", fixFee_, 18);
+        logUint("-----feeRate(varFee)", varFee_, 18);
         logUint("---------feeV(total)", feeV, 18);
         logUint("-------feeDpt(total)", feeDpt, 18);
         logUint("----------feeT(tot.)", feeSellTokenT, 18);
@@ -790,12 +909,14 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         assertEqDustLog("dpt from liq", actual, expected, dpt);
 
         // ETH for DPT fee must be sent to wallet balance from user balance
-        actual = sellToken == eth ?
-            address(wal).balance :
-            DSToken(sellToken).balanceOf(wal);
-        expected = add(balance[wal][sellToken], sub(restOfFeeT, sellToken == dpt ? profitSellTokenT : 0));
-
-        assertEqDustLog("sell token as fee to wal", actual, expected, sellToken);
+        if(erc20[sellToken]) {
+            actual = balanceOf(sellToken, address(wal));
+            expected = add(balance[wal][sellToken], sub(restOfFeeT, sellToken == dpt ? profitSellTokenT : 0));
+        } else {
+            actual = balanceOf(buyToken, address(wal));
+            expected = add(balance[wal][buyToken], sub(restOfFeeT, buyToken == dpt ? profitSellTokenT : 0));
+        }
+        assertEqDustLog("sell/buy token as fee to wal", actual, expected, sellToken);
 
         // DPT fee have to be transfered to burner
         actual = DSToken(dpt).balanceOf(burner);
@@ -806,25 +927,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // custodian balance of tokens sold by user must increase
         if (erc20[sellToken]) {
 
-            if (DiamondExchange(exchange).isHandledByAsm(buyToken)) { 
-                
-                actual = sellToken == eth ? asm.balance : DSToken(sellToken).balanceOf(asm);
+            actual = balanceOf(sellToken, origBuyer);
 
-                expected = add(
-                    balance[asm][sellToken],
-                    sellToken == cdc ? 0 : sub(finalSellT, restOfFeeT));
+            expected = add(
+                balance[origBuyer][sellToken],
+                sellToken == cdc && origBuyer == asm ? 0 : sub(finalSellT, restOfFeeT));
 
-                assertEqDustLog("seller bal inc by ERC20 sold", actual, expected, sellToken);
-            } else { 
-
-                actual = sellToken == eth ? custodian20[sellToken].balance : DSToken(sellToken).balanceOf(custodian20[sellToken]);
-
-                expected = add(
-                    balance[custodian20[sellToken]][sellToken],
-                    sub(finalSellT, restOfFeeT));
-
-                assertEqDustLog("seller bal inc by ERC20 sold", actual, expected, sellToken);
-            }
+            assertEqDustLog("seller bal inc by ERC20 sold", actual, expected, sellToken);
         } else {
 
             actualA = TrustedErc721(sellToken).ownerOf(sellAmtOrId);
@@ -836,11 +945,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         // user balance of tokens sold must decrease
         if (erc20[sellToken]) {
-            
-            actual = sellToken == eth ? user.balance : DSToken(sellToken).balanceOf(user);
+
+            actual = balanceOf(sellToken, user);
 
             expected = sub( balance[user][sellToken], finalSellT);
-            
+
             assertEqDustLog("user bal dec by ERC20 sold", actual, expected, sellToken);
 
         } else {
@@ -855,10 +964,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // user balance of tokens bought must increase
         if (erc20[buyToken]) {
 
-            actual = buyToken == eth ? user.balance : DSToken(buyToken).balanceOf(user);
+            actual = balanceOf(buyToken, user);
 
-            expected = add( balance[user][buyToken], finalBuyT);
-            
+            expected = add(balance[user][buyToken], finalBuyT);
+
             assertEqDustLog("user bal inc by ERC20 bought", actual, expected, buyToken);
 
         } else {
@@ -877,12 +986,12 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
                 assertEqDustLog("seller bal dec by ERC20 bought", actual, expected, buyToken);
             } else {
 
-                actual = buyToken == eth ? custodian20[buyToken].balance : DSToken(buyToken).balanceOf(custodian20[buyToken]);
-                
+                actual = balanceOf(buyToken, custodian20[buyToken]);
+
                 expected = sub(
-                        balance[custodian20[buyToken]][buyToken],
-                        balanceUserIncreaseT);
-                
+                    balance[custodian20[buyToken]][buyToken],
+                    add(balanceUserIncreaseT, !erc20[sellToken] ? restOfFeeT : 0));
+
                 assertEqDustLog("seller bal dec by ERC20 bought", actual, expected, buyToken);
             }
         } else {
@@ -909,7 +1018,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             emit log_bytes32("expected");
             emit LogTest(expected_);
         }
-    } 
+    }
+
     function logMsgActualExpected(bytes32 logMsg, address actual_, address expected_, bool showActualExpected_) public {
         emit log_bytes32(logMsg);
         if(showActualExpected_ || showActualExpected) {
@@ -918,26 +1028,35 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
             emit log_bytes32("expected");
             emit LogTest(expected_);
         }
-    } 
+    }
 
     function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_, address decimalToken) public {
-        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_, decimalToken)); 
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_, decimalToken));
         assertEqDust(actual_, expected_, decimalToken);
     }
 
     function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_)); 
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_));
         assertEqDust(actual_, expected_);
     }
 
     function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, false); 
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
         assertEq(actual_, expected_);
     }
 
     function assertNotEqualLog(bytes32 logMsg, address actual_, address expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, actual_ == expected_); 
+        logMsgActualExpected(logMsg, actual_, expected_, actual_ == expected_);
         assertTrue(actual_ != expected_);
+    }
+
+    function b(bytes32 a) public pure returns(bytes32) {
+        return a;
     }
 
     function b(address a) public pure returns(bytes32) {
@@ -1087,7 +1206,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testSetFixFeeDex() public {
         uint fee = 0.1 ether;
-        DiamondExchange(exchange).setConfig("fixFee", fee, "");
+        DiamondExchange(exchange).setConfig(b("fixFee"), b(fee), b(""));
         assertEq(DiamondExchange(exchange).calculateFee(
             address(this),
             0 ether,
@@ -1100,7 +1219,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testSetVarFeeDex() public {
         uint fee = 0.5 ether;
-        DiamondExchange(exchange).setConfig("varFee", fee, "");
+        DiamondExchange(exchange).setConfig(b("varFee"), b(fee), b(""));
         assertEq(DiamondExchange(exchange).calculateFee(
             address(this),
             1 ether,
@@ -1115,8 +1234,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         uint value = 1 ether;
         uint varFee1 = 0.5 ether;
         uint fixFee1 = uint(10) / uint(3) * 1 ether;
-        DiamondExchange(exchange).setConfig("varFee", varFee1, "");
-        DiamondExchange(exchange).setConfig("fixFee", fixFee1, "");
+        DiamondExchange(exchange).setConfig(b("varFee"), b(varFee1), b(""));
+        DiamondExchange(exchange).setConfig(b("fixFee"), b(fixFee1), b(""));
         assertEq(DiamondExchange(exchange).calculateFee(
             address(this),
             value,
@@ -1128,13 +1247,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testFailNonOwnerSetVarFeeDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         uint newFee = 0.1 ether;
         DiamondExchangeTester(user).doSetConfig("varFee", newFee, "");
     }
 
     function testFailNonOwnerSetFixFeeDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         uint newFee = 0.1 ether;
         DiamondExchangeTester(user).doSetConfig("fixFee", newFee, "");
     }
@@ -1142,7 +1261,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testSetEthPriceFeedDex() public {
         address token = eth;
         uint rate = 1 ether;
-        DiamondExchange(exchange).setConfig("priceFeed", token, feed[dai]);
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(feed[dai]));
         TestFeedLike(feed[dai]).setRate(rate);
         assertEq(DiamondExchange(exchange).getRate(token), rate);
     }
@@ -1150,7 +1269,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testSetDptPriceFeedDex() public {
         address token = dpt;
         uint rate = 2 ether;
-        DiamondExchange(exchange).setConfig("priceFeed", token, feed[dai]);
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(feed[dai]));
         TestFeedLike(feed[dai]).setRate(rate);
         assertEq(DiamondExchange(exchange).getRate(token), rate);
     }
@@ -1158,7 +1277,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testSetCdcPriceFeedDex() public {
         address token = cdc;
         uint rate = 4 ether;
-        DiamondExchange(exchange).setConfig("priceFeed", token, feed[dai]);
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(feed[dai]));
         TestFeedLike(feed[dai]).setRate(rate);
         assertEq(DiamondExchange(exchange).getRate(token), rate);
     }
@@ -1166,7 +1285,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testSetDaiPriceFeedDex() public {
         address token = dai;
         uint rate = 5 ether;
-        DiamondExchange(exchange).setConfig("priceFeed", token, feed[dai]);
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(feed[dai]));
         TestFeedLike(feed[dai]).setRate(rate);
         assertEq(DiamondExchange(exchange).getRate(token), rate);
     }
@@ -1174,11 +1293,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailWrongAddressSetPriceFeedDex() public {
         // error Revert ("dex-wrong-pricefeed-address")
         address token = eth;
-        DiamondExchange(exchange).setConfig("priceFeed", token, address(0));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(0)));
     }
 
     function testFailNonOwnerSetEthPriceFeedDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         address token = eth;
         DiamondExchangeTester(user).doSetConfig("priceFeed", token, address(0));
     }
@@ -1186,13 +1305,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailWrongAddressSetDptPriceFeedDex() public {
         // error Revert ("dex-wrong-pricefeed-address")
         address token = dpt;
-        DiamondExchange(exchange).setConfig("priceFeed", token, address(0));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(0)));
     }
 
     function testFailWrongAddressSetCdcPriceFeedDex() public {
         // error Revert ("dex-wrong-pricefeed-address")
         address token = cdc;
-        DiamondExchange(exchange).setConfig("priceFeed", token, address(0));
+        DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(0)));
     }
 
     function testFailNonOwnerSetCdcPriceFeedDex() public {
@@ -1203,56 +1322,56 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testSetLiquidityContractDex() public {
         DSToken(dpt).transfer(user, 100 ether);
-        DiamondExchange(exchange).setConfig("liq", user, "");
+        DiamondExchange(exchange).setConfig(b("liq"), b(user), b(""));
         assertEq(DiamondExchange(exchange).liq(), user);
     }
 
     function testFailWrongAddressSetLiquidityContractDex() public {
         // error Revert ("dex-wrong-address")
-        DiamondExchange(exchange).setConfig("liq", address(0x0), "");
+        DiamondExchange(exchange).setConfig(b("liq"), b(address(0x0)), b(""));
     }
 
     function testFailNonOwnerSetLiquidityContractDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DSToken(dpt).transfer(user, 100 ether);
         DiamondExchangeTester(user).doSetConfig("liq", user, "");
     }
 
     function testFailWrongAddressSetWalletContractDex() public {
         // error Revert ("dex-wrong-address")
-        DiamondExchange(exchange).setConfig("wal", address(0x0), "");
+        DiamondExchange(exchange).setConfig(b("wal"), b(address(0x0)), b(""));
     }
 
     function testFailNonOwnerSetWalletContractDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DiamondExchangeTester(user).doSetConfig("wal", user, "");
     }
 
     function testSetManualDptRateDex() public {
-        DiamondExchange(exchange).setConfig("manualRate", dpt, true);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));
         assertTrue(DiamondExchange(exchange).getManualRate(dpt));
-        DiamondExchange(exchange).setConfig("manualRate", dpt, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(false));
         assertTrue(!DiamondExchange(exchange).getManualRate(dpt));
     }
 
     function testSetManualCdcRateDex() public {
-        DiamondExchange(exchange).setConfig("manualRate", cdc, true);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(true));
         assertTrue(DiamondExchange(exchange).getManualRate(cdc));
-        DiamondExchange(exchange).setConfig("manualRate", cdc, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(false));
         assertTrue(!DiamondExchange(exchange).getManualRate(cdc));
     }
 
     function testSetManualEthRateDex() public {
-        DiamondExchange(exchange).setConfig("manualRate", address(0xee), true);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(address(0xee)), b(true));
         assertTrue(DiamondExchange(exchange).getManualRate(address(0xee)));
-        DiamondExchange(exchange).setConfig("manualRate", address(0xee), false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(address(0xee)), b(false));
         assertTrue(!DiamondExchange(exchange).getManualRate(address(0xee)));
     }
 
     function testSetManualDaiRateDex() public {
-        DiamondExchange(exchange).setConfig("manualRate", dai, true);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));
         assertTrue(DiamondExchange(exchange).getManualRate(dai));
-        DiamondExchange(exchange).setConfig("manualRate", dai, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(false));
         assertTrue(!DiamondExchange(exchange).getManualRate(dai));
     }
 
@@ -1261,82 +1380,82 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testFailNonOwnerSetManualCdcRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DiamondExchangeTester(user).doSetConfig("manualRate", cdc, false);
     }
 
     function testFailNonOwnerSetManualEthRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DiamondExchangeTester(user).doSetConfig("manualRate", address(0xee), false);
     }
 
     function testFailNonOwnerSetManualDaiRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DiamondExchangeTester(user).doSetConfig("manualRate", dai, false);
     }
 
     function testSetFeeCalculatorContractDex() public {
-        DiamondExchange(exchange).setConfig("fca", address(fca), "");
+        DiamondExchange(exchange).setConfig(b("fca"), b(address(fca)), b(""));
         assertEq(address(DiamondExchange(exchange).fca()), address(fca));
     }
 
     function testFailWrongAddressSetCfoDex() public {
         // error Revert ("dex-wrong-address")
-        DiamondExchange(exchange).setConfig("fca", address(0), "");
+        DiamondExchange(exchange).setConfig(b("fca"), b(address(0)), b(""));
     }
 
     function testFailNonOwnerSetCfoDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         DiamondExchangeTester(user).doSetConfig("fca", user, "");
     }
 
     function testSetDptUsdRateDex() public {
         uint newRate = 5 ether;
-        DiamondExchange(exchange).setConfig("rate", dpt, newRate);
+        DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(newRate));
         assertEq(DiamondExchange(exchange).getLocalRate(dpt), newRate);
     }
 
     function testFailIncorectRateSetDptUsdRateDex() public {
-        // error Revert ("dex-rate-must-be-greater-than-0") 
-        DiamondExchange(exchange).setConfig("rate", dpt, uint(0));
+        // error Revert ("dex-rate-must-be-greater-than-0")
+        DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(uint(0)));
     }
 
     function testFailNonOwnerSetDptUsdRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         uint newRate = 5 ether;
         DiamondExchangeTester(user).doSetConfig("rate", dpt, newRate);
     }
 
     function testSetCdcUsdRateDex() public {
         uint newRate = 5 ether;
-        DiamondExchange(exchange).setConfig("rate", cdc, newRate);
+        DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(newRate));
         assertEq(DiamondExchange(exchange).getLocalRate(cdc), newRate);
     }
 
     function testFailIncorectRateSetCdcUsdRateDex() public {
         // error Revert ("dex-rate-must-be-greater-than-0")
-        DiamondExchange(exchange).setConfig("rate", cdc, uint(0));
+        DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(uint(0)));
     }
 
     function testFailNonOwnerSetCdcUsdRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         uint newRate = 5 ether;
         DiamondExchangeTester(user).doSetConfig("rate", cdc, newRate);
     }
 
     function testSetEthUsdRateDex() public {
         uint newRate = 5 ether;
-        DiamondExchange(exchange).setConfig("rate", eth, newRate);
+        DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(newRate));
         assertEq(DiamondExchange(exchange).getLocalRate(eth), newRate);
     }
 
     function testFailIncorectRateSetEthUsdRateDex() public {
         // error Revert ("dex-rate-must-be-greater-than-0")
-        DiamondExchange(exchange).setConfig("rate", eth, uint(0));
+        DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(uint(0)));
     }
 
     function testFailNonOwnerSetEthUsdRateDex() public {
-        // error Revert ("ds-auth-unauthorized") 
+        // error Revert ("ds-auth-unauthorized")
         uint newRate = 5 ether;
         DiamondExchangeTester(user).doSetConfig("rate", eth, newRate);
     }
@@ -1345,7 +1464,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // error Revert ("dex-manual-rate-not-allowed")
         uint sentEth = 1 ether;
 
-        DiamondExchange(exchange).setConfig("manualRate", dpt, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(false));
 
         TestFeedLike(feed[dpt]).setValid(false);
 
@@ -1356,7 +1475,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // error Revert ("dex-manual-rate-not-allowed")
         uint sentEth = 1 ether;
 
-        DiamondExchange(exchange).setConfig("manualRate", eth, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(false));
 
         TestFeedLike(feed[eth]).setValid(false);
 
@@ -1367,7 +1486,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // error Revert ("dex-feed-provides-invalid-data")
         uint sentEth = 1 ether;
 
-        DiamondExchange(exchange).setConfig("manualRate", cdc, false);
+        DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(false));
 
         TestFeedLike(feed[cdc]).setValid(false);
 
@@ -1389,7 +1508,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyAllCdcUserDptNotZeroNotEnoughDex() public {
         // error Revert ("dex-token-not-allowed-to-be-bought")
-        DiamondExchange(exchange).setConfig("canBuyErc20", cdc, false);
+        DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(cdc), b(false));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -1576,7 +1695,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testFailForFixDaiBuyEthUserHasNoDptBothTooMuchDex() public {
-        // error Revert ("dex-we-do-not-sell-ether") 
+        // error Revert ("dex-we-do-not-sell-ether")
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
 
@@ -1606,7 +1725,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDaiBuyAllCdcUserHasEnoughDptCanNotSellTokenDex() public {
         // error Revert ("dex-token-not-allowed-to-be-sold")
-        DiamondExchange(exchange).setConfig("canSellErc20", dai, false);
+        DiamondExchange(exchange).setConfig(b("canSellErc20"), b(dai), b(false));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -1621,7 +1740,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDaiBuyAllCdcUserHasEnoughDptCanNotBuyTokenDex() public {
         // error Revert ("dex-token-not-allowed-to-be-sold")
-        DiamondExchange(exchange).setConfig("canBuyErc20", cdc, false);
+        DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(cdc), b(false));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -1637,7 +1756,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailForFixDaiBuyAllCdcUserHasEnoughDptZeroTokenForSaleDex() public {
         // error Revert ("dex-0-token-is-for-sale")
 
-        SimpleAssetManagement(asm).transferFrom721(dpass, asm, user,  dpassId[seller]);  // send the single collateral token away so that 0 CDC can be created.
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(address(this)), b(true));
+        Dpass(dpass).transferFrom(asm, user,  dpassId[seller]);  // send the single collateral token away so that 0 CDC can be created.
         SimpleAssetManagement(asm).notifyTransferFrom(dpass, asm, user, dpassId[seller]);
 
         userDpt = 123 ether;
@@ -1842,7 +1962,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyAllCdcUserHasNoDptAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -1857,7 +1977,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyAllCdcUserDptNotZeroNotEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -1872,7 +1992,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyAllCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -1886,7 +2006,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyAllCdcUserHasNoDptAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -1901,7 +2021,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyAllCdcUserDptNotZeroNotEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -1915,7 +2035,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyAllCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -1929,7 +2049,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyFixCdcUserHasNoDptAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -1944,7 +2064,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyFixCdcUserDptNotZeroNotEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -1958,7 +2078,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyFixCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -1972,7 +2092,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyFixCdcUserHasNoDptAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -1987,7 +2107,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyFixCdcUserDptNotZeroNotEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -2001,7 +2121,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyFixCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -2016,7 +2136,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyFixCdcUserHasNoDptSellAmtTooMuchAllFeeInDptDex() public {
         // error Revert ("dex-sell-amount-exceeds-allowance")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -2035,7 +2155,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         // if this test fails, it is because in the test testFailForFixEthBuyFixCdcUserHasNoDptBuyAmtTooMuchAllFeeInDpt ...
         // ... we do not actually buy too much, or the next test fails before the feature could be tested
 
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         uint buyAmtOrId = DSToken(cdc).balanceOf(custodian20[cdc]) + 1 ether; // more than available
         uint sellAmtOrId = wdivT(wmulV(buyAmtOrId, usdRate[cdc], cdc), usdRate[eth], eth);
@@ -2044,7 +2164,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyFixCdcUserHasNoDptBuyAmtTooMuchAllFeeInDptDex() public {
         // error Revert ("dex-buy-amount-exceeds-allowance")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         uint buyAmtOrId = DSToken(cdc).balanceOf(custodian20[cdc]) + 1 ether; // more than available
         uint sellAmtOrId = wdivT(wmulV(buyAmtOrId, usdRate[cdc], cdc), usdRate[eth], eth);
@@ -2068,7 +2188,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailSendEthIfNoEthIsSellTokenAllFeeInDptDex() public {
         // error Revert ("dex-do-not-send-ether")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         uint sentEth = 1 ether;
 
@@ -2084,7 +2204,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixDptBuyAllCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2099,7 +2219,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllDptBuyAllCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2113,7 +2233,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
     function testForAllDptBuyFixCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2127,7 +2247,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixDptBuyFixCdcUserDptEnoughAllFeeInDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2157,7 +2277,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testBuyTokensWithFeeWithManualEthUsdRateDex() public {
 
         usdRate[eth] = 400 ether;
-        DiamondExchange(exchange).setConfig("rate", eth, usdRate[eth]);
+        DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(usdRate[eth]));
         TestFeedLike(feed[eth]).setValid(false);
 
         userDpt = 123 ether;
@@ -2174,7 +2294,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testBuyTokensWithFeeWithManualDptUsdRateDex() public {
 
         usdRate[dpt] = 400 ether;
-        DiamondExchange(exchange).setConfig("rate", dpt, usdRate[dpt]);
+        DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(usdRate[dpt]));
         TestFeedLike(feed[dpt]).setValid(false);
 
         userDpt = 123 ether;
@@ -2191,7 +2311,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testBuyTokensWithFeeWithManualCdcUsdRateDex() public {
 
         usdRate[cdc] = 400 ether;
-        DiamondExchange(exchange).setConfig("rate", cdc, usdRate[cdc]);
+        DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(usdRate[cdc]));
         TestFeedLike(feed[cdc]).setValid(false);
 
         userDpt = 123 ether;
@@ -2208,7 +2328,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testBuyTokensWithFeeWithManualDaiUsdRateDex() public {
 
         usdRate[dai] = 400 ether;
-        DiamondExchange(exchange).setConfig("rate", dai, usdRate[dai]);
+        DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(usdRate[dai]));
         TestFeedLike(feed[dai]).setValid(false);
 
         userDpt = 123 ether;
@@ -2235,8 +2355,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
     function testBuyTokensWithFeeWhenFeeIsZeroDex() public {
 
-        DiamondExchange(exchange).setConfig("fixFee", uint(0), "");
-        DiamondExchange(exchange).setConfig("varFee", uint(0), "");
+        DiamondExchange(exchange).setConfig(b("fixFee"), b(uint(0)), b(""));
+        DiamondExchange(exchange).setConfig(b("varFee"), b(uint(0)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -2300,7 +2420,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForDpassBuyDpassUserHasNoDptCanSellErc721Dex() public {
         // error Revert ("dex-one-of-tokens-must-be-erc20")
-        DiamondExchange(exchange).setConfig("canSellErc721", dpass, true);
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -2314,7 +2434,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailForDpassBuyDpassUserHasDptNotEnoughCanSellErc721Dex() public {
         // error Revert ("dex-one-of-tokens-must-be-erc20")
 
-        DiamondExchange(exchange).setConfig("canSellErc721", dpass, true);
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
 
         userDpt = 1.812 ether;
         sendToken(dpt, user, userDpt);
@@ -2327,7 +2447,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForDpassBuyDpassUserHasEnoughDptCanSellErc721Dex() public {
         // error Revert ("dex-one-of-tokens-must-be-erc20")
-        DiamondExchange(exchange).setConfig("canSellErc721", dpass, true);
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2669,7 +2789,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 //-------------------new--------------------------------------------------
 
     function testForFixEthBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 0 ether;
@@ -2681,7 +2801,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
     function testForFixEthBuyDpassUserDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 5 ether;
         sendToken(dpt, user, userDpt);
@@ -2693,7 +2813,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixEthBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 6.4 ether;
@@ -2708,7 +2828,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     function testFailForFixEthBuyDpassUserDptNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
 
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2722,7 +2842,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyDpassUserEthNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1.812 ether;
         sendToken(dpt, user, userDpt);
@@ -2735,7 +2855,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyDpassUserBothNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2748,7 +2868,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 0 ether;
@@ -2761,7 +2881,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyDpassDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2774,7 +2894,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllEthBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -2787,7 +2907,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixDptBuyDpassFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2800,7 +2920,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDptBuyDpassUserDptNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1000 ether;
         sendToken(dpt, user, userDpt);
@@ -2811,7 +2931,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
     function testForAllDptBuyDpassFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 500 ether;                                // should not change this value
         sendToken(dpt, user, userDpt);
@@ -2822,7 +2942,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
     function testForFixCdcBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 0 ether;
@@ -2836,7 +2956,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixCdcBuyDpassUserDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 5 ether;
@@ -2850,7 +2970,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixCdcBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -2866,7 +2986,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixCdcBuyDpassUserDptNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2880,7 +3000,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixCdcBuyDpassUserCdcNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -2894,7 +3014,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixCdcBuyDpassUserBothNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2908,7 +3028,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDpassBuyDpassFullFeeDptDex() public {
         // error Revert ("dex-token-not-allowed-to-be-sold")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -2917,19 +3037,19 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllCdcBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
-        sendSomeCdcToUser(); 
+        sendSomeCdcToUser();
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
 
     function testForAllCdcBuyDpassDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2937,13 +3057,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
-        sendSomeCdcToUser(); 
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
 
     function testForAllCdcBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -2951,12 +3071,12 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
         address sellToken = cdc;
         uint sellAmtOrId = uint(-1);
-        sendSomeCdcToUser(); 
+        sendSomeCdcToUser();
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
     function testForFixDaiBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 0 ether;
@@ -2969,7 +3089,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixDaiBuyDpassUserDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -2982,7 +3102,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForFixDaiBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -2996,7 +3116,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDaiBuyDpassUserDptNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1 ether;
         sendToken(dpt, user, userDpt);
@@ -3009,7 +3129,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDaiBuyDpassUserDaiNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1.812 ether;
@@ -3023,7 +3143,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixDaiBuyDpassUserBothNotEnoughFullFeeDptDex() public {
         // error Revert ("dex-not-enough-user-funds-to-sell")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -3036,7 +3156,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllDaiBuyDpassUserHasNoDptFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 0 ether;
@@ -3049,7 +3169,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllDaiBuyDpassDptNotEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
 
         userDpt = 1 ether;
@@ -3062,7 +3182,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
     }
 
     function testForAllDaiBuyDpassUserDptEnoughFullFeeDptDex() public {
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b32(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
 
         userDpt = 1.812 ether;
         sendToken(dpt, user, userDpt);
@@ -3075,7 +3195,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForFixEthBuyDpassUserDptEnoughDex() public {
         // error Revert ("dex-not-enough-funds")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b(false), "");
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -3090,8 +3210,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailForDpassBuyCdcUserDptEnoughDex() public {
         // error Revert ("dex-not-enough-tokens-to-buy")
-        DiamondExchange(exchange).setConfig("takeProfitOnlyInDpt", b(false), "");
-        DiamondExchange(exchange).setConfig("canSellErc721", dpass, b(true));
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -3120,7 +3240,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         assertEq(attrs[4], bytes32(uint(0xc0a5d062e13f99c8f70d19dc7993c2f34020a7031c17f29ce2550315879006d7)));
         assertEq(attrs[5], "20191101");
         assertEq(carat, uint(0.2 * 100));
-        assertEq(price, dpassOwnerPrice);
+        assertEq(price, dpassOwnerPrice[user]);
 
         (ownerCustodian, attrs, carat, price) = DiamondExchange(exchange).getDiamondInfo(dpass, dpassId[seller]);
 
@@ -3133,43 +3253,90 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
         assertEq(attrs[4], bytes32(uint(0xac5c1daab5131326b23d7f3a4b79bba9f236d227338c5b0fb17494defc319886)));
         assertEq(attrs[5], "20191101");
         assertEq(carat, uint(3.1 * 100));
-        assertEq(price, dpassOwnerPrice);
+        assertEq(price, dpassOwnerPrice[asm]);
     }
-    
-    function testGetBuyPriceAndSetSellPriceDex() public {
+
+    function testGetBuyPriceAndSetBuyPriceDex() public {
         uint buyPrice = 43 ether;
         uint otherBuyPrice = 47 ether;
-        DiamondExchangeTester(user).doSetBuyPrice(dpass, dpassId[user], buyPrice);
-        assertEq(DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]), buyPrice);
-        DiamondExchangeTester(seller).doSetBuyPrice(dpass, dpassId[user], otherBuyPrice); // anyone can set sell price, but it will only be effective, if they own the token
-        assertEq(DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]), buyPrice);
 
-        DiamondExchangeTester(user).transferFrom721(dpass, user, seller, dpassId[user]);
-        assertEq(DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]), otherBuyPrice);
+        DiamondExchangeTester(user)
+            .doSetBuyPrice(dpass, dpassId[user], buyPrice);
+
+        assertEqLog(
+            "setBuyPrice() actually set",
+            DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]),
+            buyPrice);
+
+        DiamondExchangeTester(seller)
+            .doSetBuyPrice(dpass, dpassId[user], otherBuyPrice);            // anyone can set sell price, but it will only be effective, if they own the token
+
+        assertEqLog(
+            "setBuyPrice() by oth don't apply",
+            DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]),
+            buyPrice);
+
+        DiamondExchangeTester(user)
+            .transferFrom721(dpass, user, seller, dpassId[user]);
+        assertEqLog(
+            "setBuyPrice() apply once new own",
+            DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]),
+            otherBuyPrice);
     }
 
     function testGetPriceDex() public {
         uint buyPrice = 43 ether;
         uint otherBuyPrice = 47 ether;
-        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), dpassOwnerPrice);
+        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), dpassOwnerPrice[user]);
 
-        DiamondExchangeTester(user).doSetBuyPrice(dpass, dpassId[user], buyPrice);
-        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), buyPrice);
-        
-        DiamondExchangeTester(seller).doSetBuyPrice(dpass, dpassId[user], otherBuyPrice);       // if non-owner sets price price does not change
-        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), buyPrice);
-        
-        DiamondExchangeTester(user).doSetBuyPrice(dpass, dpassId[user], 0 ether);               // if user sets 0 price for dpass, the base price will be used
-        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), dpassOwnerPrice);
+        DiamondExchangeTester(user)
+            .doSetBuyPrice(dpass, dpassId[user], buyPrice);
 
-        DiamondExchangeTester(user).doSetBuyPrice(dpass, dpassId[user], uint(-1));               // if user sets highest possible  price for dpass, the base price will be used
-        assertEq(DiamondExchange(exchange).getPrice(dpass, dpassId[user]), dpassOwnerPrice);
+        assertEqLog(
+            "getPrice() is setBuyPrice()",
+            DiamondExchange(exchange).getPrice(dpass, dpassId[user]),
+            buyPrice
+            );
 
-        DiamondExchangeTester(user).transferFrom721(dpass, user, seller, dpassId[user]);
-        assertEq(DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]), otherBuyPrice);
+        DiamondExchangeTester(seller)
+            .doSetBuyPrice(dpass, dpassId[user], otherBuyPrice);            // if non-owner sets price price does not change
 
-        DiamondExchangeTester(seller).doSetBuyPrice(dpass, dpassId[user], 0 ether);             // if there is no valid price set, then base price is used
-        DiamondExchangeTester(seller).doSetBuyPrice(dpass, dpassId[user], dpassOwnerPrice);
+        assertEqLog(
+            "non-owner set price dont change",
+            DiamondExchange(exchange).getPrice(dpass, dpassId[user]),
+            buyPrice);
+
+        DiamondExchangeTester(user)
+            .doSetBuyPrice(dpass, dpassId[user], 0 ether);                  // if user sets 0 price for dpass, the base price will be used
+
+        assertEqLog(
+            "0 set price base price used",
+            DiamondExchange(exchange).getPrice(dpass, dpassId[user]),
+            dpassOwnerPrice[user]);
+
+        DiamondExchangeTester(user)
+            .doSetBuyPrice(dpass, dpassId[user], uint(-1));                 // if user sets highest possible  price for dpass, the base price will be used
+
+        assertEqLog(
+            "uint(-1) price is base price",
+            DiamondExchange(exchange).getPrice(dpass, dpassId[user]),
+            dpassOwnerPrice[user]);
+
+        DiamondExchangeTester(user)
+            .transferFrom721(dpass, user, seller, dpassId[user]);
+
+        assertEqLog(
+            "prev set price is now valid",
+            DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]),
+            otherBuyPrice);
+
+        DiamondExchangeTester(seller)
+            .doSetBuyPrice(dpass, dpassId[user], 0 ether);                  // if there is no valid price set, then base price is used
+
+        assertEqLog(
+            "base price used when 0 set",
+            DiamondExchange(exchange).getPrice(dpass, dpassId[user]),
+            dpassOwnerPrice[user]);
     }
 
     function testFailGetPriceBothBasePriceAndSetBuyPriceZeroDex() public {
@@ -3180,7 +3347,470 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents {
 
     function testFailGetPriceTokenNotForSaleDex() public {
         // error Revert ("dex-token-not-for-sale")
-        DiamondExchange(exchange).setConfig("canBuyErc721", dpass, b(false));
+        DiamondExchange(exchange).setConfig(b("canBuyErc721"), b(dpass), b(b(false)));
         DiamondExchange(exchange).getPrice(dpass, dpassId[user]);
     }
+
+    function testFailSellDpassForFixCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
+        // error Revert ("dex-not-enough-tokens-to-buy")
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.57 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testFailSellDpassForFixCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
+        // error Revert ("dex-not-enough-tokens-to-buy")
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.51 ether;
+        require(buyAmtOrId < 6.511428571428571429 ether, "test-buyAmtOrId-too-high");
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testFailSellDpassForFixCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
+        // error Revert ("dex-not-enough-tokens-to-buy")
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.57 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+//--------------------------------
+
+    function testFailSellDpassForFixCdcUserHasNoDptFullFeeInDptDex() public {
+        // error Revert ("dex-not-enough-tokens-to-buy") 
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.57 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasNoDptFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasNoDptFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testFailSellDpassForFixCdcUserHasDptNotEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        // error Revert ("dex-not-enough-tokens-to-buy")
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.51 ether;
+        require(buyAmtOrId < 6.511428571428571429 ether, "test-buyAmtOrId-too-high");
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasDptNotEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasDptNotEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testFailSellDpassForFixCdcUserHasDptEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+        // error Revert ("dex-not-enough-tokens-to-buy")
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 6.57 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedCdcUserHasDptEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedCdcUserHasDptEnoughFullFeeInDptDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
+
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = cdc;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForLimitedDaiDex() public {
+
+        DSToken(dai).transfer(asm, INITIAL_BALANCE);
+        balance[asm][dai] = DSToken(dai).balanceOf(asm);
+        DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(dai), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = dai;
+        uint buyAmtOrId = 70 ether;
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testSellDpassForUnlimitedDaiDex() public {
+
+        DSToken(dai).transfer(asm, INITIAL_BALANCE);
+        balance[asm][dai] = DSToken(dai).balanceOf(asm);
+        DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(dai), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+        userDpt = 123 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint sellAmtOrId = dpassId[user];
+        address buyToken = dai;
+        uint buyAmtOrId = uint(-1);
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testFailSellDpassForLimitedEthDex() public pure {
+        require(false, "approve-not-work-for-eth");          // we can't even test with eth, since it can not be approved, if you want to sell Ether, probably W-eth is your best option
+    }
+
+    function testFailSellDpassForUnlimitedEthDex() public pure {
+        require(false, "approve-not-work-for-eth");          // we can't even test with eth, since it can not be approved, if you want to sell Ether, probably W-eth is your best option
+    }
+
+    function testForFixEthBuyUserDpassUserHasNoDptDex() public {
+
+        DiamondExchangeTester(user)                                                 // address(this) is the seller the seller
+            .transferFrom721(dpass, user, address(this), dpassId[user]);
+        dpassOwnerPrice[address(this)] = 61 ether;
+        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
+        Dpass(dpass).approve(exchange, dpassId[user]);
+
+        SimpleAssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
+
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[user]);
+    }
+
+    function testForFixCdcBuyUserDpassUserHasNoDptDex() public {
+
+        DiamondExchangeTester(user)
+            .transferFrom721(dpass, user, address(this), dpassId[user]);
+        dpassOwnerPrice[address(this)] = 61 ether;
+        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
+        Dpass(dpass).approve(exchange, dpassId[user]);
+
+        SimpleAssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
+        userDpt = 0 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = cdc;
+        uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[user]);
+    }
+
+    function testFailAuthCheckSetConfigDex() public {
+        DiamondExchange(exchange).setOwner(user);
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
+    }
+
+    function testFailAuthCheck_getValuesDex() public {
+        TrustedDiamondExchange(exchange)._getValues(eth, 1 ether, cdc, uint(-1));
+    }
+
+    function testFailAuthCheck_takeFeeDex() public {
+        TrustedDiamondExchange(exchange)._takeFee(.2 ether, 1 ether, 1 ether, eth, 1 ether, cdc, 1 ether);
+    }
+
+    function testFailAuthCheck_transferTokensDex() public {
+        TrustedDiamondExchange(exchange)._transferTokens(1 ether, 1 ether, eth, 1 ether, cdc, 1 ether, .2 ether);
+    }
+
+    function testFailAuthCheckGetLocalRateDex() public {
+        DiamondExchange(exchange).setOwner(user);
+        DiamondExchange(exchange).getLocalRate(cdc);
+    }
+
+    function testFailAuthCheckGetAllowedTokenDex() public {
+        DiamondExchange(exchange).setOwner(user);
+        DiamondExchange(exchange).getAllowedToken(cdc, true);
+    }
+
+    function testFailAuthCheckGetRateDex() public {
+        DiamondExchange(exchange).setOwner(user);
+        DiamondExchange(exchange).getRate(cdc);
+    }
+
+    function testFailAuthCheck_getNewRateDex() public view {
+        TrustedDiamondExchange(exchange)._getNewRate(eth);
+    }
+
+    function testFailAuthCheck_updateRatesDex() public {
+        TrustedDiamondExchange(exchange)._updateRates(dai, dpass);
+    }
+
+    function testFailAuthCheck_logTradeDex() public {
+        TrustedDiamondExchange(exchange)._logTrade(eth, 1 ether, cdc, 1 ether, 1 ether, .2 ether);
+    }
+
+    function testFailAuthCheck_updateRateDex() public {
+        TrustedDiamondExchange(exchange)._updateRate(dai);
+    }
+
+    function testFailAuthCheck_takeFeeInTokenDex() public {
+        TrustedDiamondExchange(exchange)._takeFeeInToken(.2 ether, .03 ether, dai, address(this), 1 ether);
+    }
+
+    function testFailAuthCheck_takeFeeInDptFromUserDex() public {
+        TrustedDiamondExchange(exchange)._takeFeeInDptFromUser(.2 ether);
+    }
+
+    function testFailAuthCheck_sendTokenDex() public {
+        TrustedDiamondExchange(exchange)._sendToken(dpt, address(this), user, 1 ether);
+    }
 }
+
