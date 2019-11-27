@@ -81,8 +81,15 @@ hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc
 # BURNER=$(dapp create Burner "$DPT")
 # echo -e "Burner DEPLOYED AT: $BURNER"
 
+# export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
+# export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
+# DCDC=$(dapp create Dcdc $cccc $bDcdcName 1)
+# echo -e "DCDC DEPLOYED AT: $DCDC"
+
+
 export DPT=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
-export CDC=0x3fc234658ac12c8e823f0a2f6aa2eb1812ca440f
+# export CDC=0x3fc234658ac12c8e823f0a2f6aa2eb1812ca440f
+export CDC=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
 export DPASS=0x2283bf620ee7fdafa009b5f6607dd217eccf6fe4
 export ETH_PRICE_FEED=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
 export DPT_PRICE_FEED=0xc9faD47Fe77500515de29024C076b6d8D87d423E
@@ -94,8 +101,17 @@ export WALLET=0xA787E6c6d365641DC9540148E4f8426f81FE235B
 export FIXED_FEE=$(seth --to-uint256 $(seth --to-wei 0 eth))
 export VAR_FEE=$(seth --to-uint256 $(seth --to-wei 1 eth))
 export PROFIT_RATE=$(seth --to-uint256 $(seth --to-wei 0.1 eth))
+export DCDC=0xbF2Fb30C4a6f37dCCb08F987814852A5A7b64337
 
 seth send $DPT "transfer(address,uint)" $LIQ $(seth --to-uint256 $(seth --to-wei 1000 eth))
+
+! give access to exchange from liq
+! takeProfitOnlyInDpt = false
+! profitRate = 1eth (1eth 0.5 eth, 0.1 eth...)
+
+1) eth / cdc to wanna buy
+cdc * usd
+
 
 DIAMOND_EXCHANGE=$(dapp create DiamondExchange $CDC $DPT $DPASS $ETH_PRICE_FEED $DPT_PRICE_FEED $CDC_PRICE_FEED $LIQ $BURNER $ASM $FIXED_FEE $VAR_FEE $PROFIT_RATE $WALLET)
 
