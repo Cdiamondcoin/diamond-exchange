@@ -1,4 +1,23 @@
-#export ETH_GAS_PRICE=50000000000
+#!/usr/bin/env bash
+set -x
+
+## Settings for test networks like Rinkeby, Kovan, Ropsten
+
+## Internal settings (do not touch these unless you know what you are doing!!)
+export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
+export ETH_RPC_URL=https://rinkeby.infura.io/v3/47706a887c1245319e35b5e507c7f097
+export ETH_KEYSTORE="$(pwd)"
+export ETH_GAS=8000000
+export ETH_GAS_PRICE=50000000000
+export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
+export ETH_PASSWORD=~/.eth-pwd
+################################################################################
+# max is 24576
+DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin)
+echo $((${#DATA} / 2 - 1))
+
+
+export dex=0x63f9101b9244e20a81071d76cc12f9986f69f4d0
 export asm=0x8892a913819088fcbf412dd46355cfb2c93da71f
 
 # == Decimals ==
@@ -87,9 +106,10 @@ export dcdcs=$(seth --to-bytes32 $(seth --from-ascii dcdcs))
 # asm.setConfig("dcdcs", b(dcdc), b(true), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dcdcs $bDcdc $bTrue $diamonds
 
-# == dpasses ==
-export dpass=0xc6188fBa6b826E45C33d8711155C5f10E0790F4a
-export dpasses=$(seth --to-bytes32 $(seth --from-ascii dpasses))
-export bDpass=$(seth --to-bytes32 $(seth --to-uint256 $dpass))
-# asm.setConfig("dpasses", b(dpass), b(true), "diamonds");
-seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dpasses $bDpass $bTrue $diamonds
+# # == dpasses ==
+# export dpass=0xc6188fBa6b826E45C33d8711155C5f10E0790F4a
+# export dpasses=$(seth --to-bytes32 $(seth --from-ascii dpasses))
+# export bDpass=$(seth --to-bytes32 $(seth --to-uint256 $dpass))
+
+# # asm.setConfig("dpasses", b(dpass), b(true), "diamonds");
+# seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dpasses $bDpass $bTrue $diamonds

@@ -113,7 +113,7 @@ seth send $DPT "transfer(address,uint)" $LIQ $(seth --to-uint256 $(seth --to-wei
 cdc * usd
 
 
-DIAMOND_EXCHANGE=$(dapp create DiamondExchange $CDC $DPT $DPASS $ETH_PRICE_FEED $DPT_PRICE_FEED $CDC_PRICE_FEED $LIQ $BURNER $ASM $FIXED_FEE $VAR_FEE $PROFIT_RATE $WALLET)
+DIAMOND_EXCHANGE=$(dapp create DiamondExchange)
 
 SASM=$(dapp create SimpleAssetManagement)
 
