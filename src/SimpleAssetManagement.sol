@@ -17,9 +17,16 @@ contract TrustedFeedLike {
 }
 
 
-contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
+contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
-    event LogUpdateCollateral(uint256 positiveV, uint256 negativeV, address custodian);
+    event LogTransferEth(address src, address dst, uint256 amount);
+    event LogBasePrice(address token_, uint256 tokenId_);
+    event LogCdcValue(uint256 totalCdcV, bytes32 domain, uint256 cdcValue, address token);
+    event LogDcdcValue(uint256 totalDcdcV, bytes32 domain, uint256 ddcValue, address token);
+    event LogDcdcCustodianValue(uint256 totalDcdcCustV, uint256 dcdcCustV, address dcdc, address custodian);
+    event LogDcdcTotalCustodianValue(uint256 totalDcdcCustV, uint256 totalDcdcV, address custodian, bytes32 domain);
+    event LogDpassValue(uint256 totalDpassCustV, uint256 totalDpassV, address custodian, bytes32 domain);
+
     // Commented due fit to code size limit 24,576 bytes
     mapping(
         address => mapping(
@@ -28,33 +35,32 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     mapping(address => uint)                                // total base currency value of custodians collaterals
         public totalDpassCustV;
     mapping(address => uint) private rate;                  // current rate of a token in base currency
-    mapping(address => uint) public cdcValues;              // base currency value of cdc token
-    mapping(address => uint) public dcdcValues;             // base currency value of dcdc token
-    mapping(address => uint) public totalDcdcCustV;         // total value of all dcdcs at custodian
+    mapping(address => uint) private cdcValues;             // base currency value of cdc token
+    mapping(address => uint) private dcdcValues;            // base currency value of dcdc token
+    mapping(address => uint) private totalDcdcCustV;        // total value of all dcdcs at custodian
     mapping(
         address => mapping(
-            address => uint)) public dcdcCustV;             // dcdcCustV[dcdc][custodian] value of dcdc at custodian
-    mapping(address => bool) payTokens;                     // returns true for tokens allowed to make payment to custodians with
-    mapping(address => bool) dpasses;                       // returns true for dpass tokens allowed in this contract
-    mapping(address => bool) dcdcs;                         // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
-    mapping(address => bool) cdcs;                          // returns true for cdc tokens allowed in this contract
-    mapping(address => uint) public decimals;               // stores decimals for each ERC20 token
-    mapping(address => bool) public decimalsSet;            // stores decimals for each ERC20 token
-    mapping(address => address) public priceFeed;           // price feed address for token
-    mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
+            address => uint)) private dcdcCustV;            // dcdcCustV[dcdc][custodian] value of dcdc at custodian
+    mapping(address => bool) private payTokens;             // returns true for tokens allowed to make payment to custodians with
+    mapping(address => bool) private dpasses;               // returns true for dpass tokens allowed in this contract
+    mapping(address => bool) private dcdcs;                 // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
+    mapping(address => bool) private cdcs;                  // returns true for cdc tokens allowed in this contract
+    mapping(address => uint) private decimals;              // stores decimals for each ERC20 token
+    mapping(address => bool) private decimalsSet;           // stores decimals for each ERC20 token
+    mapping(address => address) private priceFeed;          // price feed address for token
+    mapping(address => uint) private tokenPurchaseRate;     // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
-    mapping(address => uint) public totalPaidV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
-    mapping(address => uint) public totalDpassSoldV;        // totoal amount of all dpass tokens that have been sold by custodian
+    mapping(address => uint) private totalPaidV;            // total amount that has been paid to custodian for dpasses and cdc in base currency
+    mapping(address => uint) private totalDpassSoldV;       // totoal amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => bytes32) public domains;             // the domain that connects the set of cdc, dpass, and dcdc tokens, and custodians
-    mapping(bytes32 => uint) public totalDpassV;            // total value of dpass collaterals in base currency
-    mapping(bytes32 => uint) public totalDcdcV;             // total value of dcdc collaterals in base currency
-    mapping(bytes32 => uint) public totalCdcV;              // total value of cdc tokens issued in base currency
-    mapping(bytes32 => uint) public overCollRatio;          // the totalDpassV >= overCollRatio * totalCdcV
+    mapping(bytes32 => uint) private totalDpassV;           // total value of dpass collaterals in base currency
+    mapping(bytes32 => uint) private totalDcdcV;            // total value of dcdc collaterals in base currency
+    mapping(bytes32 => uint) private totalCdcV;             // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) private overCollRatio;         // the totalDpassV >= overCollRatio * totalCdcV
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
-    bool public locked;                                     // variable prevents to exploit by recursively calling funcions
-    address public currDcdc;                                // the current dcdc token to update the price for
-    address eth = address(0xee);                            // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
+    bool private locked;                                    // variable prevents to exploit by recursively calling funcions
+    address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
     /**
      * @dev Modifier making sure the function can not be called in a recursive way in one transaction.
      */
@@ -333,6 +339,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         }
 
         basePrice[token_][tokenId_] = price_;
+        emit LogBasePrice(token_, tokenId_);
     }
 
     /**
@@ -399,7 +406,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         bytes32 domain = domains[token_];
 
         require(dpasses[token_] || cdcs[token_] || payTokens[token_], "asm-invalid-token");
-
+        require(!dpasses[token_] || Dpass(token_).getState(amtOrId_) == "sale", "asm-ntf-token-state-not-sale");
         if(dpasses[token_] && src_ == address(this)) {                        // custodian sells dpass to user
             custodian = Dpass(token_).getCustodian(amtOrId_);
             _updateCollateralDpass(0, basePrice[token_][amtOrId_], custodian);
@@ -492,14 +499,69 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         _requirePaidLessThanSold(src_, custodianCdcV);
     }
 
+    //TODO: test
+    function mintDpass(
+        address token_,
+        address custodian_,
+        bytes32 issuer_,
+        bytes32 report_,
+        bytes32 state_,
+        bytes32 cccc_,
+        uint24 carat_,
+        bytes32 attributesHash_,
+        bytes8 currentHashingAlgorithm_,
+        uint price_
+    ) public nonReentrant auth returns (uint256 id_) {
+        require(dpasses[token_], "asm-mnt-not-a-dpass-token");
+        require(!custodians[msg.sender] || custodian_ == msg.sender, "asm-mnt-can-not-mint-for-dst");
+
+        id_ = Dpass(token_).mintDiamondTo(
+            address(this),                  // owner
+            custodian_,
+            issuer_,
+            report_,
+            state_,
+            cccc_,
+            carat_,
+            attributesHash_,
+            currentHashingAlgorithm_);
+
+        setBasePrice(token_, id_, price_);
+    }
+
+    //TODO: test
+    function setDpassState(address token_, uint256 tokenId_, bytes32 state_) public nonReentrant auth {
+        require(dpasses[token_], "asm-mnt-not-a-dpass-token");
+        require(
+            !custodians[msg.sender] ||
+            msg.sender == Dpass(token_).getCustodian(tokenId_),
+            "asm-sds-not-authorized");
+        Dpass(token_).changeStateTo(state_, tokenId_);
+    }
+    
+    //TODO: test
+    function setDpassState(address token_, uint256[] memory tokenIds_, bytes32 state_) public nonReentrant auth {
+        require(dpasses[token_], "asm-sds-not-a-dpass-token");
+
+        for(uint tokenId_ = 0; tokenId_ < tokenIds_.length; tokenId_++) {
+
+            require(
+                !custodians[msg.sender] ||
+                msg.sender == Dpass(token_).getCustodian(tokenId_),
+                "asm-sds-not-authorized");
+
+            Dpass(token_).changeStateTo(state_, tokenId_);
+        }
+    }
+
     function getWithdrawValue(address custodian_) public view returns(uint) {
         require(custodians[custodian_], "asm-not-a-custodian");
-        uint custodianCdcV = _getCustodianCdcV(domains[custodian_], custodian_);
-        uint totalSoldV = add(
-            custodianCdcV,
+        uint custodianCdcV_ = _getCustodianCdcV(domains[custodian_], custodian_);
+        uint totalSoldV_ = add(
+            custodianCdcV_,
             totalDpassSoldV[custodian_]);
-        if (add(totalSoldV, dust) > totalPaidV[custodian_]) {
-            return sub(totalSoldV, totalPaidV[custodian_]);
+        if (add(totalSoldV_, dust) > totalPaidV[custodian_]) {
+            return sub(totalSoldV_, totalPaidV[custodian_]);
         } else {
             return 0;
         }
@@ -556,7 +618,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     */
     function updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDpass(positiveV_, negativeV_, custodian_);
-        emit LogUpdateCollateral(positiveV_, negativeV_, custodian_);
     }
 
     /*
@@ -564,7 +625,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
     */
     function updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
-        emit LogUpdateCollateral(positiveV_, negativeV_, custodian_);
     }
 
     function () external payable {
@@ -592,6 +652,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcValues[cdc_]);
 
         cdcValues[cdc_] = newValue;
+
+        emit LogCdcValue(totalCdcV[domain], domain, cdcValues[cdc_], cdc_);
     }
 
     function _updateTotalDcdcValue(address dcdc_) internal {
@@ -600,6 +662,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
         uint newValue = wmulV(DSToken(dcdc_).totalSupply(), _updateRate(dcdc_), dcdc_);
         totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcValues[dcdc_]);
         dcdcValues[dcdc_] = newValue;
+        emit LogDcdcValue(totalDcdcV[domain], domain, cdcValues[dcdc_], dcdc_);
     }
 
     function _updateDcdcValue(address dcdc_, address custodian_) internal {
@@ -614,6 +677,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
             dcdcCustV[dcdc_][custodian_]);
 
         dcdcCustV[dcdc_][custodian_] = newValue;
+
+        emit LogDcdcCustodianValue(totalDcdcCustV[custodian_], dcdcCustV[dcdc_][custodian_], dcdc_, custodian_);
 
         _updateTotalDcdcValue(dcdc_);
     }
@@ -708,12 +773,14 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
                 totalDpassCustV[custodian_],
                 positiveV_),
             negativeV_);
-
+        
         totalDpassV[domain] = sub(
             add(
                 totalDpassV[domain],
                 positiveV_),
             negativeV_);
+
+        emit LogDpassValue(totalDpassCustV[custodian_], totalDpassV[domain], custodian_, domain);
     }
 
     function _updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) internal {
@@ -731,11 +798,34 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath, Wallet {
                 totalDcdcV[domain],
                 positiveV_),
             negativeV_);
+
+        emit LogDcdcTotalCustodianValue(totalDcdcCustV[custodian_], totalDcdcV[domain], custodian_, domain);
+    }
+
+// TODO: comment out next function if wallet is inherited from
+    /**
+    * @dev send token or ether to destination
+    */
+    function sendToken(
+        address token,
+        address src,
+        address payable dst,
+        uint256 amount
+    ) internal returns (bool){
+        TrustedErc20Wallet erc20 = TrustedErc20Wallet(token);
+        if (token == eth && amount > 0) {
+            require(src == address(this), "wal-ether-transfer-invalid-src");
+            dst.transfer(amount);
+            emit LogTransferEth(src, dst, amount);
+        } else {
+            if (amount > 0) erc20.transferFrom(src, dst, amount);   // transfer all of token to dst
+        }
+        return true;
     }
 }
-// TODO: document functions
-// TODO: emit events
-// TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
+
+// TODO: be able to ban custodian sale, and specific diamond sale (from "sale" to "valid")
 // TODO: if dpass is created the wrong way asset management must be able to invalidate it.
-// TODO: update Wallet.sol to handle dpass tokens as well
 // TODO: order setConfig values gas decreasing order
+// TODO: update Wallet.sol to handle dpass tokens as well
+// TODO: document functions

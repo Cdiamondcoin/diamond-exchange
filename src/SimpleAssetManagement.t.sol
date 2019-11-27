@@ -343,7 +343,6 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         feed[dai] = address(new TestFeedLike(usdRate[dai], true));
         feed[eng] = address(new TestFeedLike(usdRate[eng], true));
 
-
         feed[cdc] = address(new TestFeedLike(usdRate[cdc], true));
         feed[cdc1] = address(new TestFeedLike(usdRate[cdc1], true));
         feed[cdc2] = address(new TestFeedLike(usdRate[cdc2], true));
@@ -933,7 +932,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         bytes32 cccc_ = "BR,IF,F,0.01";
         uint amt = 10 ether;
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
@@ -956,7 +955,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         bytes32 cccc_ = "BR,IF,F,0.01";
         uint amt = 10 ether;
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
@@ -1011,7 +1010,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint id_;
         bytes32 cccc_ = "BR,I3,D,10.00";
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = Dpass(dpass).mintDiamondTo(user, custodian, "GIA", "3333333", "valid", cccc_, 1, b(0xef), "20191107");
+        id_ = Dpass(dpass).mintDiamondTo(user, custodian, "GIA", "3333333", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
         asm.setConfig("payTokens", b(dpass), b(true), "diamonds");
@@ -1046,7 +1045,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc1_, true);
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
 
-        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
@@ -1057,7 +1056,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(exchange).doSendToken(dai, user, address(asm), price_);
         asm.notifyTransferFrom(dai, user, address(asm), price_);
 
-        id1_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "22222222", "valid", cccc1_, 1, b(0xef), "20191107");
+        id1_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "22222222", "sale", cccc1_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id1_, price1_);
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id1_);
@@ -1181,7 +1180,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint id_;
         bytes32 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
