@@ -24,8 +24,4 @@ contract Burner is DSAuth {
         uint totalAmount = token.balanceOf(address(this));
         burn(totalAmount);
     }
-
-    function returnToOwner(uint amount_) public auth {
-        token.transfer(owner, amount_);
-    }
 }
