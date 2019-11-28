@@ -10,168 +10,6 @@ import "./SimpleAssetManagement.sol";
 import "./Wallet.sol";
 import "./Dcdc.sol";
 
-contract TestFeedLike {
-    bytes32 public rate;
-    bool public feedValid;
-
-    constructor(uint rate_, bool feedValid_) public {
-        require(rate_ > 0, "TestFeedLike: Rate must be > 0");
-        rate = bytes32(rate_);
-        feedValid = feedValid_;
-    }
-
-    function peek() external view returns (bytes32, bool) {
-        return (rate, feedValid);
-    }
-
-    function setRate(uint rate_) public {
-        rate = bytes32(rate_);
-    }
-
-    function setValid(bool feedValid_) public {
-        feedValid = feedValid_;
-    }
-}
-
-
-contract TrustedDpassTester {
-    Dpass public dpass;
-
-    constructor(Dpass dpass_) public {
-        dpass = dpass_;
-    }
-
-    function doSetSaleStatus(uint tokenId) public {
-        dpass.setSaleStatus(tokenId);
-    }
-
-    function doRedeem(uint tokenId) public {
-        dpass.redeem(tokenId);
-    }
-
-    function doChangeStateTo(bytes32 state, uint tokenId) public {
-        dpass.changeStateTo(state, tokenId);
-    }
-
-    function doSetCustodian(uint tokenId, address newCustodian) public {
-        dpass.setCustodian(tokenId, newCustodian);
-    }
-
-    function doSetAllowedCccc(bytes32 _cccc, bool allow) public {
-        dpass.setCccc(_cccc, allow);
-    }
-
-    function doTransferFrom(address from, address to, uint256 tokenId) public {
-        dpass.transferFrom(from, to, tokenId);
-    }
-
-    function doSafeTransferFrom(address from, address to, uint256 tokenId) public {
-        dpass.safeTransferFrom(from, to, tokenId);
-    }
-}
-
-contract TrustedSASMTester is Wallet {
-    SimpleAssetManagement asm;
-
-    constructor(address payable asm_) public {
-        asm = SimpleAssetManagement(asm_);
-    }
-
-    function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {
-        asm.setConfig(what_, value_, value1_, value2_);
-    }
-
-    function doSetBasePrice(address token, uint256 tokenId, uint256 price) public {
-        asm.setBasePrice(token, tokenId, price);
-    }
-
-    function doUpdateCdcValue(address cdc) public {
-        asm.updateCdcValue(cdc);
-    }
-
-    function doUpdateTotalDcdcValue(address dcdc) public {
-        asm.updateTotalDcdcValue(dcdc);
-    }
-
-    function doUpdateDcdcValue(address dcdc, address custodian) public {
-        asm.updateDcdcValue(dcdc, custodian);
-    }
-
-    function doNotifyTransferFrom(address token, address src, address dst, uint256 amtOrId) public {
-        asm.notifyTransferFrom(token, src, dst, amtOrId);
-    }
-
-    function doBurn(address token, uint256 amt) public {
-        asm.burn(token, amt);
-    }
-
-    function doMint(address token, address dst, uint256 amt) public {
-        asm.mint(token, dst, amt);
-    }
-    
-    function doMintDpass(
-        address token_,
-        address custodian_,
-        bytes32 issuer_,
-        bytes32 report_,
-        bytes32 state_,
-        bytes32 cccc_,
-        uint24 carat_,
-        bytes32 attributesHash_,
-        bytes8 currentHashingAlgorithm_,
-        uint price_
-    ) public returns (uint) {
-
-        return asm.mintDpass(
-            token_,
-            custodian_,
-            issuer_,
-            report_,
-            state_,
-            cccc_,
-            carat_,
-            attributesHash_,
-            currentHashingAlgorithm_,
-            price_);
-    }
-
-    function doMintDcdc(address token, address dst, uint256 amt) public {
-        asm.mintDcdc(token, dst, amt);
-    }
-
-    function doBurnDcdc(address token, address dst, uint256 amt) public {
-        asm.burnDcdc(token, dst, amt);
-    }
-
-    function doWithdraw(address token, uint256 amt) public {
-        asm.withdraw(token, amt);
-    }
-
-    function doUpdateCollateralDpass(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDpass(positiveV, negativeV, custodian);
-    }
-
-    function doUpdateCollateralDcdc(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDcdc(positiveV, negativeV, custodian);
-    }
-
-    function doApprove(address token, address dst, uint256 amt) public {
-        DSToken(token).approve(dst, amt);
-    }
-
-    function doSendToken(address token, address src, address payable dst, uint256 amt) public {
-        sendToken(token, src, dst, amt);
-    }
-
-    function doSendDpassToken(address token, address src, address payable dst, uint256 id_) public {
-        Dpass(token).transferFrom(src, dst, id_);
-    }
-
-    function () external payable {
-    }
-}
-
-
 contract SimpleAssetManagementTest is DSTest, DSMath {
     // TODO: remove all following LogTest()
     event LogUintIpartUintFpart(bytes32 key, uint val, uint val1);
@@ -215,332 +53,19 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     mapping(address => uint) dust;
     mapping(address => bool) dustSet;
 
-    SimpleAssetManagement public asm;                             // SimpleAssetManagement()
+    SimpleAssetManagement public asm;                       // SimpleAssetManagement()
     bool showActualExpected;
 
-    function () external payable {
-    }
-
-    /*
-    * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
-    *      token Value
-    */
-    function wmulV(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wdiv(wmul(a, b), decimals[token]);
-    }
-
-    /*
-    * @dev calculates division with decimals adjusted to match to tokens precision
-    */
-    function wdivT(uint256 a, uint256 b, address token) public view returns(uint256) {
-        return wmul(wdiv(a,b), decimals[token]);
-    }
-
     function setUp() public {
-        uint ourGas = gasleft();
-        asm = new SimpleAssetManagement();
-        emit LogTest("cerate SimpleAssetManagement");
-        emit LogTest(ourGas - gasleft());
-        guard = new DSGuard();
-        asm.setAuthority(guard);
-        user = address(new TrustedSASMTester(address(asm)));
-        custodian = address(new TrustedSASMTester(address(asm)));
-        custodian1 = address(new TrustedSASMTester(address(asm)));
-        custodian2 = address(new TrustedSASMTester(address(asm)));
-        exchange = address(new TrustedSASMTester(address(asm)));
-
-
-        dpt = address(new DSToken("DPT"));
-        dai = address(new DSToken("DAI"));
-        eth = address(0xee);
-        eng = address(new DSToken("ENG"));   // TODO: make sure it is 8 decimals
-
-        cdc = address(new DSToken("CDC"));
-        cdc1 = address(new DSToken("CDC1"));
-        cdc2 = address(new DSToken("CDC2"));
-
-        dcdc = address(new Dcdc("BR,IF,F,0.01", "DCDC", true));
-        dcdc1 = address(new Dcdc("BR,SI3,E,0.04", "DCDC1", true));
-        dcdc2 = address(new Dcdc("BR,SI1,J,1.50", "DCDC2", true));
-
-        dpass = address(new Dpass());
-        dpass1 = address(new Dpass());
-        dpass2 = address(new Dpass());
-
-        DSToken(cdc).setAuthority(guard);
-        DSToken(cdc1).setAuthority(guard);
-        DSToken(cdc2).setAuthority(guard);
-
-        DSToken(dcdc).setAuthority(guard);
-        DSToken(dcdc1).setAuthority(guard);
-        DSToken(dcdc2).setAuthority(guard);
-
-        Dpass(dpass).setAuthority(guard);
-        Dpass(dpass1).setAuthority(guard);
-        Dpass(dpass1).setAuthority(guard);
-
-        dust[dpt] = 10000;
-        dust[cdc] = 10000;
-        dust[eth] = 10000;
-        dust[dai] = 10000;
-        dust[eng] = 10;
-        dust[dpass] = 10000;
-
-        dustSet[dpt] = true;
-        dustSet[cdc] = true;
-        dustSet[eth] = true;
-        dustSet[dai] = true;
-        dustSet[eng] = true;
-        dustSet[dpass] = true;
-        
-        guard.permit(address(this), address(asm), ANY);
-        guard.permit(address(asm), dpass, ANY);
-        guard.permit(address(asm), dpass1, ANY);
-        guard.permit(address(asm), cdc, ANY);
-        guard.permit(address(asm), cdc1, ANY);
-        guard.permit(address(asm), cdc2, ANY);
-        guard.permit(address(asm), dcdc, ANY);
-        guard.permit(address(asm), dcdc1, ANY);
-        guard.permit(address(asm), dcdc2, ANY);
-        guard.permit(custodian, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
-
-        guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
-        guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-
-        guard.permit(custodian1, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
-
-        guard.permit(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
-        guard.permit(custodian1, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian1, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian1, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian1, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian1, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian1, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-
-        guard.permit(custodian2, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
-        guard.permit(custodian2, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian2, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian2, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian2, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-        guard.permit(custodian2, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
-        guard.permit(custodian2, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
-
-
-
-        guard.permit(exchange, address(asm), bytes4(keccak256("notifyTransferFrom(address,address,address,uint256)")));
-        guard.permit(exchange, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(exchange, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
-
-        DSToken(dpt).mint(SUPPLY);
-        DSToken(dai).mint(SUPPLY);
-        DSToken(eng).mint(SUPPLY);
-
-        decimals[dpt] = 18;
-        decimals[dai] = 18;
-        decimals[eth] = 18;
-        decimals[eng] = 8;
-
-        decimals[cdc] = 18;
-        decimals[cdc1] = 18;
-        decimals[cdc2] = 18;
-
-        decimals[dcdc] = 18;
-        decimals[dcdc1] = 18;
-        decimals[dcdc2] = 18;
-
-        usdRate[dpt] = 2 ether;
-        usdRate[dai] = 1 ether;
-        usdRate[eth] = 7 ether;
-        usdRate[eng] = 13 ether;
-
-        usdRate[cdc] = 17 ether;
-        usdRate[cdc1] = 19 ether;
-        usdRate[cdc2] = 23 ether;
-
-        usdRate[dcdc] = 29 ether;
-        usdRate[dcdc1] = 31 ether;
-        usdRate[dcdc2] = 37 ether;
-
-        feed[dpt] = address(new TestFeedLike(usdRate[dpt], true));
-        feed[cdc] = address(new TestFeedLike(usdRate[cdc], true));
-        feed[eth] = address(new TestFeedLike(usdRate[eth], true));
-        feed[dai] = address(new TestFeedLike(usdRate[dai], true));
-        feed[eng] = address(new TestFeedLike(usdRate[eng], true));
-
-        feed[cdc] = address(new TestFeedLike(usdRate[cdc], true));
-        feed[cdc1] = address(new TestFeedLike(usdRate[cdc1], true));
-        feed[cdc2] = address(new TestFeedLike(usdRate[cdc2], true));
-
-        feed[dcdc] = address(new TestFeedLike(usdRate[dcdc], true));
-        feed[dcdc1] = address(new TestFeedLike(usdRate[dcdc1], true));
-        feed[dcdc2] = address(new TestFeedLike(usdRate[dcdc2], true));
-
-        asm.setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
-        asm.setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
-        asm.setConfig("decimals", b(eth), b(decimals[eth]), "diamonds");
-        asm.setConfig("decimals", b(eng), b(decimals[eng]), "diamonds");
-
-        asm.setConfig("decimals", b(cdc), b(decimals[cdc]), "diamonds");
-        asm.setConfig("decimals", b(cdc1), b(decimals[cdc1]), "diamonds");
-        asm.setConfig("decimals", b(cdc2), b(decimals[cdc2]), "diamonds");
-
-        asm.setConfig("decimals", b(dcdc), b(decimals[dcdc]), "diamonds");
-        asm.setConfig("decimals", b(dcdc1), b(decimals[dcdc1]), "diamonds");
-        asm.setConfig("decimals", b(dcdc2), b(decimals[dcdc2]), "diamonds");
-
-        asm.setConfig("priceFeed", b(dpt), b(feed[dpt]), "diamonds");
-        asm.setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
-        asm.setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
-        asm.setConfig("priceFeed", b(dai), b(feed[dai]), "diamonds");
-        asm.setConfig("priceFeed", b(eng), b(feed[eng]), "diamonds");
-
-        asm.setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
-        asm.setConfig("priceFeed", b(cdc1), b(feed[cdc1]), "diamonds");
-        asm.setConfig("priceFeed", b(cdc2), b(feed[cdc2]), "diamonds");
-
-        asm.setConfig("priceFeed", b(dcdc), b(feed[dcdc]), "diamonds");
-        asm.setConfig("priceFeed", b(dcdc1), b(feed[dcdc1]), "diamonds");
-        asm.setConfig("priceFeed", b(dcdc2), b(feed[dcdc2]), "diamonds");
-
-        asm.setConfig("custodians", b(custodian), b(true), "diamonds");
-        asm.setConfig("custodians", b(custodian1), b(true), "diamonds");
-        asm.setConfig("custodians", b(custodian2), b(true), "diamonds");
-
-        asm.setConfig("payTokens", b(dpt), b(true), "diamonds");
-        asm.setConfig("payTokens", b(dai), b(true), "diamonds");
-        asm.setConfig("payTokens", b(eth), b(true), "diamonds");
-        asm.setConfig("payTokens", b(eng), b(true), "diamonds");
-
-        asm.setConfig("cdcs", b(cdc), b(true), "diamonds");
-        asm.setConfig("cdcs", b(cdc1), b(true), "diamonds");
-        asm.setConfig("cdcs", b(cdc2), b(true), "diamonds");
-
-        asm.setConfig("dcdcs", b(dcdc), b(true), "diamonds");
-        asm.setConfig("dcdcs", b(dcdc1), b(true), "diamonds");
-        asm.setConfig("dcdcs", b(dcdc2), b(true), "diamonds");
-
-        asm.setConfig("dpasses", b(dpass), b(true), "diamonds");
-        asm.setConfig("dpasses", b(dpass1), b(true), "diamonds");
-        asm.setConfig("dpasses", b(dpass2), b(true), "diamonds");
-    }
-
-    /*
-    * @dev Compare two numbers with round-off errors considered.
-    * Assume that the numbers are 18 decimals precision.
-    */
-    function assertEqDust(uint a_, uint b_) public {
-        assertEqDust(a_, b_, eth);
-    }
-
-    /*
-    * @dev Compare two numbers with round-off errors considered.
-    * Assume that the numbers have the decimals of token.
-    */
-    function assertEqDust(uint a_, uint b_, address token) public {
-        assertTrue(isEqualDust(a_, b_, token));
-    }
-
-    function isEqualDust(uint a_, uint b_) public view returns (bool) {
-        return isEqualDust(a_, b_, eth);
-    }
-
-    function isEqualDust(uint a_, uint b_, address token) public view returns (bool) {
-        uint diff = a_ - b_;
-        require(dustSet[token], "Dust limit must be set to token.");
-        uint dustT = dust[token];
-        return diff < dustT || uint(-1) - diff < dustT;
-    }
-
-    function logMsgActualExpected(bytes32 logMsg, uint256 actual_, uint256 expected_, bool showActualExpected_) public {
-        emit log_bytes32(logMsg);
-        if(showActualExpected_ || showActualExpected) {
-            emit log_bytes32("actual");
-            emit LogTest(actual_);
-            emit log_bytes32("expected");
-            emit LogTest(expected_);
-        }
-    }
-
-    function logMsgActualExpected(bytes32 logMsg, address actual_, address expected_, bool showActualExpected_) public {
-        emit log_bytes32(logMsg);
-        if(showActualExpected_ || showActualExpected) {
-            emit log_bytes32("actual");
-            emit LogTest(actual_);
-            emit log_bytes32("expected");
-            emit LogTest(expected_);
-        }
-    }
-
-    function logMsgActualExpected(bytes32 logMsg, bytes32 actual_, bytes32 expected_, bool showActualExpected_) public {
-        emit log_bytes32(logMsg);
-        if(showActualExpected_ || showActualExpected) {
-            emit log_bytes32("actual");
-            emit LogTest(actual_);
-            emit log_bytes32("expected");
-            emit LogTest(expected_);
-        }
-    }
-
-    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_, address decimalToken) public {
-        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_, decimalToken));
-        assertEqDust(actual_, expected_, decimalToken);
-    }
-
-    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_));
-        assertEqDust(actual_, expected_);
-    }
-
-    function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, false);
-        assertEq(actual_, expected_);
-    }
-
-    function assertEqLog(bytes32 logMsg, bytes32 actual_, bytes32 expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, false);
-        assertEq(actual_, expected_);
-    }
-
-    function assertEqLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, false);
-        assertEq(actual_, expected_);
-    }
-
-    function assertNotEqualLog(bytes32 logMsg, address actual_, address expected_) public {
-        logMsgActualExpected(logMsg, actual_, expected_, actual_ == expected_);
-        assertTrue(actual_ != expected_);
-    }
-    function b(address a) public pure returns(bytes32) {
-        return bytes32(uint(a));
-    }
-
-    function b(uint a) public pure returns(bytes32) {
-        return bytes32(a);
-    }
-
-    function b(bool a) public pure returns(bytes32) {
-        return a ? bytes32(uint(1)) : bytes32(uint(0));
+        _createActors();
+        _createTokens();
+        _setDust();
+        _setGuardPermissions();
+        _mintInitialSupply();
+        _setDecimals();
+        _setRates();
+        _setFeeds();
+        _configAsm();
     }
 
     function testSetConfigRateAsm() public {
@@ -734,7 +259,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testSetDustAsm() public {
         uint dust_ = 25334567;
         assertEq(asm.dust(), 1000);
-        asm.setConfig("dust_", b(uint(dust_)), "", "diamonds");
+        asm.setConfig("dust", b(uint(dust_)), "", "diamonds");
         assertEq(asm.dust(), dust_);
     }
 
@@ -1396,7 +921,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.updateCollateralDpass(1 ether, 0, custodian);
         assertEq(asm.getTotalDpassCustV(custodian), 1 ether);
         assertEq(asm.getTotalDpassV("diamonds"), 1 ether);
-        
+
         asm.updateCollateralDpass(0, 1 ether, custodian);
         assertEq(asm.getTotalDpassCustV(custodian), 0 ether);
         assertEq(asm.getTotalDpassV("diamonds"), 0 ether);
@@ -1407,7 +932,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.updateCollateralDcdc(1 ether, 0, custodian);
         assertEq(asm.getTotalDcdcCustV(custodian), 1 ether);
         assertEq(asm.getTotalDcdcV("diamonds"), 1 ether);
-        
+
         asm.updateCollateralDcdc(0, 1 ether, custodian);
         assertEq(asm.getTotalDcdcCustV(custodian), 0 ether);
         assertEq(asm.getTotalDcdcV("diamonds"), 0 ether);
@@ -1436,7 +961,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.burn(cdc, mintCdc / 2);
         assertEq(asm.getTotalCdcV("diamonds"), wmul(mintCdc / 2, usdRate[cdc]));
         assertEq(asm.getCdcValues(cdc), wmul(mintCdc / 2, usdRate[cdc]));
-        assertEq(asm.getWithdrawValue(custodian), wmul(mintCdc / 2, usdRate[cdc])); 
+        assertEq(asm.getWithdrawValue(custodian), wmul(mintCdc / 2, usdRate[cdc]));
         assertEq(asm.getAmtForSale(cdc), wdiv(sub(wdiv(add(price_, wmul(mintDcdcAmt, usdRate[dcdc])), overCollRatio_), wmul(mintCdc / 2, usdRate[cdc])), usdRate[cdc]));
     }
 
@@ -1682,7 +1207,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(user).doApprove(dai, exchange, amt);
         TrustedSASMTester(exchange).doSendToken(dai, user, address(asm), amt);
         asm.notifyTransferFrom(dai, user, address(asm), amt);
-        
+
         guard.forbid(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
         TrustedSASMTester(custodian).doWithdraw(dai, amt);
     }
@@ -1700,4 +1225,511 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         asm.updateCollateralDcdc(1 ether, 0,  custodian);
     }
+//----------------------end-of-tests-------------------------------------------------------------
+
+    /*
+    * @dev Compare two numbers with round-off errors considered.
+    * Assume that the numbers are 18 decimals precision.
+    */
+    function assertEqDust(uint a_, uint b_) public {
+        assertEqDust(a_, b_, eth);
+    }
+
+    /*
+    * @dev Compare two numbers with round-off errors considered.
+    * Assume that the numbers have the decimals of token.
+    */
+    function assertEqDust(uint a_, uint b_, address token) public {
+        assertTrue(isEqualDust(a_, b_, token));
+    }
+
+    function isEqualDust(uint a_, uint b_) public view returns (bool) {
+        return isEqualDust(a_, b_, eth);
+    }
+
+    function isEqualDust(uint a_, uint b_, address token) public view returns (bool) {
+        uint diff = a_ - b_;
+        require(dustSet[token], "Dust limit must be set to token.");
+        uint dustT = dust[token];
+        return diff < dustT || uint(-1) - diff < dustT;
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, uint256 actual_, uint256 expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, address actual_, address expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, bytes32 actual_, bytes32 expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_, address decimalToken) public {
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_, decimalToken));
+        assertEqDust(actual_, expected_, decimalToken);
+    }
+
+    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_));
+        assertEqDust(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, bytes32 actual_, bytes32 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertNotEqualLog(bytes32 logMsg, address actual_, address expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, actual_ == expected_);
+        assertTrue(actual_ != expected_);
+    }
+    function b(address a) public pure returns(bytes32) {
+        return bytes32(uint(a));
+    }
+
+    function b(uint a) public pure returns(bytes32) {
+        return bytes32(a);
+    }
+
+    function b(bool a) public pure returns(bytes32) {
+        return a ? bytes32(uint(1)) : bytes32(uint(0));
+    }
+
+
+    function () external payable {
+    }
+
+    /*
+    * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
+    *      token Value
+    */
+    function wmulV(uint256 a, uint256 b_, address token) public view returns(uint256) {
+        return wdiv(wmul(a, b_), decimals[token]);
+    }
+
+    /*
+    * @dev calculates division with decimals adjusted to match to tokens precision
+    */
+    function wdivT(uint256 a, uint256 b_, address token) public view returns(uint256) {
+        return wmul(wdiv(a, b_), decimals[token]);
+    }
+
+    function _createActors() internal {
+        uint ourGas = gasleft();
+        asm = new SimpleAssetManagement();
+        emit LogTest("cerate SimpleAssetManagement");
+        emit LogTest(ourGas - gasleft());
+        guard = new DSGuard();
+        asm.setAuthority(guard);
+        user = address(new TrustedSASMTester(address(asm)));
+        custodian = address(new TrustedSASMTester(address(asm)));
+        custodian1 = address(new TrustedSASMTester(address(asm)));
+        custodian2 = address(new TrustedSASMTester(address(asm)));
+        exchange = address(new TrustedSASMTester(address(asm)));
+    }
+
+    function _createTokens() internal {
+
+        dpt = address(new DSToken("DPT"));
+        dai = address(new DSToken("DAI"));
+        eth = address(0xee);
+        eng = address(new DSToken("ENG"));   // TODO: make sure it is 8 decimals
+
+        cdc = address(new DSToken("CDC"));
+        cdc1 = address(new DSToken("CDC1"));
+        cdc2 = address(new DSToken("CDC2"));
+
+        dcdc = address(new Dcdc("BR,IF,F,0.01", "DCDC", true));
+        dcdc1 = address(new Dcdc("BR,SI3,E,0.04", "DCDC1", true));
+        dcdc2 = address(new Dcdc("BR,SI1,J,1.50", "DCDC2", true));
+
+        dpass = address(new Dpass());
+        dpass1 = address(new Dpass());
+        dpass2 = address(new Dpass());
+    }
+
+    function _setDust() internal {
+        dust[dpt] = 10000;
+        dust[cdc] = 10000;
+        dust[eth] = 10000;
+        dust[dai] = 10000;
+        dust[eng] = 10;
+        dust[dpass] = 10000;
+
+        dustSet[dpt] = true;
+        dustSet[cdc] = true;
+        dustSet[eth] = true;
+        dustSet[dai] = true;
+        dustSet[eng] = true;
+        dustSet[dpass] = true;
+    }
+
+    function _setGuardPermissions() internal {
+        DSToken(cdc).setAuthority(guard);
+        DSToken(cdc1).setAuthority(guard);
+        DSToken(cdc2).setAuthority(guard);
+
+        DSToken(dcdc).setAuthority(guard);
+        DSToken(dcdc1).setAuthority(guard);
+        DSToken(dcdc2).setAuthority(guard);
+
+        Dpass(dpass).setAuthority(guard);
+        Dpass(dpass1).setAuthority(guard);
+        Dpass(dpass1).setAuthority(guard);
+
+        guard.permit(address(this), address(asm), ANY);
+        guard.permit(address(asm), dpass, ANY);
+        guard.permit(address(asm), dpass1, ANY);
+        guard.permit(address(asm), cdc, ANY);
+        guard.permit(address(asm), cdc1, ANY);
+        guard.permit(address(asm), cdc2, ANY);
+        guard.permit(address(asm), dcdc, ANY);
+        guard.permit(address(asm), dcdc1, ANY);
+        guard.permit(address(asm), dcdc2, ANY);
+        guard.permit(custodian, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+
+        guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+
+        guard.permit(custodian1, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+
+        guard.permit(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian1, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian1, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian1, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian1, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian1, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+
+        guard.permit(custodian2, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian2, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian2, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian2, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian2, dpass1, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+        guard.permit(custodian2, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+        guard.permit(custodian2, dpass2, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
+
+        guard.permit(exchange, address(asm), bytes4(keccak256("notifyTransferFrom(address,address,address,uint256)")));
+        guard.permit(exchange, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(exchange, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+    }
+
+    function _mintInitialSupply() internal {
+        DSToken(dpt).mint(SUPPLY);
+        DSToken(dai).mint(SUPPLY);
+        DSToken(eng).mint(SUPPLY);
+    }
+
+    function _setDecimals() internal {
+        decimals[dpt] = 18;
+        decimals[dai] = 18;
+        decimals[eth] = 18;
+        decimals[eng] = 8;
+
+        decimals[cdc] = 18;
+        decimals[cdc1] = 18;
+        decimals[cdc2] = 18;
+
+        decimals[dcdc] = 18;
+        decimals[dcdc1] = 18;
+        decimals[dcdc2] = 18;
+    }
+
+    function _setRates() internal {
+        usdRate[dpt] = 2 ether;
+        usdRate[dai] = 1 ether;
+        usdRate[eth] = 7 ether;
+        usdRate[eng] = 13 ether;
+
+        usdRate[cdc] = 17 ether;
+        usdRate[cdc1] = 19 ether;
+        usdRate[cdc2] = 23 ether;
+
+        usdRate[dcdc] = 29 ether;
+        usdRate[dcdc1] = 31 ether;
+        usdRate[dcdc2] = 37 ether;
+    }
+
+    function _setFeeds() internal {
+
+        feed[dpt] = address(new TestFeedLike(usdRate[dpt], true));
+        feed[cdc] = address(new TestFeedLike(usdRate[cdc], true));
+        feed[eth] = address(new TestFeedLike(usdRate[eth], true));
+        feed[dai] = address(new TestFeedLike(usdRate[dai], true));
+        feed[eng] = address(new TestFeedLike(usdRate[eng], true));
+
+        feed[cdc] = address(new TestFeedLike(usdRate[cdc], true));
+        feed[cdc1] = address(new TestFeedLike(usdRate[cdc1], true));
+        feed[cdc2] = address(new TestFeedLike(usdRate[cdc2], true));
+
+        feed[dcdc] = address(new TestFeedLike(usdRate[dcdc], true));
+        feed[dcdc1] = address(new TestFeedLike(usdRate[dcdc1], true));
+        feed[dcdc2] = address(new TestFeedLike(usdRate[dcdc2], true));
+    }
+
+    function _configAsm() internal {
+        asm.setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
+        asm.setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
+        asm.setConfig("decimals", b(eth), b(decimals[eth]), "diamonds");
+        asm.setConfig("decimals", b(eng), b(decimals[eng]), "diamonds");
+
+        asm.setConfig("decimals", b(cdc), b(decimals[cdc]), "diamonds");
+        asm.setConfig("decimals", b(cdc1), b(decimals[cdc1]), "diamonds");
+        asm.setConfig("decimals", b(cdc2), b(decimals[cdc2]), "diamonds");
+
+        asm.setConfig("decimals", b(dcdc), b(decimals[dcdc]), "diamonds");
+        asm.setConfig("decimals", b(dcdc1), b(decimals[dcdc1]), "diamonds");
+        asm.setConfig("decimals", b(dcdc2), b(decimals[dcdc2]), "diamonds");
+
+        asm.setConfig("priceFeed", b(dpt), b(feed[dpt]), "diamonds");
+        asm.setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
+        asm.setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
+        asm.setConfig("priceFeed", b(dai), b(feed[dai]), "diamonds");
+        asm.setConfig("priceFeed", b(eng), b(feed[eng]), "diamonds");
+
+        asm.setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
+        asm.setConfig("priceFeed", b(cdc1), b(feed[cdc1]), "diamonds");
+        asm.setConfig("priceFeed", b(cdc2), b(feed[cdc2]), "diamonds");
+
+        asm.setConfig("priceFeed", b(dcdc), b(feed[dcdc]), "diamonds");
+        asm.setConfig("priceFeed", b(dcdc1), b(feed[dcdc1]), "diamonds");
+        asm.setConfig("priceFeed", b(dcdc2), b(feed[dcdc2]), "diamonds");
+
+        asm.setConfig("custodians", b(custodian), b(true), "diamonds");
+        asm.setConfig("custodians", b(custodian1), b(true), "diamonds");
+        asm.setConfig("custodians", b(custodian2), b(true), "diamonds");
+
+        asm.setConfig("payTokens", b(dpt), b(true), "diamonds");
+        asm.setConfig("payTokens", b(dai), b(true), "diamonds");
+        asm.setConfig("payTokens", b(eth), b(true), "diamonds");
+        asm.setConfig("payTokens", b(eng), b(true), "diamonds");
+
+        asm.setConfig("cdcs", b(cdc), b(true), "diamonds");
+        asm.setConfig("cdcs", b(cdc1), b(true), "diamonds");
+        asm.setConfig("cdcs", b(cdc2), b(true), "diamonds");
+
+        asm.setConfig("dcdcs", b(dcdc), b(true), "diamonds");
+        asm.setConfig("dcdcs", b(dcdc1), b(true), "diamonds");
+        asm.setConfig("dcdcs", b(dcdc2), b(true), "diamonds");
+
+        asm.setConfig("dpasses", b(dpass), b(true), "diamonds");
+        asm.setConfig("dpasses", b(dpass1), b(true), "diamonds");
+        asm.setConfig("dpasses", b(dpass2), b(true), "diamonds");
+    }
+
 }
+//----------------------end-of-SimpleAssetManagementTest-----------------------------------------
+
+contract TestFeedLike {
+    bytes32 public rate;
+    bool public feedValid;
+
+    constructor(uint rate_, bool feedValid_) public {
+        require(rate_ > 0, "TestFeedLike: Rate must be > 0");
+        rate = bytes32(rate_);
+        feedValid = feedValid_;
+    }
+
+    function peek() external view returns (bytes32, bool) {
+        return (rate, feedValid);
+    }
+
+    function setRate(uint rate_) public {
+        rate = bytes32(rate_);
+    }
+
+    function setValid(bool feedValid_) public {
+        feedValid = feedValid_;
+    }
+}
+
+
+contract TrustedDpassTester {
+    Dpass public dpass;
+
+    constructor(Dpass dpass_) public {
+        dpass = dpass_;
+    }
+
+    function doSetSaleStatus(uint tokenId) public {
+        dpass.setSaleStatus(tokenId);
+    }
+
+    function doRedeem(uint tokenId) public {
+        dpass.redeem(tokenId);
+    }
+
+    function doChangeStateTo(bytes32 state, uint tokenId) public {
+        dpass.changeStateTo(state, tokenId);
+    }
+
+    function doSetCustodian(uint tokenId, address newCustodian) public {
+        dpass.setCustodian(tokenId, newCustodian);
+    }
+
+    function doSetAllowedCccc(bytes32 _cccc, bool allow) public {
+        dpass.setCccc(_cccc, allow);
+    }
+
+    function doTransferFrom(address from, address to, uint256 tokenId) public {
+        dpass.transferFrom(from, to, tokenId);
+    }
+
+    function doSafeTransferFrom(address from, address to, uint256 tokenId) public {
+        dpass.safeTransferFrom(from, to, tokenId);
+    }
+}
+
+contract TrustedSASMTester is Wallet {
+    SimpleAssetManagement asm;
+
+    constructor(address payable asm_) public {
+        asm = SimpleAssetManagement(asm_);
+    }
+
+    function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {
+        asm.setConfig(what_, value_, value1_, value2_);
+    }
+
+    function doSetBasePrice(address token, uint256 tokenId, uint256 price) public {
+        asm.setBasePrice(token, tokenId, price);
+    }
+
+    function doUpdateCdcValue(address cdc) public {
+        asm.updateCdcValue(cdc);
+    }
+
+    function doUpdateTotalDcdcValue(address dcdc) public {
+        asm.updateTotalDcdcValue(dcdc);
+    }
+
+    function doUpdateDcdcValue(address dcdc, address custodian) public {
+        asm.updateDcdcValue(dcdc, custodian);
+    }
+
+    function doNotifyTransferFrom(address token, address src, address dst, uint256 amtOrId) public {
+        asm.notifyTransferFrom(token, src, dst, amtOrId);
+    }
+
+    function doBurn(address token, uint256 amt) public {
+        asm.burn(token, amt);
+    }
+
+    function doMint(address token, address dst, uint256 amt) public {
+        asm.mint(token, dst, amt);
+    }
+
+    function doMintDpass(
+        address token_,
+        address custodian_,
+        bytes32 issuer_,
+        bytes32 report_,
+        bytes32 state_,
+        bytes32 cccc_,
+        uint24 carat_,
+        bytes32 attributesHash_,
+        bytes8 currentHashingAlgorithm_,
+        uint price_
+    ) public returns (uint) {
+
+        return asm.mintDpass(
+            token_,
+            custodian_,
+            issuer_,
+            report_,
+            state_,
+            cccc_,
+            carat_,
+            attributesHash_,
+            currentHashingAlgorithm_,
+            price_);
+    }
+
+    function doMintDcdc(address token, address dst, uint256 amt) public {
+        asm.mintDcdc(token, dst, amt);
+    }
+
+    function doBurnDcdc(address token, address dst, uint256 amt) public {
+        asm.burnDcdc(token, dst, amt);
+    }
+
+    function doWithdraw(address token, uint256 amt) public {
+        asm.withdraw(token, amt);
+    }
+
+    function doUpdateCollateralDpass(uint positiveV, uint negativeV, address custodian) public {
+        asm.updateCollateralDpass(positiveV, negativeV, custodian);
+    }
+
+    function doUpdateCollateralDcdc(uint positiveV, uint negativeV, address custodian) public {
+        asm.updateCollateralDcdc(positiveV, negativeV, custodian);
+    }
+
+    function doApprove(address token, address dst, uint256 amt) public {
+        DSToken(token).approve(dst, amt);
+    }
+
+    function doSendToken(address token, address src, address payable dst, uint256 amt) public {
+        sendToken(token, src, dst, amt);
+    }
+
+    function doSendDpassToken(address token, address src, address payable dst, uint256 id_) public {
+        Dpass(token).transferFrom(src, dst, id_);
+    }
+
+    function () external payable {
+    }
+}
+
+
