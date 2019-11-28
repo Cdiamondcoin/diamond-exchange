@@ -108,6 +108,32 @@ contract TrustedSASMTester is Wallet {
     function doMint(address token, address dst, uint256 amt) public {
         asm.mint(token, dst, amt);
     }
+    
+    function doMintDpass(
+        address token_,
+        address custodian_,
+        bytes32 issuer_,
+        bytes32 report_,
+        bytes32 state_,
+        bytes32 cccc_,
+        uint24 carat_,
+        bytes32 attributesHash_,
+        bytes8 currentHashingAlgorithm_,
+        uint price_
+    ) public returns (uint) {
+
+        return asm.mintDpass(
+            token_,
+            custodian_,
+            issuer_,
+            report_,
+            state_,
+            cccc_,
+            carat_,
+            attributesHash_,
+            currentHashingAlgorithm_,
+            price_);
+    }
 
     function doMintDcdc(address token, address dst, uint256 amt) public {
         asm.mintDcdc(token, dst, amt);
@@ -186,8 +212,11 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     mapping(address => uint) public usdRate;                // TestFeedLike()
 
     mapping(address => uint) public decimals;               // decimal precision of token
+    mapping(address => uint) dust;
+    mapping(address => bool) dustSet;
 
     SimpleAssetManagement public asm;                             // SimpleAssetManagement()
+    bool showActualExpected;
 
     function () external payable {
     }
@@ -250,7 +279,23 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass1).setAuthority(guard);
         Dpass(dpass1).setAuthority(guard);
 
+        dust[dpt] = 10000;
+        dust[cdc] = 10000;
+        dust[eth] = 10000;
+        dust[dai] = 10000;
+        dust[eng] = 10;
+        dust[dpass] = 10000;
+
+        dustSet[dpt] = true;
+        dustSet[cdc] = true;
+        dustSet[eth] = true;
+        dustSet[dai] = true;
+        dustSet[eng] = true;
+        dustSet[dpass] = true;
+        
         guard.permit(address(this), address(asm), ANY);
+        guard.permit(address(asm), dpass, ANY);
+        guard.permit(address(asm), dpass1, ANY);
         guard.permit(address(asm), cdc, ANY);
         guard.permit(address(asm), cdc1, ANY);
         guard.permit(address(asm), cdc2, ANY);
@@ -400,6 +445,92 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("dpasses", b(dpass2), b(true), "diamonds");
     }
 
+    /*
+    * @dev Compare two numbers with round-off errors considered.
+    * Assume that the numbers are 18 decimals precision.
+    */
+    function assertEqDust(uint a_, uint b_) public {
+        assertEqDust(a_, b_, eth);
+    }
+
+    /*
+    * @dev Compare two numbers with round-off errors considered.
+    * Assume that the numbers have the decimals of token.
+    */
+    function assertEqDust(uint a_, uint b_, address token) public {
+        assertTrue(isEqualDust(a_, b_, token));
+    }
+
+    function isEqualDust(uint a_, uint b_) public view returns (bool) {
+        return isEqualDust(a_, b_, eth);
+    }
+
+    function isEqualDust(uint a_, uint b_, address token) public view returns (bool) {
+        uint diff = a_ - b_;
+        require(dustSet[token], "Dust limit must be set to token.");
+        uint dustT = dust[token];
+        return diff < dustT || uint(-1) - diff < dustT;
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, uint256 actual_, uint256 expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, address actual_, address expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function logMsgActualExpected(bytes32 logMsg, bytes32 actual_, bytes32 expected_, bool showActualExpected_) public {
+        emit log_bytes32(logMsg);
+        if(showActualExpected_ || showActualExpected) {
+            emit log_bytes32("actual");
+            emit LogTest(actual_);
+            emit log_bytes32("expected");
+            emit LogTest(expected_);
+        }
+    }
+
+    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_, address decimalToken) public {
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_, decimalToken));
+        assertEqDust(actual_, expected_, decimalToken);
+    }
+
+    function assertEqDustLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, !isEqualDust(actual_, expected_));
+        assertEqDust(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, bytes32 actual_, bytes32 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertEqLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, false);
+        assertEq(actual_, expected_);
+    }
+
+    function assertNotEqualLog(bytes32 logMsg, address actual_, address expected_) public {
+        logMsgActualExpected(logMsg, actual_, expected_, actual_ == expected_);
+        assertTrue(actual_ != expected_);
+    }
     function b(address a) public pure returns(bytes32) {
         return bytes32(uint(a));
     }
@@ -601,10 +732,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function testSetDustAsm() public {
-        uint dust = 25334567;
+        uint dust_ = 25334567;
         assertEq(asm.dust(), 1000);
-        asm.setConfig("dust", b(uint(dust)), "", "diamonds");
-        assertEq(asm.dust(), dust);
+        asm.setConfig("dust_", b(uint(dust_)), "", "diamonds");
+        assertEq(asm.dust(), dust_);
     }
 
     function testSetConfigNewRateAsm() public {
@@ -1307,5 +1438,266 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.getCdcValues(cdc), wmul(mintCdc / 2, usdRate[cdc]));
         assertEq(asm.getWithdrawValue(custodian), wmul(mintCdc / 2, usdRate[cdc])); 
         assertEq(asm.getAmtForSale(cdc), wdiv(sub(wdiv(add(price_, wmul(mintDcdcAmt, usdRate[dcdc])), overCollRatio_), wmul(mintCdc / 2, usdRate[cdc])), usdRate[cdc]));
+    }
+
+    function testMintDpassAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = asm.mintDpass(dpass, custodian, "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        (
+            bytes32 issuer,
+            bytes32 report,
+            bytes32 state,
+            bytes32 cccc,
+            uint24 carat,
+            bytes32 attributesHash) = Dpass(dpass).getDiamond(id_);
+
+        assertEqLog("owner is asm", Dpass(dpass).ownerOf(id_), address(asm));
+        assertEqLog("custodian is custodian", Dpass(dpass).getCustodian(id_), custodian);
+        assertEqLog("GIA is GIA", Dpass(dpass).getCustodian(id_), custodian);
+        assertEqLog("issuer is what is set", issuer, "GIA_spec");
+        assertEqLog("report is what is set", report, "11211211");
+        assertEqLog("state is what is set", state, "sale");
+        assertEqLog("cccc is what is set", cccc, cccc_);
+        assertEqLog("carat is what is set", carat, 1);
+        assertEqLog("attr.hash is what is set", attributesHash, b(0xef));
+        assertEqLog( "price is what was set", asm.getBasePrice(dpass, id_), price_);
+    }
+
+    function testFailCustodianMintDpassNotToSelfAsm() public {
+        // error Revert ("asm-mnt-can-not-mint-for-dst")
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+
+        Dpass(dpass).setCccc(cccc_, true);
+
+        guard.permit(address(custodian), address(asm), ANY);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, address(asm), "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+    }
+
+    function testFailCustodianMintNotDpassAsm() public {
+        // error Revert ("asm-mnt-not-a-dpass-token")
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+
+        Dpass(dpass).setCccc(cccc_, true);
+
+        guard.permit(address(custodian), address(asm), ANY);
+        id_ = TrustedSASMTester(custodian).doMintDpass(cdc, address(asm), "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+    }
+
+    function testSetStateDpassAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes32 stateTo_ = "invalid";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+    }
+
+    function testSetStateDpassArrayAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        uint id1_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes32 stateTo_ = "invalid";
+        uint[] memory tokenIds_;
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id1_ = asm.mintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        tokenIds_ = new uint[](2);
+        tokenIds_[0] = id_;
+        tokenIds_[1] = id1_;
+
+        asm.setStateDpass(dpass, tokenIds_, stateTo_);
+
+        (
+            bytes32 issuer,
+            bytes32 report,
+            bytes32 state,
+            bytes32 cccc,
+            uint24 carat,
+            bytes32 attributesHash) = Dpass(dpass).getDiamond(id_);
+
+        assertEqLog("state did change id_", state, stateTo_);
+
+        (
+            issuer,
+            report,
+            state,
+            cccc,
+            carat,
+            attributesHash) = Dpass(dpass).getDiamond(id1_);
+        assertEqLog("state did change id1_", state, stateTo_);
+    }
+
+    function testFailAuthCheckSetConfigAsm() public {
+        uint overCollRatio_ = 1.1 ether;
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setConfig("overCollRatio", b(overCollRatio_), "", "diamonds");
+    }
+
+    function testFailAuthCheckGetRateNewestAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.getRateNewest(cdc);
+    }
+
+    function testFailAuthCheckGetRateAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.getRate(cdc);
+    }
+
+    function testFailAuthCheckSetBasePriceAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setBasePrice(dpass, 1, 1 ether);
+    }
+
+    function testFailAuthCheckNotifyTransferFromAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.notifyTransferFrom(dpass, address(asm), user, 1);
+    }
+
+    function testFailAuthCheckBurnAsm() public {
+        asm.mint(cdc, address(this), 1 ether);
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+
+        DSToken(cdc).transfer(address(asm), 1 ether);
+        asm.burn(cdc, 0.5 ether);
+    }
+
+    function testFailAuthCheckMintAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        guard.forbid(address(this), address(asm), ANY);
+        asm.mint(cdc, address(this), 1 ether);
+    }
+
+    function testFailAuthCheckMintDcdcAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        guard.forbid(address(this), address(asm), ANY);
+        asm.mintDcdc(dcdc, address(this), 1 ether);
+    }
+
+    function testFailAuthCheckBurnDcdcAsm() public {
+        asm.mintDcdc(dcdc, address(this), 1 ether);
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.burnDcdc(dcdc, address(this), 1 ether);
+    }
+
+    function testFailAuthCheckMintDpassAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+    }
+
+    function testFailAuthCheckSetStateDpassAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes32 stateTo_ = "invalid";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setStateDpass(dpass, id_, stateTo_);
+    }
+
+    function testFailAuthCheckSetStateDpassArrayAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        uint id1_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes32 stateTo_ = "invalid";
+        uint[] memory tokenIds_;
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id1_ = asm.mintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        tokenIds_ = new uint[](2);
+        tokenIds_[0] = id_;
+        tokenIds_[1] = id1_;
+
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setStateDpass(dpass, tokenIds_, stateTo_);
+    }
+
+    function testFailAuthCheckWithdrawAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes32 cccc_ = "BR,IF,F,0.01";
+        uint amt = 10 ether;
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
+
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
+        asm.setBasePrice(dpass, id_, price_);
+        assertTrue(Dpass(dpass).isApprovedForAll(address(asm), exchange));
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
+        asm.notifyTransferFrom(dpass, address(asm), user, id_);
+
+        DSToken(dai).transfer(user, amt);
+        TrustedSASMTester(user).doApprove(dai, exchange, amt);
+        TrustedSASMTester(exchange).doSendToken(dai, user, address(asm), amt);
+        asm.notifyTransferFrom(dai, user, address(asm), amt);
+        
+        guard.forbid(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        TrustedSASMTester(custodian).doWithdraw(dai, amt);
+    }
+
+    function testFailAuthCheckUpdateCollateralDpassAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.updateCollateralDpass(1 ether, 0,  custodian);
+    }
+
+    function testFailAuthCheckUpdateCollateralDcdcAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.updateCollateralDcdc(1 ether, 0,  custodian);
     }
 }

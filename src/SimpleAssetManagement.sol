@@ -26,6 +26,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     event LogDcdcCustodianValue(uint256 totalDcdcCustV, uint256 dcdcCustV, address dcdc, address custodian);
     event LogDcdcTotalCustodianValue(uint256 totalDcdcCustV, uint256 totalDcdcV, address custodian, bytes32 domain);
     event LogDpassValue(uint256 totalDpassCustV, uint256 totalDpassV, address custodian, bytes32 domain);
+    event LogForceUpdateCollateralDpass(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
+    event LogForceUpdateCollateralDcdc(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
 
     // Commented due fit to code size limit 24,576 bytes
     mapping(
@@ -86,33 +88,38 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             require(payTokens[token] || cdcs[token] || dcdcs[token], "asm-token-not-allowed-rate");
             require(value > 0, "asm-rate-must-be-gt-0");
             rate[token] = value;
+        } else if (what_ == "custodians") {
+            bytes32 domain = value2_;
+            address custodian = addr(value_);
+            bool enable = uint(value1_) > 0;
+            if(enable) domains[custodian] = domain;
+            require(custodian != address(0), "asm-custodian-zero-address");
+            custodians[addr(value_)] = enable;
+        } else if (what_ == "overCollRatio") {
+            bytes32 domain = value2_;
+            overCollRatio[domain] = uint(value_);
+            require(overCollRatio[domain] >= 1 ether, "asm-system-must-be-overcollaterized");
+            _requireSystemCollaterized(domain);
         } else if (what_ == "priceFeed") {
             require(addr(value1_) != address(address(0x0)), "asm-wrong-pricefeed-address");
             require(addr(value_) != address(address(0x0)), "asm-wrong-token-address");
             priceFeed[addr(value_)] = addr(value1_);
+        } else if (what_ == "decimals") {
+            address token = addr(value_);
+            uint decimal = uint256(value1_);
+            require(token != address(0x0), "asm-wrong-address");
+            decimals[token] = 10 ** decimal;
+            decimalsSet[token] = true;
         } else if (what_ == "manualRate") {
             address token = addr(value_);
             bool enable = uint(value1_) > 0;
             require(token != address(address(0x0)), "asm-wrong-token-address");
             require(priceFeed[token] != address(address(0x0)), "asm-priceFeed-first");
             manualRate[token] = enable;
-        } else if (what_ == "dpasses") {
-            bytes32 domain = value2_;
-            address dpass = addr(value_);
-            bool enable = uint(value1_) > 0;
-            if(enable) domains[dpass] = domain;
-            require(dpass != address(0), "asm-dpass-address-zero");
-            dpasses[dpass] = enable;
-        } else if (what_ == "cdcs") {
-            bytes32 domain = value2_;
-            address newCdc = addr(value_);
-            bool enable = uint(value1_) > 0;
-            if(enable) domains[newCdc] = domain;
-            require(priceFeed[newCdc] != address(0), "asm-add-pricefeed-first");
-            require(decimalsSet[newCdc], "asm-add-decimals-first");
-            require(newCdc != address(0), "asm-cdc-address-zero");
-            cdcs[newCdc] = enable;
-            _updateCdcValue(newCdc);
+        } else if (what_ == "payTokens") {
+            address token = addr(value_);
+            require(token != address(0), "asm-pay-token-address-no-zero");
+            payTokens[token] = uint(value1_) > 0;
         } else if (what_ == "dcdcs") {
             bytes32 domain = value2_;
             address newDcdc = addr(value_);
@@ -123,13 +130,23 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             require(decimalsSet[newDcdc],"asm-no-decimals-set-for-token");
             dcdcs[newDcdc] = enable;
             _updateTotalDcdcValue(newDcdc);
-        } else if (what_ == "custodians") {
+        } else if (what_ == "cdcs") {
             bytes32 domain = value2_;
-            address custodian = addr(value_);
+            address newCdc = addr(value_);
             bool enable = uint(value1_) > 0;
-            if(enable) domains[custodian] = domain;
-            require(custodian != address(0), "asm-custodian-zero-address");
-            custodians[addr(value_)] = enable;
+            if(enable) domains[newCdc] = domain;
+            require(priceFeed[newCdc] != address(0), "asm-add-pricefeed-first");
+            require(decimalsSet[newCdc], "asm-add-decimals-first");
+            require(newCdc != address(0), "asm-cdc-address-zero");
+            cdcs[newCdc] = enable;
+            _updateCdcValue(newCdc);
+        } else if (what_ == "dpasses") {
+            bytes32 domain = value2_;
+            address dpass = addr(value_);
+            bool enable = uint(value1_) > 0;
+            if(enable) domains[dpass] = domain;
+            require(dpass != address(0), "asm-dpass-address-zero");
+            dpasses[dpass] = enable;
         } else if (what_ == "approve") {
             address token = addr(value_);
             address dst = addr(value1_);
@@ -144,21 +161,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             require(dpasses[token],"asm-not-a-dpass-token");
             require(dst != address(0), "asm-dst-zero-address");
             Dpass(token).setApprovalForAll(dst, enable);
-        } else if (what_ == "overCollRatio") {
-            bytes32 domain = value2_;
-            overCollRatio[domain] = uint(value_);
-            require(overCollRatio[domain] >= 1 ether, "asm-system-must-be-overcollaterized");
-            _requireSystemCollaterized(domain);
-        } else if (what_ == "payTokens") {
-            address token = addr(value_);
-            require(token != address(0), "asm-pay-token-address-no-zero");
-            payTokens[token] = uint(value1_) > 0;
-        } else if (what_ == "decimals") {
-            address token = addr(value_);
-            uint decimal = uint256(value1_);
-            require(token != address(0x0), "asm-wrong-address");
-            decimals[token] = 10 ** decimal;
-            decimalsSet[token] = true;
         } else if (what_ == "dust") {
             dust = uint256(value_);
         } else {
@@ -425,7 +427,10 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
                     token_ == eth ?
                         address(this).balance :
                         DSToken(token_).balanceOf(address(this)),
-                    amtOrId_);                                              // this assumes that first tokens are sent, than notifyTransferFrom is called, if it is the other way around then amtOrId_ must not be subrtacted from current balance
+                    amtOrId_);                                              // this assumes that first tokens are sent, than ...
+                                                                            // ... notifyTransferFrom is called, if it is the other way ...
+                                                                            // ... around then amtOrId_ must not be subrtacted from current ...
+                                                                            // ... balance
                 tokenPurchaseRate[token_] = wdiv(
                     add(
                         wmulV(
@@ -499,7 +504,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         _requirePaidLessThanSold(src_, custodianCdcV);
     }
 
-    //TODO: test
     function mintDpass(
         address token_,
         address custodian_,
@@ -529,8 +533,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         setBasePrice(token_, id_, price_);
     }
 
-    //TODO: test
-    function setDpassState(address token_, uint256 tokenId_, bytes32 state_) public nonReentrant auth {
+    function setStateDpass(address token_, uint256 tokenId_, bytes32 state_) public nonReentrant auth {
         require(dpasses[token_], "asm-mnt-not-a-dpass-token");
         require(
             !custodians[msg.sender] ||
@@ -538,19 +541,18 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             "asm-sds-not-authorized");
         Dpass(token_).changeStateTo(state_, tokenId_);
     }
-    
-    //TODO: test
-    function setDpassState(address token_, uint256[] memory tokenIds_, bytes32 state_) public nonReentrant auth {
+
+    function setStateDpass(address token_, uint256[] memory tokenIds_, bytes32 state_) public nonReentrant auth {
         require(dpasses[token_], "asm-sds-not-a-dpass-token");
 
-        for(uint tokenId_ = 0; tokenId_ < tokenIds_.length; tokenId_++) {
+        for(uint idx_ = 0; idx_ < tokenIds_.length; idx_++) {
 
             require(
                 !custodians[msg.sender] ||
-                msg.sender == Dpass(token_).getCustodian(tokenId_),
+                msg.sender == Dpass(token_).getCustodian(tokenIds_[idx_]),
                 "asm-sds-not-authorized");
 
-            Dpass(token_).changeStateTo(state_, tokenId_);
+            Dpass(token_).changeStateTo(state_, tokenIds_[idx_]);
         }
     }
 
@@ -618,6 +620,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     */
     function updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDpass(positiveV_, negativeV_, custodian_);
+
+        emit LogForceUpdateCollateralDpass(msg.sender, positiveV_, negativeV_, custodian_);
     }
 
     /*
@@ -625,6 +629,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     */
     function updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
+        emit LogForceUpdateCollateralDcdc(msg.sender, positiveV_, negativeV_, custodian_);
     }
 
     function () external payable {
@@ -824,8 +829,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 }
 
-// TODO: be able to ban custodian sale, and specific diamond sale (from "sale" to "valid")
-// TODO: if dpass is created the wrong way asset management must be able to invalidate it.
-// TODO: order setConfig values gas decreasing order
+// TODO: be able to ban custodian sale 
 // TODO: update Wallet.sol to handle dpass tokens as well
 // TODO: document functions
+// TODO: auth thests
+// TODO: auth thests
