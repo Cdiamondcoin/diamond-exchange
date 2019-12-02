@@ -21,6 +21,7 @@ contract TrustedFeedLikeDex {
 * @dev Contract to calculate user fee based on amount
 */
 contract TrustedFeeCalculator {
+
     function calculateFee(
         address sender,
         uint256 value,
@@ -29,13 +30,23 @@ contract TrustedFeeCalculator {
         address buyToken,
         uint256 buyAmtOrId
     ) external view returns (uint);
+
+    function getCosts(
+        address user,                                                           // user for whom we want to check the costs for
+        address sellToken_,
+        uint256 sellId_,
+        address buyToken_,
+        uint256 buyAmtOrId_
+    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_) {
+        // calculate expected sell amount when user wants to buy something anc only knows how much he wants to buy from a token and whishes to know how much it will cost.
+    }
 }
 
 
 contract TrustedAsm {
     function notifyTransferFrom(address token, address src, address dst, uint256 id721) external;
     function getBasePrice(address erc721, uint256 id721) external view returns(uint256);
-    function getAmtForSale(address token) external returns(uint256);
+    function getAmtForSale(address token) external view returns(uint256);
     function isDpass(address dpass) external view returns(bool);
     function mint(address token, address dst, uint256 amt) external;
 }
@@ -75,7 +86,11 @@ contract DiamondExchangeEvents {
     event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1);
 
     event LogTransferEth(address src, address dst, uint256 val);
-
+    // TODO: remove all following LogTest()
+    event LogTest(uint256 what);
+    event LogTest(bool what);
+    event LogTest(address what);
+    event LogTest(bytes32 what);
 }
 
 contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
@@ -817,7 +832,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint24 carat_,
         uint priceV_
     ) {
-        require(asm.isDpass(token_), "dex-token-not-a-dpass-token");
+        require(canBuyErc721[token_] || canSellErc721[token_], "dex-token-not-a-dpass-token");
         (ownerCustodian_, attrs_, carat_) = Dpass(token_).getDiamondInfo(tokenId_);
         priceV_ = getPrice(token_, tokenId_);
     }
@@ -856,6 +871,123 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         }
     }
 
+    /**
+    * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees
+    * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dpt fee,
+    */
+    function getCosts(
+        address user,                                                           // user for whom we want to check the costs for
+        address sellToken_,                                                     // token we want to know how much we must pay of
+        uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
+        address buyToken_,                                                      // the token user wants to buy
+        uint256 buyAmtOrId_                                                     // the amount user wants to buy
+    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_) {
+        uint max_;
+        uint buyV_;
+        uint dptBalance_;
+        uint feeV_;
+        uint feeDptV_;
+
+        if(fca == TrustedFeeCalculator(0)) {
+
+            require(user != address(0),
+                "dex-user-address-zero");
+
+            require(
+                canSellErc20[sellToken_] ||
+                canSellErc721[sellToken_],
+                "dex-selltoken-invalid");
+
+            require(
+                canBuyErc20[buyToken_] ||
+                canBuyErc721[buyToken_],
+                "dex-buytoken-invalid");
+
+            require(
+                !(canBuyErc721[buyToken_] &&
+                canSellErc721[sellToken_]),
+                "dex-both-tokens-dpass");
+
+            require(dpt != address(0), "dex-dpt-address-zero");
+
+            if(canBuyErc20[buyToken_]) {
+
+                max_ = handledByAsm[buyToken_] ?                               // set buy amount to max_ possible
+                        asm.getAmtForSale(buyToken_) :                          // if managed by asset management get available
+                        min(                                                    // if not managed by asset management get max_ available
+                            TrustedDSToken(buyToken_).balanceOf(
+                                custodian20[buyToken_]),
+                            TrustedDSToken(buyToken_).allowance(
+                                custodian20[buyToken_], address(this)));
+
+                max_ = min(max_, buyAmtOrId_);
+
+                buyV_ = wmulV(max_, _getNewRate(buyToken_), buyToken_);
+
+            } else {
+
+                buyV_ = getPrice(buyToken_, buyAmtOrId_);
+            }
+
+            if(canSellErc20[sellToken_]) {
+
+                sellAmtOrId_ = sellToken_ == eth ?
+                    user.balance :
+                    min(
+                        TrustedDSToken(sellToken_).balanceOf(user),
+                        TrustedDSToken(sellToken_).allowance(
+                            user, address(this)));
+
+                max_ = wmulV(sellAmtOrId_, _getNewRate(sellToken_), sellToken_);
+
+            } else {
+                max_ = getPrice(sellToken_, sellId_);
+            }
+
+            dptBalance_ = TrustedDSToken(dpt).balanceOf(user);
+
+            feeV_ = add(
+                wmul(min(buyV_, max_), varFee),
+                fixFee);
+
+            feeDpt_ = wmul(
+                wdivT(
+                    feeV_,
+                    _getNewRate(dpt),
+                    dpt),
+                takeProfitOnlyInDpt ? profitRate : 1 ether);
+
+            if(canSellErc20[sellToken_]) {
+
+                if(dptBalance_ <= add(feeDpt_, dust)) {
+
+                    feeDptV_ = wmulV(dptBalance_, _getNewRate(dpt), dpt);
+
+                    feeDpt_ = dptBalance_;
+
+                } else {
+
+                    feeDptV_ = wmulV(feeDpt_, _getNewRate(dpt), dpt);
+
+                }
+
+                sellAmtOrId_ = min(
+                    wdivT(
+                        add(buyV_, sub(feeV_, feeDptV_)),
+                        _getNewRate(sellToken_),
+                        sellToken_),
+                    sellAmtOrId_);
+
+            } else {
+
+                sellAmtOrId_ = add(buyV_, dust) >= getPrice(sellToken_, sellId_) ? 1 : 0;
+                feeDpt_ = min(feeDpt_, dptBalance_);
+            }
+        } else {
+
+            return fca.getCosts(user, sellToken_, sellId_, buyToken_, buyAmtOrId_);
+        }
+    }
     /**
     * @dev Get exchange rate in base currency
     */

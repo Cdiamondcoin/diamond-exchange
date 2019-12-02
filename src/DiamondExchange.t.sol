@@ -2851,6 +2851,344 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         );
     }
 
+    function testGetCostsBuyDpassTakeProfitOnlyDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = cdc;
+        uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            22311428571428571429,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            1644000000000000000,
+            dpt);
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
+    }
+
+    function testGetCostsBuyDpassTakeProfitOnlyDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 0.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = cdc;
+        uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            22905714285714285715,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            812000000000000000,
+            dpt);
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
+    }
+
+    function testGetCostsBuyDpassTakeAllCostsInDptDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 5.49 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = cdc;
+        uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            19571428571428571429,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            5480000000000000000,
+            dpt);
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
+    }
+
+//-------------------
+    function testGetCostsBuyDpassTakeAllCostsInDptDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 5.3 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = cdc;
+        uint sellAmtOrId = 25.89 ether;
+        sendSomeCdcToUser(sellAmtOrId);
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            19700000000000000000,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            5300000000000000000,
+            dpt);
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
+    }
+ 
+    function testFailGetCostsUserZeroDex() public view{
+        // error Revert ("dex-user-address-zero")
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+    }
+
+    function testFailGetCostsSellTokenInvalidDex() public view{
+        // error Revert ("dex-selltoken-invalid")
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, address(0xffffff), 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+    }
+
+    function testFailGetCostsBuyTokenInvalidDex() public view {
+        // error Revert ("dex-buytoken-invalid")
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, address(0xffeeff), dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+    }
+
+    function testFailGetCostsBothTokensDpassDex() public view {
+        // error Revert ("dex-both-tokens-dpass")
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dpass, 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+    }
+
+    function testGetCostsBuyCdcTakeProfitOnlyDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            1000000000000000000000,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            1812000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, uint(-1));
+    }
+
+    function testGetCostsBuyCdcTakeProfitOnlyDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 0.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            11184195804195804196,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            812000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, uint(-1));
+    }
+
+    function testGetCostsBuyCdcTakeAllCostsInDptDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 5.49 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            9580419580419580420,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            4981818181818181818,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, uint(-1));
+    }
+
+    function testGetCostsBuyCdcTakeAllCostsInDptDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 5.3 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            9580419580419580420,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            4981818181818181818,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, uint(-1));
+    }
+
+    function testGetCostsBuyFixCdcTakeProfitOnlyDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 1.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        uint buyAmt = 10 ether;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            6138461538461538461,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            840000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, buyAmt);
+    }
+
+    function testGetCostsBuyFixCdcTakeProfitOnlyDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(true)), b(""));
+
+
+        userDpt = 0.812 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        uint buyAmt = 10 ether;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            6149230769230769230,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            812000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, buyAmt);
+    }
+
+    function testGetCostsBuyFixCdcTakeAllCostsInDptDptEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 5.49 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        uint buyAmt = 10 ether;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            5384615384615384615,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            2800000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, buyAmt);
+    }
+
+    function testGetCostsBuyFixCdcTakeAllCostsInDptDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+
+
+        userDpt = 2.3 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;
+        uint buyAmt = 10 ether;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            5576923076923076923,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            2300000000000000000,
+            dpt);
+
+        doExchange(sellToken, uint(-1), cdc, buyAmt);
+    }
+
+    function testGetCostsSellDpassBuyFixCdcTakeAllCostsInDptDptNotEnoughDex() public {
+        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
+        DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
+
+
+        userDpt = 2.3 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dpass;
+        uint buyAmt = 10 ether;
+        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, sellToken, dpassId[user], cdc, buyAmt);
+
+        assertEqDustLog("expected sell amount adds up",
+            sellAmt_,
+            5576923076923076923,
+            cdc);
+
+        assertEqDustLog("expected dpt fee adds up",
+            feeDpt_,
+            2300000000000000000,
+            dpt);
+
+        doExchange(sellToken, dpassId[user], cdc, buyAmt);
+    }
 //------------------end-of-tests------------------------------------
 
     function createDiamond(uint price_) public {
@@ -3661,6 +3999,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         emit log_named_address("burner", burner);
         emit log_named_address("this", address(this));
     } 
+
 }
 //------------------end-of-DiamondExchangeTest------------------------------------
 
