@@ -47,8 +47,7 @@ contract BurnerTest is DSTest {
     function testReturnToOwner() public {
         uint sentAmount = 250;
         token.transfer(address(burner), sentAmount);
-        burner.returnToOwner(sentAmount);
         assertEq(token.totalSupply(), initialBalance);
-        assertEq(token.balanceOf(burner.owner()), initialBalance);
+        assertEq(token.balanceOf(address(burner)), initialBalance + sentAmount);
     }
 }

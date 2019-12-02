@@ -517,7 +517,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         uint price_
     ) public nonReentrant auth returns (uint256 id_) {
         require(dpasses[token_], "asm-mnt-not-a-dpass-token");
-        require(!custodians[msg.sender] || custodian_ == msg.sender, "asm-mnt-can-not-mint-for-dst");
+        require(!custodians[msg.sender] || custodian_ == msg.sender, "asm-mnt-no-mint-to-others");
 
         id_ = Dpass(token_).mintDiamondTo(
             address(this),                  // owner

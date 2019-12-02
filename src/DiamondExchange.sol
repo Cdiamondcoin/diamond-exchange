@@ -209,6 +209,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             varFee = uint256(value_);
 
+            require(varFee <= 1 ether, "dex-var-fee-too-high");
+
         } else if (what_ == "manualRate") {
 
             address token = addr(value_);
@@ -255,6 +257,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             liq = address(uint160(addr(value_)));
 
             require(liq != address(0x0), "dex-wrong-address");
+
+            require(dpt != address(0), "dex-add-dpt-token-first");
 
             require(
                 TrustedDSToken(dpt).balanceOf(liq) > 0,

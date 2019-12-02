@@ -31,7 +31,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     address public eng;
     address payable public exchange;                                        // DiamondExchange()
 
-    address payable public liquidityContract;                               // DiamondExchangeTester()
+    address payable public liq;                                             // DiamondExchangeTester()
     address payable public wal;                                             // DptTester()
     address payable public asm;                                             // SimpleAssetManagement()
     address payable public user;                                            // DiamondExchangeTester()
@@ -103,8 +103,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         _setDecimals();
         _setDust();
         _setFeeds();
-        _setupContracts();
-        _setupActors();
+        _createContracts();
+        _createActors();
         _setupGuard();
         _setupCustodian20();
         _setConfigAsm();
@@ -1191,8 +1191,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testFailBuyTokensWithFeeLiquidityContractHasInsufficientDptDex() public {
         // error Revert ("ds-token-insufficient-balance")
-        DiamondExchangeTester(liquidityContract).doTransfer(dpt, address(this), INITIAL_BALANCE);
-        assertEq(DSToken(dpt).balanceOf(liquidityContract), 0);
+        DiamondExchangeTester(liq).doTransfer(dpt, address(this), INITIAL_BALANCE);
+        assertEq(DSToken(dpt).balanceOf(liq), 0);
 
         address sellToken = eth;
         uint sellAmtOrId = 17 ether;
@@ -3065,8 +3065,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         logUint("balanceUserDecreaseT", balanceUserDecreaseT, 18);
         logUint("balanceUserDecreaseV", balanceUserDecreaseV, 18);
 
-        // DPT (eq fee in USD) must be sold from: liquidityContract balance
-        actual = sub(INITIAL_BALANCE, DSToken(dpt).balanceOf(address(liquidityContract)));
+        // DPT (eq fee in USD) must be sold from: liq balance
+        actual = sub(INITIAL_BALANCE, DSToken(dpt).balanceOf(address(liq)));
         expected = sellToken == dpt ? 0 : sub(profitDpt, _takeProfitOnlyInDpt ? feeSpentDpt : wmul(feeSpentDpt, profitRate));
 
         assertEqDustLog("dpt from liq", actual, expected, dpt);
@@ -3422,7 +3422,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         feed[eng] = address(new TestFeedLike(usdRate[eng], true));
     }
     
-    function _setupContracts() internal {
+    function _createContracts() internal {
         burner = address(uint160(address(new Burner(DSToken(dpt))))); // Burner()
         wal = address(uint160(address(new DptTester(DSToken(dai))))); // DptTester()
         asm = address(uint160(address(new SimpleAssetManagement())));
@@ -3432,9 +3432,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         exchange = address(uint160(address(new DiamondExchange())));
         emit LogTest(ourGas - gasleft());
 
-        liquidityContract = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
-        DSToken(dpt).transfer(liquidityContract, INITIAL_BALANCE);
-        DiamondExchangeTester(liquidityContract).doApprove(dpt, exchange, uint(-1));
+        liq = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
+        DSToken(dpt).transfer(liq, INITIAL_BALANCE);
+        DiamondExchangeTester(liq).doApprove(dpt, exchange, uint(-1));
 
         fca = address(uint160(address(new TestFeeCalculator())));
     }
@@ -3449,9 +3449,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         guard.permit(address(asm), dpass, ANY);
         guard.permit(exchange, asm, ANY);
 
-        DiamondExchangeTester(liquidityContract).setAuthority(guard);
-        guard.permit(exchange, liquidityContract, ANY);
-        DiamondExchangeTester(liquidityContract).setOwner(exchange);
+        DiamondExchangeTester(liq).setAuthority(guard);
+        guard.permit(exchange, liq, ANY);
+        DiamondExchangeTester(liq).setOwner(exchange);
     } 
 
     function _setupCustodian20() internal {
@@ -3497,7 +3497,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         SimpleAssetManagement(asm).setConfig("rate", b(dpt), b(usdRate[dpt]), "diamonds");
         SimpleAssetManagement(asm).setConfig("rate", b(eng), b(usdRate[eng]), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                             // asset management will handle this token
         SimpleAssetManagement(asm).setConfig("custodians", b(seller), b(true), "diamonds");
         SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
     }
@@ -3519,7 +3518,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(feed[dpt]));
         DiamondExchange(exchange).setConfig("priceFeed", b(eth), b(feed[eth]));
         DiamondExchange(exchange).setConfig("priceFeed", b(cdc), b(feed[cdc]));
-        DiamondExchange(exchange).setConfig("liq", b(liquidityContract), b(""));
+        DiamondExchange(exchange).setConfig("liq", b(liq), b(""));
         DiamondExchange(exchange).setConfig("burner", b(burner), b(""));
         DiamondExchange(exchange).setConfig("asm", b(asm), b(""));
         DiamondExchange(exchange).setConfig("fixFee", b(fixFee), b(""));
@@ -3568,10 +3567,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("decimals"), b(eng), b(8));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(eng), b(custodian20[eng]));
 
-        DiamondExchange(exchange).setConfig(b("liq"), b(liquidityContract), b(""));
+        DiamondExchange(exchange).setConfig(b("liq"), b(liq), b(""));
     }
 
-    function _setupActors() internal {
+    function _createActors() internal {
     
         user = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
         seller = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
@@ -3641,7 +3640,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         balance[asm][dpt] = DSToken(dpt).balanceOf(asm);
         balance[asm][dai] = DSToken(dai).balanceOf(asm);
 
-        balance[liquidityContract][eth] = liquidityContract.balance;
+        balance[liq][eth] = liq.balance;
         balance[wal][eth] = wal.balance;
         balance[custodian20[eth]][eth] = custodian20[eth].balance;
         balance[custodian20[cdc]][cdc] = Cdc(cdc).balanceOf(custodian20[cdc]);
@@ -3658,7 +3657,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         emit log_named_address("user", user);
         emit log_named_address("seller", seller);
         emit log_named_address("wal", wal);
-        emit log_named_address("liq", liquidityContract);
+        emit log_named_address("liq", liq);
         emit log_named_address("burner", burner);
         emit log_named_address("this", address(this));
     } 
@@ -3956,7 +3955,7 @@ contract TrustedDiamondExchange {
         uint256 amount
     ) external returns(bool);
 }
-
+// TODO: tasts for liqBuysDpt where liwuidity contract buys dpt for us and sends to burner
 
 
 

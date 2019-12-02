@@ -5,7 +5,7 @@ import "ds-auth/auth.sol";
 import "ds-token/token.sol";
 
 contract Liquidity is Wallet {
-    function burn(address dpt, address burner, uint256 burnValue) public auth {
+    function burn(address dpt, address payable burner, uint256 burnValue) public auth {
         transfer(dpt, burner, burnValue);
     }
 }

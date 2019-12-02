@@ -1345,12 +1345,15 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function _createActors() internal {
+        
         uint ourGas = gasleft();
         asm = new SimpleAssetManagement();
         emit LogTest("cerate SimpleAssetManagement");
         emit LogTest(ourGas - gasleft());
+
         guard = new DSGuard();
         asm.setAuthority(guard);
+        
         user = address(new TrustedSASMTester(address(asm)));
         custodian = address(new TrustedSASMTester(address(asm)));
         custodian1 = address(new TrustedSASMTester(address(asm)));
@@ -1422,6 +1425,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
 
         guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
         guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -1437,6 +1441,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
 
         guard.permit(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
         guard.permit(custodian1, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -1451,6 +1456,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
         guard.permit(custodian2, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
