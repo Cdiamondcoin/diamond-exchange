@@ -207,6 +207,111 @@ contract IntegrationsTest is DSTest {
         logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
     }
+    
+    function test4DpassPurchaseInt() public {       // use-case 4. Dpass purchase 
+
+        uint daiPaid = 4000 ether; 
+
+        DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
+
+        TesterActor(user)
+            .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
+
+        Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
+        
+        DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
+            "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
+            b(dpass),                               // .... This must be done only once at configuration time.
+            b(true));
+        
+        uint id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
+            .doMintDpass(
+            dpass,
+            custodian,
+            "GIA",
+            "2134567890",
+            "sale",
+            "BR,IF,D,5.00",
+            511,
+            0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff,
+
+            "20191107",
+            2928.03 ether
+        );
+       
+        TesterActor(user).doBuyTokensWithFee(
+            dai,
+            daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
+            dpass,
+            id
+        );
+
+        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
+        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+    }
+
+    
+    function testFail4DpassPurchaseInt() public {       // use-case 4. Dpass purchase failure - because single dpass is a collateral to cdc minted. 
+
+        uint daiPaid = 4000 ether; 
+
+        DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
+
+        TesterActor(user)
+            .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
+
+        Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
+        
+        DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
+            "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
+            b(dpass),                               // .... This must be done only once at configuration time.
+            b(true));
+        
+        uint id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
+            .doMintDpass(
+            dpass,
+            custodian,
+            "GIA",
+            "2134567890",
+            "sale",
+            "BR,IF,D,5.00",
+            511,
+            0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff,
+
+            "20191107",
+            2928.03 ether
+        );
+       //-this-is-the-difference-form-previous-test----------------------------------------
+
+        TesterActor(user).doBuyTokensWithFee(       // user buys one single CDC whose only collateral is the one printed before.
+            dai,
+            1 ether,
+            cdc,
+            uint(-1)
+        );
+       //-this-is-the-difference-form-previous-test----------------------------------------
+
+        TesterActor(user).doBuyTokensWithFee(       // THIS WILL FAIL!! Because if the only dpass is sold, there would be nothing ...
+                                                    // ... to back the value of CDC sold in previous step.  
+            dai,
+            daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
+            dpass,
+            id
+        );                                          // error Revert ("dex-sell-amount-exceeds-allowance")
+
+        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
+        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+    }
 
     function logUint(bytes32 what, uint256 num, uint256 dec) public {
         emit LogUintIpartUintFpart( what, num / 10 ** dec, num % 10 ** dec);
