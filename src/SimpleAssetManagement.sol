@@ -335,9 +335,11 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     */
     function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public auth {
         require(dpasses[token_], "asm-invalid-token-address");
+        address custodian_ = Dpass(token_).getCustodian(tokenId_); 
+        require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
 
         if(Dpass(token_).ownerOf(tokenId_) == address(this)) {
-            _updateCollateralDpass(price_, basePrice[token_][tokenId_], Dpass(token_).getCustodian(tokenId_));
+            _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
         }
 
         basePrice[token_][tokenId_] = price_;
@@ -442,7 +444,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             }
 
 
-        } else if (dpasses[token_]) {                                        // user sells erc721 token_ to custodian
+        } else if (dst_ == address(this) && dpasses[token_]) {                                        // user sells erc721 token_ to custodians
 
             require(payTokens[token_], "asm-token-not-accepted");
 
