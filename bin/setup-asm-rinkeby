@@ -13,22 +13,23 @@ export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export ETH_PASSWORD=~/.eth-pwd
 ################################################################################
 # max is 24576
-DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin)
-echo $((${#DATA} / 2 - 1))
+# DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin)
+# echo $((${#DATA} / 2 - 1))
 
-
-export dex=0x63f9101b9244e20a81071d76cc12f9986f69f4d0
-export asm=0x8892a913819088fcbf412dd46355cfb2c93da71f
+echo -e "===================== ######################## =========================="
+echo -e "=====================  Setup Asset Management  =========================="
+echo -e "===================== ######################## =========================="
+export asm=0x12fcf438d8fa751c9c63b7a6d9241f412c2d1803
 
 # == Decimals ==
 export dpt=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
 export cdc=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
 export eth=0x00000000000000000000000000000000000000ee
 export dcdc=0xbF2Fb30C4a6f37dCCb08F987814852A5A7b64337
+
 # DPT
-# asm.setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds")
+echo -e "====================== Setup decimals =========================="
 export decimals=$(seth --to-bytes32 $(seth --from-ascii decimals))
-# export d18=$(seth --to-bytes32 $(seth --from-ascii 18))
 export d18=$(seth --to-bytes32 $(seth --to-uint256 18))
 export bDpt=$(seth --to-bytes32 $(seth --to-uint256 $dpt))
 export diamonds=$(seth --to-bytes32 $(seth --from-ascii diamonds))
@@ -36,7 +37,6 @@ export diamonds=$(seth --to-bytes32 $(seth --from-ascii diamonds))
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $decimals $bDpt $d18 $diamonds
 
 # CDC
-# asm.setConfig("decimals", b(cdc), b(decimals[cdc]), "diamonds")
 export bCdc=$(seth --to-bytes32 $(seth --to-uint256 $cdc))
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $decimals $bCdc $d18 $diamonds
 
@@ -52,64 +52,168 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $decimals $bDcdc $d1
 export dptPriceFeed=0xc9faD47Fe77500515de29024C076b6d8D87d423E
 export cdcPriceFeed=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
 export ethPriceFeed=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
-
 export priceFeed=$(seth --to-bytes32 $(seth --from-ascii priceFeed))
-
 export bDptPriceFeed=$(seth --to-bytes32 $(seth --to-uint256 $dptPriceFeed))
-# asm.setConfig("priceFeed", b(dpt), b(feed[dpt]), "diamonds");
+
+echo -e "====================== Setup priceFeed =========================="
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bDpt $bDptPriceFeed $diamonds
 
 export bCdcPriceFeed=$(seth --to-bytes32 $(seth --to-uint256 $cdcPriceFeed))
-# asm.setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bCdc $bCdcPriceFeed $diamonds
-
 
 # DCDC is the same as CDC price feed
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bDcdc $bCdcPriceFeed $diamonds
 
 export bEthPriceFeed=$(seth --to-bytes32 $(seth --to-uint256 $ethPriceFeed))
-# asm.setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bEth $bEthPriceFeed $diamonds
 
 export bEthPriceFeed=$(seth --to-bytes32 $(seth --to-uint256 $ethPriceFeed))
-# asm.setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bEth $bEthPriceFeed $diamonds
 
 
 # == Custodians ==
+echo -e "====================== Setup Custodians =========================="
 export custodian=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
-
 export custodians=$(seth --to-bytes32 $(seth --from-ascii custodians))
-export bCustodians=$(seth --to-bytes32 $(seth --to-uint256 $custodian))
+export bCustodian=$(seth --to-bytes32 $(seth --to-uint256 $custodian))
 export bTrue=$(seth --to-bytes32 $(seth --to-uint256 1))
+export bFalse=$(seth --to-bytes32 $(seth --to-uint256 0))
 
-# asm.setConfig("custodians", b(custodian), b(true), "diamonds");
-seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $custodians $bCustodians $bTrue $diamonds
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $custodians $bCustodian $bTrue $diamonds
 
 # == payTokens ==
+echo -e "====================== Setup payTokens =========================="
 export payTokens=$(seth --to-bytes32 $(seth --from-ascii payTokens))
 
-# asm.setConfig("payTokens", b(dpt), b(true), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $payTokens $bDpt $bTrue $diamonds
-# asm.setConfig("payTokens", b(eth), b(true), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $payTokens $bEth $bTrue $diamonds
 
 
 # == cdcs ==
+echo -e "====================== Setup cdcs =========================="
 export cdcs=$(seth --to-bytes32 $(seth --from-ascii cdcs))
-# asm.setConfig("cdcs", b(cdc), b(true), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $cdcs $bCdc $bTrue $diamonds
 
-# Это еще не выполнилось
 # == dcdcs ==
+echo -e "====================== Setup dcdcs =========================="
 export dcdcs=$(seth --to-bytes32 $(seth --from-ascii dcdcs))
-# asm.setConfig("dcdcs", b(dcdc), b(true), "diamonds");
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dcdcs $bDcdc $bTrue $diamonds
 
-# # == dpasses ==
-# export dpass=0xc6188fBa6b826E45C33d8711155C5f10E0790F4a
-# export dpasses=$(seth --to-bytes32 $(seth --from-ascii dpasses))
-# export bDpass=$(seth --to-bytes32 $(seth --to-uint256 $dpass))
+# == dpasses ==
+echo -e "====================== Setup dpasses =========================="
+export dpass=0xc6188fBa6b826E45C33d8711155C5f10E0790F4a
+export dpasses=$(seth --to-bytes32 $(seth --from-ascii dpasses))
+export bDpass=$(seth --to-bytes32 $(seth --to-uint256 $dpass))
 
-# # asm.setConfig("dpasses", b(dpass), b(true), "diamonds");
-# seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dpasses $bDpass $bTrue $diamonds
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dpasses $bDpass $bTrue $diamonds
+
+
+echo -e "====================== Setup overCollRatio =========================="
+SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
+
+export overCollRatio=$(seth --to-bytes32 $(seth --from-ascii overCollRatio))
+export b11eth=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 1.1 eth)))
+export bEmpty=$(seth --to-bytes32 $(seth --from-ascii ""))
+
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $overCollRatio $b11eth $bEmpty $diamonds
+
+echo -e "====================== ################### =========================="
+echo -e "======================    Setup Exchange   =========================="
+echo -e "====================== ################### =========================="
+export dex=0xb8e16932cebbe14596edbb9b7e5eeb3029238fb5
+
+# We named everything from the point of view of the user. CanSellErc20 means USER Can Sell Erc20 token.
+export canSellErc20=$(seth --to-bytes32 $(seth --from-ascii canSellErc20))
+export canBuyErc20=$(seth --to-bytes32 $(seth --from-ascii canBuyErc20))
+# User can sell to dex DPT and CDC?
+# seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canSellErc20 $bDpt $bTrue
+# seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canSellErc20 $bCdc $bTrue
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canSellErc20 $bEth $bTrue
+# User can buy DPT?
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canBuyErc20 $bDpt $bTrue
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canBuyErc20 $bCdc $bTrue
+
+
+export canBuyErc721=$(seth --to-bytes32 $(seth --from-ascii canBuyErc721))
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $canBuyErc721 $bDpass $bTrue
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $decimals $bDpt $d18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $decimals $bCdc $d18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $decimals $bEth $d18
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii cdc)) $bCdc $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii dpt)) $bDpt $bEmpty
+
+export handledByAsm=$(seth --to-bytes32 $(seth --from-ascii handledByAsm))
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $handledByAsm $bCdc $d18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $handledByAsm $bDpass $d18
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bDpt $bDptPriceFeed
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bEth $bEthPriceFeed
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bCdc $bCdcPriceFeed
+
+export liq=0x1369a1a0d7bfefc5beafbc1c8ea03ba65e487bf6
+export burner=0xd98860b7eef76be5c3f2a8d8845a1e9f0f9fad36
+export wal=0xA787E6c6d365641DC9540148E4f8426f81FE235B
+
+export bLiq=$(seth --to-bytes32 $(seth --to-uint256 $liq))
+export bBurner=$(seth --to-bytes32 $(seth --to-uint256 $burner))
+export bWal=$(seth --to-bytes32 $(seth --to-uint256 $wal))
+export bAsm=$(seth --to-bytes32 $(seth --to-uint256 $asm))
+export bDex=$(seth --to-bytes32 $(seth --to-uint256 $dex))
+
+# uint public fixFee = 0 ether;           // in USD
+# uint public varFee = .001 ether;        // variable fee is 0.1% of value
+# uint public profitRate = .3 ether;      // profit rate 30%
+# bool public takeProfitOnlyInDpt = true; // take only profit or total fee (cost + profit) in DPT
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii liq)) $bLiq $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii burner)) $bBurner $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii asm)) $bAsm $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii wal)) $bWal $bEmpty
+
+export bFixFee=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 1 eth)))
+export bVarFee=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 0.001 eth)))
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii fixFee)) $bFixFee $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii varFee)) $bVarFee $bEmpty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii profitRate)) $bTrue $bEmpty
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii custodian20)) $bEth $bAsm
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii custodian20)) $bDpt $bAsm
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii custodian20)) $bCdc $bAsm
+
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii takeProfitOnlyInDpt)) $bFalse $bEmpty
+
+export guard=0x073d2f0a2722cb8f10de4a3ddb0e7c201b6b38b1
+export ANY=$(seth call $guard "ANY()")
+export bANY=$(seth --to-bytes32 $ANY)
+export uANY=$(seth --to-uint256 $ANY)
+
+# Guard
+echo -e "============== Setup guard ====================="
+seth send $asm "setAuthority(address)" $guard
+seth send $cdc "setAuthority(address)" $guard
+seth send $dcdc "setAuthority(address)" $guard
+seth send $dpass "setAuthority(address)" $guard
+
+# TODO: fix permissions
+# caller, toContract, permissions
+seth send $guard "permit(address,address,bytes32)" $asm $cdc $bANY
+seth send $guard "permit(address,address,bytes32)" $asm $dcdc $bANY
+seth send $guard "permit(address,address,bytes32)" $asm $dpass $bANY
+
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $bANY
+seth send $guard "permit(address,address,bytes32)" $custodian $dpass $bANY
+seth send $guard "permit(address,address,bytes32)" $dex $asm $bANY
+
+seth send $liq "approve(address,address,uint)" $dpt $dex $uANY
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii liq)) $bLiq $bEmpty
+seth send $liq "setOwner(address)" $dex
+
+seth send $asm "setBasePrice(address,uint,uint)" $dpass $(seth --to-uint256 1) $(seth --to-uint256 $(seth --to-wei 30 eth))
+
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii setApproveForAll)) $bDpass $bDex $bTrue
+
+# ???
+# seth send $asm "setAmtForSale(address,uint)" $cdc $(seth --to-uint256 $(seth --to-wei 1000 eth))
