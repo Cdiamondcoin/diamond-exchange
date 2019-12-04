@@ -45,9 +45,8 @@ contract TrustedFeeCalculator {
 
 contract TrustedAsm {
     function notifyTransferFrom(address token, address src, address dst, uint256 id721) external;
-    function getBasePrice(address erc721, uint256 id721) external view returns(uint256);
+    function basePrice(address erc721, uint256 id721) external view returns(uint256);
     function getAmtForSale(address token) external view returns(uint256);
-    function isDpass(address dpass) external view returns(bool);
     function mint(address token, address dst, uint256 amt) external;
 }
 
@@ -863,7 +862,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint buyPrice_ = buyPrice[token_][owner_][tokenId_];
         require(canBuyErc721[token_], "dex-token-not-for-sale");
         if( buyPrice_ == 0 || buyPrice_ == uint(-1)) {
-            basePrice_ = asm.getBasePrice(token_, tokenId_);
+            basePrice_ = asm.basePrice(token_, tokenId_);
             require(basePrice_ != 0, "dex-zero-price-not-allowed");
             return basePrice_;
         } else {

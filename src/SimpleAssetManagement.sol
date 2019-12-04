@@ -16,7 +16,7 @@ contract TrustedFeedLike {
 }
 
 
-contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
+contract SimpleAssetManagement is DSAuth, DSStop {
 
     event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
@@ -32,41 +32,41 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
 
     mapping(
         address => mapping(
-            uint => uint)) private basePrice;               // the base price used for collateral valuation
-    mapping(address => bool) custodians;                    // returns true for custodians
+            uint => uint)) public basePrice;               // the base price used for collateral valuation
+    mapping(address => bool) public custodians;                    // returns true for custodians
     mapping(address => uint)                                // total base currency value of custodians collaterals
         public totalDpassCustV;
     mapping(address => uint) private rate;                  // current rate of a token in base currency
-    mapping(address => uint) private cdcV;                  // base currency value of cdc token
-    mapping(address => uint) private dcdcV;                 // base currency value of dcdc token
-    mapping(address => uint) private totalDcdcCustV;        // total value of all dcdcs at custodian
+    mapping(address => uint) public cdcV;                  // base currency value of cdc token
+    mapping(address => uint) public dcdcV;                 // base currency value of dcdc token
+    mapping(address => uint) public totalDcdcCustV;        // total value of all dcdcs at custodian
     mapping(
         address => mapping(
-            address => uint)) private dcdcCustV;            // dcdcCustV[dcdc][custodian] value of dcdc at custodian
-    mapping(address => bool) private payTokens;             // returns true for tokens allowed to make payment to custodians with
-    mapping(address => bool) private dpasses;               // returns true for dpass tokens allowed in this contract
-    mapping(address => bool) private dcdcs;                 // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
-    mapping(address => bool) private cdcs;                  // returns true for cdc tokens allowed in this contract
+            address => uint)) public dcdcCustV;            // dcdcCustV[dcdc][custodian] value of dcdc at custodian
+    mapping(address => bool) public payTokens;             // returns true for tokens allowed to make payment to custodians with
+    mapping(address => bool) public dpasses;               // returns true for dpass tokens allowed in this contract
+    mapping(address => bool) public dcdcs;                 // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
+    mapping(address => bool) public cdcs;                  // returns true for cdc tokens allowed in this contract
     mapping(address => uint) private decimals;              // stores decimals for each ERC20 token
-    mapping(address => bool) private decimalsSet;           // stores decimals for each ERC20 token
-    mapping(address => address) private priceFeed;          // price feed address for token
-    mapping(address => uint) private tokenPurchaseRate;     // the average purchase rate of a token. This is the ...
+    mapping(address => bool) public decimalsSet;           // stores decimals for each ERC20 token
+    mapping(address => address) public priceFeed;          // price feed address for token
+    mapping(address => uint) public tokenPurchaseRate;     // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
-    mapping(address => uint) private totalPaidV;            // total amount that has been paid to custodian for dpasses and cdc in base currency
-    mapping(address => uint) private totalDpassSoldV;       // totoal amount of all dpass tokens that have been sold by custodian
+    mapping(address => uint) public totalPaidV;            // total amount that has been paid to custodian for dpasses and cdc in base currency
+    mapping(address => uint) public totalDpassSoldV;       // totoal amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => bytes32) public domains;             // the domain that connects the set of cdc, dpass, and dcdc tokens, and custodians
-    mapping(bytes32 => uint) private totalDpassV;           // total value of dpass collaterals in base currency
-    mapping(bytes32 => uint) private totalDcdcV;            // total value of dcdc collaterals in base currency
-    mapping(bytes32 => uint) private totalCdcV;             // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalDpassV;           // total value of dpass collaterals in base currency
+    mapping(bytes32 => uint) public totalDcdcV;            // total value of dcdc collaterals in base currency
+    mapping(bytes32 => uint) public totalCdcV;             // total value of cdc tokens issued in base currency
     mapping(bytes32 => uint)
-        private overCollRatio;                              // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
+        public overCollRatio;                              // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
     mapping(bytes32 => uint)
-        private overCollRemoveRatio;                        // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
-    mapping(address => uint) private maxCollCustV;          // maximum value of dpass and dcdc tokens a custodian is allowed to mint
+        public overCollRemoveRatio;                        // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
+    mapping(address => uint) public maxCollCustV;          // maximum value of dpass and dcdc tokens a custodian is allowed to mint
 
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
-    bool private locked;                                    // variable prevents to exploit by recursively calling funcions
+    bool public locked;                                    // variable prevents to exploit by recursively calling funcions
     address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
     /**
      * @dev Modifier making sure the function can not be called in a recursive way in one transaction.
@@ -81,7 +81,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 
     mapping(address => Audit) public audit;                 // containing the last audit reports for all custodians.
-    uint32 auditInterval = 1776000;                         // represents 3 months of audit interwal in which an audit is mandatory for custodian.
+    uint32 public auditInterval = 1776000;                  // represents 3 months of audit interwal in which an audit is mandatory for custodian.
 
     modifier nonReentrant {
         require(!locked, "asm-reentrancy-detected");
@@ -90,6 +90,29 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         locked = false;
     }
 
+  //-----------included-from-ds-math---------------------------------begin
+    uint constant WAD = 10 ** 18;
+
+    function add(uint x, uint y) internal pure returns (uint z) {
+        require((z = x + y) >= x, "ds-math-add-overflow");
+    }
+    function sub(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x, "ds-math-sub-underflow");
+    }
+    function min(uint x, uint y) internal pure returns (uint z) {
+        return x <= y ? x : y;
+    }
+    function mul(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
+    }
+    function wmul(uint x, uint y) internal pure returns (uint z) {
+        z = add(mul(x, y), WAD / 2) / WAD;
+    }
+    function wdiv(uint x, uint y) internal pure returns (uint z) {
+        z = add(mul(x, WAD), y / 2) / y;
+    }
+//-----------included-from-ds-math---------------------------------end
+    
     /**
     * @dev Set configuration variables of asset managment contract.
     * @param what_ bytes32 tells to function what to set.
@@ -202,22 +225,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     function setRate(address token_, uint256 value_) public nonReentrant auth {
         setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
-
-    /**
-     * @dev Returns true if custodian is a valid custodian.
-     */
-    function isCustodian(address custodian_) public view returns(bool) {
-        return custodians[custodian_];
-    }
-
-    /**
-     * @dev Return the total value of all dpass tokens at custodians.
-     */
-    function getTotalDpassCustV(address custodian_) public view returns(uint256) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        return totalDpassCustV[custodian_];
-    }
-
     /**
      * @dev Get newest rate in base currency from priceFeed for token.
      */
@@ -233,67 +240,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 
     /**
-     * @dev Get currently stored value in base currency of cdc token.
-     */
-    function getCdcV(address cdc_) public view returns(uint256) {
-        require(cdcs[cdc_], "asm-token-not-listed");
-        return cdcV[cdc_];
-    }
-
-    /**
-     * @dev Get currently stored total value of dcdc token.
-     */
-    function getDcdcV(address dcdc_) public view returns(uint256) {
-        require(dcdcs[dcdc_], "asm-token-not-listed");
-        return dcdcV[dcdc_];
-    }
-
-    /**
-     * @dev Get the currently stored total value in base currency of all dcdc tokens at a custodian.
-     */
-    function getTotalDcdcCustV(address custodian_) public view returns(uint256) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        return totalDcdcCustV[custodian_];
-    }
-
-    /**
-     * @dev Get the currently sotored total value in base currency of a certain dcdc token at a custodian.
-     */
-    function getDcdcCustV(address custodian_, address dcdc_) public view returns(uint256) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
-        return dcdcCustV[dcdc_][custodian_];
-    }
-
-    /**
-     * @dev Returns true if token can be used as a payment token.
-     */
-    function isPayToken(address payToken_) public view returns(bool) {
-        return payTokens[payToken_];
-    }
-
-    /**
-     * @dev Returns true if token is a valid dpass token.
-     */
-    function isDpass(address dpass_) public view returns(bool) {
-        return dpasses[dpass_];
-    }
-
-    /**
-     * @dev Returns true if token is a valid dcdc token.
-     */
-    function isDcdc(address dcdc_) public view returns(bool) {
-        return dcdcs[dcdc_];
-    }
-
-    /**
-     * @dev Returns true if token is a valid cdc token.
-     */
-    function isCdc(address cdc_) public view returns(bool) {
-        return cdcs[cdc_];
-    }
-
-    /**
     * @dev Retrieve the decimals of a token. As we can store only uint values, the decimals defne how many of the lower digits are part of the fraction part.
     */
     function getDecimals(address token_) public view returns (uint8 dec) {
@@ -305,62 +251,11 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         dec--;
     }
 
-    /**
-    * @dev Returns true if decimals have been set for a certain token.
-    */
-    function isDecimalsSet(address token) public view returns(bool) {
-        return decimalsSet[token];
-    }
-
-    /**
-    * @dev Returns the price feed address of a token. Price feeds provide pricing info for asset management.
-    */
-    function getPriceFeed(address token_) public view returns(address) {
-        require(dpasses[token_] || cdcs[token_] || dcdcs[token_] || payTokens[token_], "asm-token_-not-listed");
-        return priceFeed[token_];
-    }
-
-    /**
-    * @dev Returns the average purchase rate for a token. Users send
-           different tokens several times to asm. Their price in terms of
-           base currency is varying. This function returns the avarage value of the token.
-    */
-    function getTokenPurchaseRate(address token_) public view returns(uint256) {
-        require(payTokens[token_], "asm-token-not-listed");
-        return tokenPurchaseRate[token_];
-    }
-
-    /**
-    * @dev  Returns the total value that has been paid out for a custodian
-            for its services. The value is calculated in terms of base currency.
-    */
-    function getTotalPaidV(address custodian_) public view returns(uint256) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        return totalPaidV[custodian_];
-    }
-
-    /**
-    * @dev  Returns the total value of all the dpass diamonds sold by a custodian.
-            The value is calculated in base currency.
-    */
-    function getTotalDpassSoldV(address custodian_) public view returns(uint256) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        return totalDpassSoldV[custodian_];
-    }
-
     /*
     * @dev Convert address to bytes32
     */
     function addr(bytes32 b_) public pure returns (address) {
         return address(uint256(b_));
-    }
-
-    /**
-    * @dev Returns the base price of a diamond. This price is the final value of the diamond. Asset management uses this price to define total collateral value.
-    */
-    function getBasePrice(address token_, uint256 tokenId_) public view returns(uint) {
-        require(dpasses[token_], "asm-invalid-token-address");
-        return basePrice[token_][tokenId_];
     }
 
     /**
@@ -379,43 +274,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
 
         basePrice[token_][tokenId_] = price_;
         emit LogBasePrice(token_, tokenId_);
-    }
-
-    /**
-    * @dev Returns the total value of all the dpass tokens in a domain_.
-    */
-    function getTotalDpassV(bytes32 domain_) public view returns(uint) {
-        return totalDpassV[domain_];
-    }
-
-    /**
-    * @dev Returns the total value of all the dcdc tokens in a domain_.
-    */
-    function getTotalDcdcV(bytes32 domain_) public view returns(uint) {
-        return totalDcdcV[domain_];
-    }
-
-    /**
-    * @dev Returns the total value of all the cdc tokens in a domain_.
-    */
-    function getTotalCdcV(bytes32 domain_) public view returns(uint) {
-        return totalCdcV[domain_];
-    }
-
-    /**
-    * @dev Returns the required of overcollaterization ratio that is required. The total value of cdc tokens in a domain_ should be less than total value of dpass tokens plus total value of dcdc tokens divided by overcollatrization ratio.
-    */
-    function getOverCollRatio(bytes32 domain_) public view returns(uint) {
-        return overCollRatio[domain_];
-    }
-
-    /**
-    * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
-    */
-    // TODO: test
-    function getMaxCollCustV(address custodian_) public view returns(uint) {
-        require(custodians[custodian_], "asm-should-be-custodian");
-        return maxCollCustV[custodian_];
     }
 
     /**
@@ -692,26 +550,9 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 
     /*
-    * @dev Set state for multiple dpass tokens in one transaction. No more than 15 tokens should be updated at once.
-    */
-    function setStateDpass(address token_, uint256[] memory tokenIds_, bytes8 state_) public nonReentrant auth {
-        require(dpasses[token_], "asm-sds-not-a-dpass-token");
-
-        for(uint idx_ = 0; idx_ < tokenIds_.length; idx_++) {
-
-            require(
-                !custodians[msg.sender] ||
-                msg.sender == Dpass(token_).getCustodian(tokenIds_[idx_]),
-                "asm-sds-not-authorized");
-
-            Dpass(token_).setState(state_, tokenIds_[idx_]);
-        }
-    }
-
-    /*
     * @dev Custodians can find out how much token they can withdraw.
     */
-    function getWithdrawV(address custodian_) public view returns(uint) {
+    function withdrawV(address custodian_) public view returns(uint) {
         require(custodians[custodian_], "asm-not-a-custodian");
         uint custodianCdcV_ = _getCustodianCdcV(domains[custodian_], custodian_);
 
@@ -1022,20 +863,18 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         address payable dst,
         uint256 amount
     ) internal returns (bool){
-        DSToken erc20 = DSToken(token);
         if (token == eth && amount > 0) {
             require(src == address(this), "wal-ether-transfer-invalid-src");
             dst.transfer(amount);
             emit LogTransferEth(src, dst, amount);
         } else {
-            if (amount > 0) erc20.transferFrom(src, dst, amount);   // transfer all of token to dst
+            if (amount > 0) DSToken(token).transferFrom(src, dst, amount);   // transfer all of token to dst
         }
         return true;
     }
 }
 
 // TODO: redeem func
-// TODO: auditor func at least a Log
 // TODO: be able to ban custodian sale
 // TODO: document functions
 // TODO: auth thests

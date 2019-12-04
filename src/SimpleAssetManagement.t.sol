@@ -75,29 +75,29 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
     function testSetPriceFeedAsm() public {
         asm.setConfig("priceFeed", b(cdc), b(address(0xe)), "diamonds");
-        assertEq(asm.getPriceFeed(cdc), address(0xe));
+        assertEq(asm.priceFeed(cdc), address(0xe));
     }
 
     function testSetDpassAsm() public {
         asm.setConfig("dpasses", b(address(0xefecd)), b(true), "diamonds");
-        assertTrue(asm.isDpass(address(0xefecd)));
-        assertTrue(asm.isDpass(dpass));
-        assertTrue(asm.isDpass(dpass1));
-        assertTrue(asm.isDpass(dpass2));
-        assertTrue(!asm.isDpass(cdc));
-        assertTrue(!asm.isDpass(cdc1));
-        assertTrue(!asm.isDpass(cdc2));
-        assertTrue(!asm.isDpass(dcdc));
-        assertTrue(!asm.isDpass(dcdc1));
-        assertTrue(!asm.isDpass(dcdc2));
-        assertTrue(!asm.isDpass(dpt));
-        assertTrue(!asm.isDpass(dai));
-        assertTrue(!asm.isDpass(eth));
-        assertTrue(!asm.isDpass(eng));
-        assertTrue(!asm.isDpass(user));
-        assertTrue(!asm.isDpass(custodian));
-        assertTrue(!asm.isDpass(custodian1));
-        assertTrue(!asm.isDpass(custodian2));
+        assertTrue(asm.dpasses(address(0xefecd)));
+        assertTrue(asm.dpasses(dpass));
+        assertTrue(asm.dpasses(dpass1));
+        assertTrue(asm.dpasses(dpass2));
+        assertTrue(!asm.dpasses(cdc));
+        assertTrue(!asm.dpasses(cdc1));
+        assertTrue(!asm.dpasses(cdc2));
+        assertTrue(!asm.dpasses(dcdc));
+        assertTrue(!asm.dpasses(dcdc1));
+        assertTrue(!asm.dpasses(dcdc2));
+        assertTrue(!asm.dpasses(dpt));
+        assertTrue(!asm.dpasses(dai));
+        assertTrue(!asm.dpasses(eth));
+        assertTrue(!asm.dpasses(eng));
+        assertTrue(!asm.dpasses(user));
+        assertTrue(!asm.dpasses(custodian));
+        assertTrue(!asm.dpasses(custodian1));
+        assertTrue(!asm.dpasses(custodian2));
     }
 
     function testSetCdcAsm() public {
@@ -105,24 +105,24 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newToken)), b(uint(18)), "diamonds");
         asm.setConfig("priceFeed", b(address(newToken)), b(feed[cdc]), "diamonds");
         asm.setConfig("cdcs", b(address(newToken)), b(true), "diamonds");
-        assertTrue(asm.isCdc(address(newToken)));
-        assertTrue(!asm.isCdc(dpass));
-        assertTrue(!asm.isCdc(dpass1));
-        assertTrue(!asm.isCdc(dpass2));
-        assertTrue(asm.isCdc(cdc));
-        assertTrue(asm.isCdc(cdc1));
-        assertTrue(asm.isCdc(cdc2));
-        assertTrue(!asm.isCdc(dcdc));
-        assertTrue(!asm.isCdc(dcdc1));
-        assertTrue(!asm.isCdc(dcdc2));
-        assertTrue(!asm.isCdc(dpt));
-        assertTrue(!asm.isCdc(dai));
-        assertTrue(!asm.isCdc(eth));
-        assertTrue(!asm.isCdc(eng));
-        assertTrue(!asm.isCdc(user));
-        assertTrue(!asm.isCdc(custodian));
-        assertTrue(!asm.isCdc(custodian1));
-        assertTrue(!asm.isCdc(custodian2));
+        assertTrue(asm.cdcs(address(newToken)));
+        assertTrue(!asm.cdcs(dpass));
+        assertTrue(!asm.cdcs(dpass1));
+        assertTrue(!asm.cdcs(dpass2));
+        assertTrue(asm.cdcs(cdc));
+        assertTrue(asm.cdcs(cdc1));
+        assertTrue(asm.cdcs(cdc2));
+        assertTrue(!asm.cdcs(dcdc));
+        assertTrue(!asm.cdcs(dcdc1));
+        assertTrue(!asm.cdcs(dcdc2));
+        assertTrue(!asm.cdcs(dpt));
+        assertTrue(!asm.cdcs(dai));
+        assertTrue(!asm.cdcs(eth));
+        assertTrue(!asm.cdcs(eng));
+        assertTrue(!asm.cdcs(user));
+        assertTrue(!asm.cdcs(custodian));
+        assertTrue(!asm.cdcs(custodian1));
+        assertTrue(!asm.cdcs(custodian2));
     }
 
     function testSetDcdcAsm() public {
@@ -130,24 +130,24 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newDcdc)), b(uint(18)), "diamonds");
         asm.setConfig("priceFeed", b(address(newDcdc)), b(feed[cdc]), "diamonds");
         asm.setConfig("dcdcs", b(address(newDcdc)), b(true), "diamonds");
-        assertTrue(asm.isDcdc(address(newDcdc)));
-        assertTrue(!asm.isDcdc(dpass));
-        assertTrue(!asm.isDcdc(dpass1));
-        assertTrue(!asm.isDcdc(dpass2));
-        assertTrue(!asm.isDcdc(cdc));
-        assertTrue(!asm.isDcdc(cdc1));
-        assertTrue(!asm.isDcdc(cdc2));
-        assertTrue(asm.isDcdc(dcdc));
-        assertTrue(asm.isDcdc(dcdc1));
-        assertTrue(asm.isDcdc(dcdc2));
-        assertTrue(!asm.isDcdc(dpt));
-        assertTrue(!asm.isDcdc(dai));
-        assertTrue(!asm.isDcdc(eth));
-        assertTrue(!asm.isDcdc(eng));
-        assertTrue(!asm.isDcdc(user));
-        assertTrue(!asm.isDcdc(custodian));
-        assertTrue(!asm.isDcdc(custodian1));
-        assertTrue(!asm.isDcdc(custodian2));
+        assertTrue(asm.dcdcs(address(newDcdc)));
+        assertTrue(!asm.dcdcs(dpass));
+        assertTrue(!asm.dcdcs(dpass1));
+        assertTrue(!asm.dcdcs(dpass2));
+        assertTrue(!asm.dcdcs(cdc));
+        assertTrue(!asm.dcdcs(cdc1));
+        assertTrue(!asm.dcdcs(cdc2));
+        assertTrue(asm.dcdcs(dcdc));
+        assertTrue(asm.dcdcs(dcdc1));
+        assertTrue(asm.dcdcs(dcdc2));
+        assertTrue(!asm.dcdcs(dpt));
+        assertTrue(!asm.dcdcs(dai));
+        assertTrue(!asm.dcdcs(eth));
+        assertTrue(!asm.dcdcs(eng));
+        assertTrue(!asm.dcdcs(user));
+        assertTrue(!asm.dcdcs(custodian));
+        assertTrue(!asm.dcdcs(custodian1));
+        assertTrue(!asm.dcdcs(custodian2));
     }
 
     function testSetDcdcStoppedAsm() public {
@@ -156,46 +156,46 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newDcdc)), b(uint(18)), "diamonds");
         asm.setConfig("priceFeed", b(address(newDcdc)), b(feed[cdc]), "diamonds");
         asm.setConfig("dcdcs", b(address(newDcdc)), b(true), "diamonds");
-        assertTrue(asm.isDcdc(address(newDcdc)));
-        assertTrue(!asm.isDcdc(dpass));
-        assertTrue(!asm.isDcdc(dpass1));
-        assertTrue(!asm.isDcdc(dpass2));
-        assertTrue(!asm.isDcdc(cdc));
-        assertTrue(!asm.isDcdc(cdc1));
-        assertTrue(!asm.isDcdc(cdc2));
-        assertTrue(asm.isDcdc(dcdc));
-        assertTrue(asm.isDcdc(dcdc1));
-        assertTrue(asm.isDcdc(dcdc2));
-        assertTrue(!asm.isDcdc(dpt));
-        assertTrue(!asm.isDcdc(dai));
-        assertTrue(!asm.isDcdc(eth));
-        assertTrue(!asm.isDcdc(eng));
-        assertTrue(!asm.isDcdc(user));
-        assertTrue(!asm.isDcdc(custodian));
-        assertTrue(!asm.isDcdc(custodian1));
-        assertTrue(!asm.isDcdc(custodian2));
+        assertTrue(asm.dcdcs(address(newDcdc)));
+        assertTrue(!asm.dcdcs(dpass));
+        assertTrue(!asm.dcdcs(dpass1));
+        assertTrue(!asm.dcdcs(dpass2));
+        assertTrue(!asm.dcdcs(cdc));
+        assertTrue(!asm.dcdcs(cdc1));
+        assertTrue(!asm.dcdcs(cdc2));
+        assertTrue(asm.dcdcs(dcdc));
+        assertTrue(asm.dcdcs(dcdc1));
+        assertTrue(asm.dcdcs(dcdc2));
+        assertTrue(!asm.dcdcs(dpt));
+        assertTrue(!asm.dcdcs(dai));
+        assertTrue(!asm.dcdcs(eth));
+        assertTrue(!asm.dcdcs(eng));
+        assertTrue(!asm.dcdcs(user));
+        assertTrue(!asm.dcdcs(custodian));
+        assertTrue(!asm.dcdcs(custodian1));
+        assertTrue(!asm.dcdcs(custodian2));
     }
     function testSetCustodianAsm() public {
         address custodian_ = address(0xeeeeee);
         asm.setConfig("custodians", b(address(custodian_)), b(true), "diamonds");
-        assertTrue(asm.isCustodian(address(custodian_)));
-        assertTrue(!asm.isCustodian(dpass));
-        assertTrue(!asm.isCustodian(dpass1));
-        assertTrue(!asm.isCustodian(dpass2));
-        assertTrue(!asm.isCustodian(cdc));
-        assertTrue(!asm.isCustodian(cdc1));
-        assertTrue(!asm.isCustodian(cdc2));
-        assertTrue(!asm.isCustodian(dcdc));
-        assertTrue(!asm.isCustodian(dcdc1));
-        assertTrue(!asm.isCustodian(dcdc2));
-        assertTrue(!asm.isCustodian(dpt));
-        assertTrue(!asm.isCustodian(dai));
-        assertTrue(!asm.isCustodian(eth));
-        assertTrue(!asm.isCustodian(eng));
-        assertTrue(!asm.isCustodian(user));
-        assertTrue(asm.isCustodian(custodian));
-        assertTrue(asm.isCustodian(custodian1));
-        assertTrue(asm.isCustodian(custodian2));
+        assertTrue(asm.custodians(address(custodian_)));
+        assertTrue(!asm.custodians(dpass));
+        assertTrue(!asm.custodians(dpass1));
+        assertTrue(!asm.custodians(dpass2));
+        assertTrue(!asm.custodians(cdc));
+        assertTrue(!asm.custodians(cdc1));
+        assertTrue(!asm.custodians(cdc2));
+        assertTrue(!asm.custodians(dcdc));
+        assertTrue(!asm.custodians(dcdc1));
+        assertTrue(!asm.custodians(dcdc2));
+        assertTrue(!asm.custodians(dpt));
+        assertTrue(!asm.custodians(dai));
+        assertTrue(!asm.custodians(eth));
+        assertTrue(!asm.custodians(eng));
+        assertTrue(!asm.custodians(user));
+        assertTrue(asm.custodians(custodian));
+        assertTrue(asm.custodians(custodian1));
+        assertTrue(asm.custodians(custodian2));
     }
 
     function testGetTotalDpassCustVAsm() public {
@@ -205,12 +205,12 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
-        assertEq(asm.getTotalDpassCustV(custodian), price_);
+        assertEq(asm.totalDpassCustV(custodian), price_);
     }
 
     function testSetOverCollRatioAsm() public {
         asm.setConfig("overCollRatio", b(uint(1.2 ether)), "", "diamonds");
-        assertEq(asm.getOverCollRatio("diamonds"), 1.2 ether);
+        assertEq(asm.overCollRatio("diamonds"), 1.2 ether);
     }
 
     function testSetPayTokensAsm() public {
@@ -218,24 +218,24 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newPayToken)), b(uint(18)), "diamonds");
         asm.setConfig("priceFeed", b(address(newPayToken)), b(feed[cdc]), "diamonds");
         asm.setConfig("payTokens", b(address(newPayToken)), b(true), "diamonds");
-        assertTrue(asm.isPayToken(address(newPayToken)));
-        assertTrue(!asm.isPayToken(dpass));
-        assertTrue(!asm.isPayToken(dpass1));
-        assertTrue(!asm.isPayToken(dpass2));
-        assertTrue(!asm.isPayToken(cdc));
-        assertTrue(!asm.isPayToken(cdc1));
-        assertTrue(!asm.isPayToken(cdc2));
-        assertTrue(!asm.isPayToken(dcdc));
-        assertTrue(!asm.isPayToken(dcdc1));
-        assertTrue(!asm.isPayToken(dcdc2));
-        assertTrue(asm.isPayToken(dpt));
-        assertTrue(asm.isPayToken(dai));
-        assertTrue(asm.isPayToken(eth));
-        assertTrue(asm.isPayToken(eng));
-        assertTrue(!asm.isPayToken(user));
-        assertTrue(!asm.isPayToken(custodian));
-        assertTrue(!asm.isPayToken(custodian1));
-        assertTrue(!asm.isPayToken(custodian2));
+        assertTrue(asm.payTokens(address(newPayToken)));
+        assertTrue(!asm.payTokens(dpass));
+        assertTrue(!asm.payTokens(dpass1));
+        assertTrue(!asm.payTokens(dpass2));
+        assertTrue(!asm.payTokens(cdc));
+        assertTrue(!asm.payTokens(cdc1));
+        assertTrue(!asm.payTokens(cdc2));
+        assertTrue(!asm.payTokens(dcdc));
+        assertTrue(!asm.payTokens(dcdc1));
+        assertTrue(!asm.payTokens(dcdc2));
+        assertTrue(asm.payTokens(dpt));
+        assertTrue(asm.payTokens(dai));
+        assertTrue(asm.payTokens(eth));
+        assertTrue(asm.payTokens(eng));
+        assertTrue(!asm.payTokens(user));
+        assertTrue(!asm.payTokens(custodian));
+        assertTrue(!asm.payTokens(custodian1));
+        assertTrue(!asm.payTokens(custodian2));
     }
 
     function testSetDecimalsAsm() public {
@@ -275,17 +275,17 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newPayToken)), b(uint(2)), "diamonds");
         asm.setConfig("priceFeed", b(address(newPayToken)), b(feed[cdc]), "diamonds");
         asm.setConfig("payTokens", b(address(newPayToken)), b(true), "diamonds");
-        assertTrue(asm.isDecimalsSet(address(newPayToken)));
-        assertTrue(asm.isDecimalsSet(cdc));
-        assertTrue(asm.isDecimalsSet(cdc1));
-        assertTrue(asm.isDecimalsSet(cdc2));
-        assertTrue(asm.isDecimalsSet(dcdc));
-        assertTrue(asm.isDecimalsSet(dcdc1));
-        assertTrue(asm.isDecimalsSet(dcdc2));
-        assertTrue(asm.isDecimalsSet(dpt));
-        assertTrue(asm.isDecimalsSet(dai));
-        assertTrue(asm.isDecimalsSet(eth));
-        assertTrue(asm.isDecimalsSet(eng));
+        assertTrue(asm.decimalsSet(address(newPayToken)));
+        assertTrue(asm.decimalsSet(cdc));
+        assertTrue(asm.decimalsSet(cdc1));
+        assertTrue(asm.decimalsSet(cdc2));
+        assertTrue(asm.decimalsSet(dcdc));
+        assertTrue(asm.decimalsSet(dcdc1));
+        assertTrue(asm.decimalsSet(dcdc2));
+        assertTrue(asm.decimalsSet(dpt));
+        assertTrue(asm.decimalsSet(dai));
+        assertTrue(asm.decimalsSet(eth));
+        assertTrue(asm.decimalsSet(eng));
     }
 
     function testGetPriceFeedAsm() public {
@@ -293,17 +293,17 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("decimals", b(address(newPayToken)), b(uint(2)), "diamonds");
         asm.setConfig("priceFeed", b(address(newPayToken)), b(feed[cdc]), "diamonds");
         asm.setConfig("payTokens", b(address(newPayToken)), b(true), "diamonds");
-        assertTrue(asm.getPriceFeed(address(newPayToken)) == feed[cdc]);
-        assertTrue(asm.getPriceFeed(cdc) == feed[cdc]);
-        assertTrue(asm.getPriceFeed(cdc1) == feed[cdc1]);
-        assertTrue(asm.getPriceFeed(cdc2) == feed[cdc2]);
-        assertTrue(asm.getPriceFeed(dcdc) == feed[dcdc]);
-        assertTrue(asm.getPriceFeed(dcdc1) == feed[dcdc1]);
-        assertTrue(asm.getPriceFeed(dcdc2) == feed[dcdc2]);
-        assertTrue(asm.getPriceFeed(dpt) == feed[dpt]);
-        assertTrue(asm.getPriceFeed(dai) == feed[dai]);
-        assertTrue(asm.getPriceFeed(eth) == feed[eth]);
-        assertTrue(asm.getPriceFeed(eng) == feed[eng]);
+        assertTrue(asm.priceFeed(address(newPayToken)) == feed[cdc]);
+        assertTrue(asm.priceFeed(cdc) == feed[cdc]);
+        assertTrue(asm.priceFeed(cdc1) == feed[cdc1]);
+        assertTrue(asm.priceFeed(cdc2) == feed[cdc2]);
+        assertTrue(asm.priceFeed(dcdc) == feed[dcdc]);
+        assertTrue(asm.priceFeed(dcdc1) == feed[dcdc1]);
+        assertTrue(asm.priceFeed(dcdc2) == feed[dcdc2]);
+        assertTrue(asm.priceFeed(dpt) == feed[dpt]);
+        assertTrue(asm.priceFeed(dai) == feed[dai]);
+        assertTrue(asm.priceFeed(eth) == feed[eth]);
+        assertTrue(asm.priceFeed(eng) == feed[eng]);
     }
 
     function testGetCdcValuesMintAsm() public {
@@ -314,9 +314,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcV(cdc), 17 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 17 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
     }
 
     function testGetCdcValuesMintBurnAsm() public {
@@ -328,23 +328,23 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcV(cdc), 17 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 17 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
 
         DSToken(cdc).transfer(address(asm), 1 ether);
         asm.burn(cdc, 0.5 ether);
-        assertEq(asm.getCdcV(cdc), 8.5 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 8.5 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintAsm() public {
         uint mintAmt = 1 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcV(dcdc1), 0 ether);
-        assertEq(asm.getDcdcV(dcdc2), 0 ether);
+        assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcV(dcdc1), 0 ether);
+        assertEq(asm.dcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintBurnAsm() public {
@@ -354,9 +354,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         TrustedSASMTester(custodian).doApprove(dcdc, address(asm),uint(-1));
         TrustedSASMTester(custodian).doBurnDcdc(dcdc, custodian, burnAmt);
-        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
-        assertEq(asm.getDcdcV(dcdc1), 0 ether);
-        assertEq(asm.getDcdcV(dcdc2), 0 ether);
+        assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
+        assertEq(asm.dcdcV(dcdc1), 0 ether);
+        assertEq(asm.dcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintBurnStoppedAsm() public {
@@ -367,32 +367,32 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         TrustedSASMTester(custodian).doApprove(dcdc, address(asm),uint(-1));
         TrustedSASMTester(custodian).doBurnDcdc(dcdc, custodian, burnAmt);
-        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
-        assertEq(asm.getDcdcV(dcdc1), 0 ether);
-        assertEq(asm.getDcdcV(dcdc2), 0 ether);
+        assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
+        assertEq(asm.dcdcV(dcdc1), 0 ether);
+        assertEq(asm.dcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintStoppedAsm() public {
         uint mintAmt = 1 ether;
         asm.stop();
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcV(dcdc1), 0 ether);
-        assertEq(asm.getDcdcV(dcdc2), 0 ether);
+        assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcV(dcdc1), 0 ether);
+        assertEq(asm.dcdcV(dcdc2), 0 ether);
     }
 
     function testGetTotalDcdcValuesMintAsm() public {
         uint mintAmt = 131 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getTotalDcdcCustV(custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.totalDcdcCustV(custodian), wmul(usdRate[dcdc], mintAmt));
     }
 
     function testGetDcdcCustVAsm() public {
         uint mintAmt = 11 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcCustV(custodian, dcdc1), 0);
-        assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
+        assertEqLog("dcdc-at-custodian", asm.dcdcCustV(dcdc, custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEqLog("dcdc1-custodian-has-none", asm.dcdcCustV(dcdc1, custodian), 0);
+        assertEqLog("dcdc2-custodian-has-none", asm.dcdcCustV(dcdc2, custodian), 0);
     }
 
     function testAddrAsm() public {
@@ -407,11 +407,11 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
-        assertEq(asm.getBasePrice(dpass, id_), price_);
+        assertEq(asm.basePrice(dpass, id_), price_);
         asm.setBasePrice(dpass, id_, price_ * 2);
-        assertEq(asm.getBasePrice(dpass, id_), price_ * 2);
+        assertEq(asm.basePrice(dpass, id_), price_ * 2);
         asm.setBasePrice(dpass, id_, price_ * 3);
-        assertEq(asm.getBasePrice(dpass, id_), price_ * 3);
+        assertEq(asm.basePrice(dpass, id_), price_ * 3);
     }
 
     function testStoppedMintStillWorksAsm() public {
@@ -424,16 +424,16 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.stop();
         asm.mint(cdc, address(this), 1 ether);
         asm.start();
-        assertEq(asm.getCdcV(cdc), 17 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 17 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
         asm.setCdcV(cdc);
 
-        assertEq(asm.getCdcV(cdc), 30 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 30 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
     }
 
     function testUpdateCdcValueAsm() public {
@@ -445,16 +445,16 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcV(cdc), 17 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 17 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
         asm.setCdcV(cdc);
 
-        assertEq(asm.getCdcV(cdc), 30 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 30 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
     }
 
     function testFailUpdateCdcValueAsm() public {
@@ -466,9 +466,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcV(cdc), 17 ether);
-        assertEq(asm.getCdcV(cdc1), 0 ether);
-        assertEq(asm.getCdcV(cdc2), 0 ether);
+        assertEq(asm.cdcV(cdc), 17 ether);
+        assertEq(asm.cdcV(cdc1), 0 ether);
+        assertEq(asm.cdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
         asm.stop();
@@ -479,13 +479,13 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcCustV(custodian, dcdc1), 0);
-        assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
+        assertEq(asm.dcdcCustV(dcdc, custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcCustV(dcdc1, custodian), 0);
+        assertEq(asm.dcdcCustV(dcdc2, custodian), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.setTotalDcdcV(dcdc);
-        assertEq(asm.getTotalDcdcV("diamonds"), wmul(rate_, mintAmt));
+        assertEq(asm.totalDcdcV("diamonds"), wmul(rate_, mintAmt));
 
     }
 
@@ -493,9 +493,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcCustV(custodian, dcdc1), 0);
-        assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
+        assertEq(asm.dcdcCustV(dcdc, custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcCustV(dcdc1, custodian), 0);
+        assertEq(asm.dcdcCustV(dcdc2, custodian), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.stop();
@@ -506,22 +506,22 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcCustV(custodian, dcdc1), 0);
-        assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
+        assertEq(asm.dcdcCustV(dcdc, custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcCustV(dcdc1, custodian), 0);
+        assertEq(asm.dcdcCustV(dcdc2, custodian), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.setDcdcV(dcdc, custodian);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(rate_, mintAmt));
+        assertEq(asm.dcdcCustV(dcdc, custodian), wmul(rate_, mintAmt));
     }
 
     function testFailUpdateDcdcValueStoppedAsm() public {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcCustV(custodian, dcdc1), 0);
-        assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
+        assertEq(asm.dcdcCustV(dcdc, custodian), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.dcdcCustV(dcdc1, custodian), 0);
+        assertEq(asm.dcdcCustV(dcdc2, custodian), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.stop();
@@ -555,7 +555,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMint(cdc, user, mintCdc);
         TrustedSASMTester(user).doSendToken(cdc, user, address(asm), mintCdc);
         asm.notifyTransferFrom(cdc, user, address(asm), mintCdc);
-        assertEq(asm.getTokenPurchaseRate(cdc), 0); // does not update tokenPurchaseRate as token is burnt
+        assertEq(asm.tokenPurchaseRate(cdc), 0); // does not update tokenPurchaseRate as token is burnt
     }
 
     function testGetTokenPuchaseRateDaiAsm() public {
@@ -563,7 +563,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         DSToken(dai).transfer(user, amt);
         TrustedSASMTester(user).doSendToken(dai, user, address(asm), amt);
         asm.notifyTransferFrom(dai, user, address(asm), amt);
-        assertEq(asm.getTokenPurchaseRate(dai), usdRate[dai]); // does not update tokenPurchaseRate as token is burnt
+        assertEq(asm.tokenPurchaseRate(dai), usdRate[dai]); // does not update tokenPurchaseRate as token is burnt
         assertEq(DSToken(dai).balanceOf(address(asm)), amt);
     }
 
@@ -573,13 +573,13 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         DSToken(dai).transfer(user, amt);
         TrustedSASMTester(user).doSendToken(dai, user, address(asm), amt / 2);
         asm.notifyTransferFrom(dai, user, address(asm), amt / 2);
-        assertEq(asm.getTokenPurchaseRate(dai), usdRate[dai]);
+        assertEq(asm.tokenPurchaseRate(dai), usdRate[dai]);
         assertEq(DSToken(dai).balanceOf(address(asm)), amt / 2);
         TestFeedLike(feed[dai]).setRate(newRate);
 
         TrustedSASMTester(user).doSendToken(dai, user, address(asm), amt / 2);
         asm.notifyTransferFrom(dai, user, address(asm), amt / 2);
-        assertEq(asm.getTokenPurchaseRate(dai), (usdRate[dai] * amt / 2 + newRate * amt / 2) / amt);
+        assertEq(asm.tokenPurchaseRate(dai), (usdRate[dai] * amt / 2 + newRate * amt / 2) / amt);
     }
 
     function testGetTotalPaidVDaiAsm() public {
@@ -602,7 +602,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), amt);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amt);
-        assertEq(asm.getTotalPaidV(custodian), wmul(amt, usdRate[dai]));
+        assertEq(asm.totalPaidV(custodian), wmul(amt, usdRate[dai]));
     }
 
     function testGetTotalDpassSoldVAsm() public logs_gas {
@@ -625,7 +625,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), amt);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amt);
-        assertEq(asm.getTotalDpassSoldV(custodian), price_);
+        assertEq(asm.totalDpassSoldV(custodian), price_);
     }
 
     function testGetTotalDpassVAsm() public {
@@ -636,12 +636,12 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
-        assertEq(asm.getTotalDpassV("diamonds"), price_);
+        assertEq(asm.totalDpassV("diamonds"), price_);
 
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11111111", "valid", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
-        assertEq(asm.getTotalDpassV("diamonds"), mul(2, price_));
+        assertEq(asm.totalDpassV("diamonds"), mul(2, price_));
     }
 
     function testGetTotalDcdcVAsm() public {
@@ -649,7 +649,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintCdc = 1 ether;
         require(mintCdc * usdRate[cdc] <= mintDcdcAmt * usdRate[dcdc], "test-mintCdc-too-high");
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintDcdcAmt);
-        assertEq(asm.getTotalDcdcV("diamonds"), wmul(usdRate[dcdc], mintDcdcAmt));
+        assertEq(asm.totalDcdcV("diamonds"), wmul(usdRate[dcdc], mintDcdcAmt));
     }
 
     function testGetTotalCdcVAsm() public logs_gas {
@@ -658,7 +658,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         require(mintCdc * usdRate[cdc] <= mintDcdcAmt * usdRate[dcdc], "test-mintCdc-too-high");
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintDcdcAmt);
         TrustedSASMTester(custodian).doMint(cdc, user, mintCdc);
-        assertEq(asm.getTotalCdcV("diamonds"), wmul(mintCdc, usdRate[cdc])); // does not update tokenPurchaseRate as token is burnt
+        assertEq(asm.totalCdcV("diamonds"), wmul(mintCdc, usdRate[cdc])); // does not update tokenPurchaseRate as token is burnt
     }
 
     function testNotifyTransferFromDpassAsm() public {
@@ -673,8 +673,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(user).doSendDpassToken(dpass, user, address(asm), id_);
         TrustedSASMTester(exchange).doNotifyTransferFrom(dpass, user, address(asm), id_);
 
-        assertEq(asm.getTotalDpassCustV(custodian), price_);
-        assertEq(asm.getTotalDpassV("diamonds"), price_);
+        assertEq(asm.totalDpassCustV(custodian), price_);
+        assertEq(asm.totalDpassV("diamonds"), price_);
     }
 
     function testFailNotifyTransferFromUserCustodianAsm() public {
@@ -724,7 +724,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), price1_);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amtToWithdraw);
-        assertEq(asm.getTotalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
+        assertEq(asm.totalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
 
     }
 
@@ -765,7 +765,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), price1_);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amtToWithdraw);
-        assertEq(asm.getTotalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
+        assertEq(asm.totalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
 
     }
 
@@ -827,7 +827,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(exchange).doSendToken(dai, user, address(asm), price_);
         asm.notifyTransferFrom(dai, user, address(asm), price_);
 
-        assertEq(asm.getWithdrawV(custodian), wmul(mintCdc, usdRate[cdc]));
+        assertEq(asm.withdrawV(custodian), wmul(mintCdc, usdRate[cdc]));
     }
 
     function testGetWithdrawValueDpassAsm() public {
@@ -843,7 +843,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
 
-        assertEq(asm.getWithdrawV(custodian), price_);
+        assertEq(asm.withdrawV(custodian), price_);
     }
 
     function testGetAmtForSaleDcdcAsm() public {
@@ -919,23 +919,23 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testUpdateCollateralDpassAsm() public {
 
         asm.setCollateralDpass(1 ether, 0, custodian);
-        assertEq(asm.getTotalDpassCustV(custodian), 1 ether);
-        assertEq(asm.getTotalDpassV("diamonds"), 1 ether);
+        assertEq(asm.totalDpassCustV(custodian), 1 ether);
+        assertEq(asm.totalDpassV("diamonds"), 1 ether);
 
         asm.setCollateralDpass(0, 1 ether, custodian);
-        assertEq(asm.getTotalDpassCustV(custodian), 0 ether);
-        assertEq(asm.getTotalDpassV("diamonds"), 0 ether);
+        assertEq(asm.totalDpassCustV(custodian), 0 ether);
+        assertEq(asm.totalDpassV("diamonds"), 0 ether);
     }
 
     function testUpdateCollateralDcdcAsm() public {
 
         asm.setCollateralDcdc(1 ether, 0, custodian);
-        assertEq(asm.getTotalDcdcCustV(custodian), 1 ether);
-        assertEq(asm.getTotalDcdcV("diamonds"), 1 ether);
+        assertEq(asm.totalDcdcCustV(custodian), 1 ether);
+        assertEq(asm.totalDcdcV("diamonds"), 1 ether);
 
         asm.setCollateralDcdc(0, 1 ether, custodian);
-        assertEq(asm.getTotalDcdcCustV(custodian), 0 ether);
-        assertEq(asm.getTotalDcdcV("diamonds"), 0 ether);
+        assertEq(asm.totalDcdcCustV(custodian), 0 ether);
+        assertEq(asm.totalDcdcV("diamonds"), 0 ether);
     }
 
     function testBurnAsm() public {
@@ -959,9 +959,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMint(cdc, user, mintCdc);
         TrustedSASMTester(user).doSendToken(cdc, user, address(asm), mintCdc);
         asm.burn(cdc, mintCdc / 2);
-        assertEq(asm.getTotalCdcV("diamonds"), wmul(mintCdc / 2, usdRate[cdc]));
-        assertEq(asm.getCdcV(cdc), wmul(mintCdc / 2, usdRate[cdc]));
-        assertEq(asm.getWithdrawV(custodian), wmul(mintCdc / 2, usdRate[cdc]));
+        assertEq(asm.totalCdcV("diamonds"), wmul(mintCdc / 2, usdRate[cdc]));
+        assertEq(asm.cdcV(cdc), wmul(mintCdc / 2, usdRate[cdc]));
+        assertEq(asm.withdrawV(custodian), wmul(mintCdc / 2, usdRate[cdc]));
         assertEq(asm.getAmtForSale(cdc), wdiv(sub(wdiv(add(price_, wmul(mintDcdcAmt, usdRate[dcdc])), overCollRatio_), wmul(mintCdc / 2, usdRate[cdc])), usdRate[cdc]));
     }
 
@@ -989,7 +989,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEqLog("cccc is what is set", cccc, cccc_);
         assertEqLog("carat is what is set", carat, 1);
         assertEqLog("attr.hash is what is set", attributesHash, b(0xef));
-        assertEqLog( "price is what was set", asm.getBasePrice(dpass, id_), price_);
+        assertEqLog( "price is what was set", asm.basePrice(dpass, id_), price_);
     }
 
     function testFailCustodianMintDpassNotToSelfAsm() public {
@@ -1034,7 +1034,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
             ) = Dpass(dpass).getDiamond(id_);
         assertEqLog("state did change", state, stateTo_);
     }
-
+/*
     function testSetStateDpassArrayAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -1071,7 +1071,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
             attributesHash) = Dpass(dpass).getDiamond(id1_);
         assertEqLog("state did change id1_", state, stateTo_);
     }
-
+*/
     function testFailAuthCheckSetConfigAsm() public {
         uint overCollRatio_ = 1.1 ether;
         asm.setOwner(user);
@@ -1168,6 +1168,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setStateDpass(dpass, id_, stateTo_);
     }
 
+    /*
     function testFailAuthCheckSetStateDpassArrayAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -1187,7 +1188,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.forbid(address(this), address(asm), ANY);
 
         asm.setStateDpass(dpass, tokenIds_, stateTo_);
-    }
+    }*/
 
     function testFailAuthCheckWithdrawAsm() public {
         uint price_ = 100 ether;
@@ -1662,10 +1663,10 @@ contract TrustedSASMTester is Wallet {
     function doSetStateDpass(address token, uint tokenId, bytes8 state) public {
         asm.setStateDpass(token, tokenId, state);
     }
-
+/*
     function doSetStateDpass(address token, uint[] memory tokenIds, bytes8 state) public {
         asm.setStateDpass(token, tokenIds, state);
-    }
+    }*/
 
     function doSetTotalDcdcV(address dcdc) public {
         asm.setTotalDcdcV(dcdc);
