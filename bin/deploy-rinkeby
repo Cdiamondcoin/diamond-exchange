@@ -6,7 +6,7 @@
 ### geth - https://github.com/ethereum/go-ethereum/wiki/Backup-&-restore
 ### parity - https://ethereum.stackexchange.com/questions/6471/where-are-my-keys-and-chain-data-located-if-i-am-using-parity
 
-set -ex
+set -x
 
 ## Settings for test networks like Rinkeby, Kovan, Ropsten
 
@@ -15,15 +15,16 @@ export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
 export ETH_RPC_URL=https://rinkeby.infura.io/v3/47706a887c1245319e35b5e507c7f097
 export ETH_KEYSTORE="$(pwd)"
 
-export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize"}
+# export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize --optimize-runs 1"}
+export SOLC_FLAGS="--optimize"
 # export ETH_GAS=${ETH_GAS:-"8000000"}
 # https://ethstats.net/ 9965875
 # https://www.rinkeby.io/#stats 7006834
-export ETH_GAS=9999001
+export ETH_GAS=9965875
 
 # 1000000000 wei = 1 gwei
 # export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
-export ETH_GAS_PRICE=50000000000
+export ETH_GAS_PRICE=10000000000
 
 # export ETH_FROM=$(seth rpc eth_coinbase)
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
@@ -38,92 +39,60 @@ hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Bu
 hevm flatten --source-file src/SimpleAssetManagement.sol --json-file out/dapp.sol.json > out/SimpleAssetManagement-flatt.sol
 hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc-flatt.sol
 
+export dpt=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
+export cdc=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
+export dpass=0x18a7a95d17f2e7208982922a814d49661f23a073
+export ethPriceFeed=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
+export dptPriceFeed=0xc9faD47Fe77500515de29024C076b6d8D87d423E
+export cdcPriceFeed=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
+
+# export liq=0xc633247c3647a33a0adae21335516a1497393834
+# export wal=0x16bb6010f38effab6238988d72119f3738ebeb6e
+# export burner=0x728fe77af990628164fd4f39a9aba163a998d540
+# export dcdc=0xae1764f007284bd2ad4add9376bae9cc6bb57dd1
+# export guard=0x9251886d8642df76e1b6bbfb0c28b335d1c61c31
+
 
 # # ETH feed
 # export RATE=120
 # export FEED_VALID=true
-# ETH_PRICE_FEED=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "ETH Price Fedd DEPLOYED AT: $ETH_PRICE_FEED"
+# ethPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+# echo -e "ETH Price Fedd DEPLOYED AT: $ethPriceFeed"
 
 # # DPT feed
 # export RATE=12
-# DPT_PRICE_FEED=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "DPT Price Fedd DEPLOYED AT: $DPT_PRICE_FEED"
+# dptPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+# echo -e "DPT Price Fedd DEPLOYED AT: $dptPriceFeed"
 
 # # CDC feed
 # export RATE=70
-# CDC_PRICE_FEED=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "CDC Price Fedd DEPLOYED AT: $CDC_PRICE_FEED"
+# cdcPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+# echo -e "CDC Price Fedd DEPLOYED AT: $cdcPriceFeed"
 
-# LIQ=$(dapp create Liquidity)
-# echo -e "Liquiditiy DEPLOYED AT: $LIQ"
+export liq=$(dapp create Liquidity)
+echo -e "Liquiditiy DEPLOYED AT: $liq"
+seth send $dpt "transfer(address,uint)" $liq $(seth --to-uint256 $(seth --to-wei 10000 eth))
 
-# export SUPPLY=10000000000000000000000000000
-# CDC=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii CDC)))
-# echo -e "CDC DEPLOYED AT: $CDC"
-# seth send $CDC "mint(uint)" $(seth --to-uint256 $SUPPLY)
+# export wal=$(dapp create Wallet)
+# echo -e "Wallet DEPLOYED AT: $wal"
 
-# DPT=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii DPT)))
-# echo -e "DPT DEPLOYED AT: $DPT"
-# seth send $DPT "mint(uint)" $(seth --to-uint256 $SUPPLY)
-
-# DPASS=$(dapp create Dpass)
-# echo -e "DPASS DEPLOYED AT: $DPASS"
-
-# WALLET=$(dapp create Wallet)
-# echo -e "Wallet DEPLOYED AT: $WALLET"
-
-# ASM=$(dapp create TrustedASMTester)
-# echo -e "ASM DEPLOYED AT: $ASM"
-
-# # export DPT=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
-# BURNER=$(dapp create Burner "$DPT")
-# echo -e "Burner DEPLOYED AT: $BURNER"
+# burner=$(dapp create Burner "$dpt")
+# echo -e "Burner DEPLOYED AT: $burner"
 
 # export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
 # export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
-# DCDC=$(dapp create Dcdc $cccc $bDcdcName 1)
-# echo -e "DCDC DEPLOYED AT: $DCDC"
+# dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
+# echo -e "DCDC DEPLOYED AT: $dcdc"
 
+# export guard=$(dapp create CdcAuthority)
 
-export DPT=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
-export CDC=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
-export DPASS=0x2283bf620ee7fdafa009b5f6607dd217eccf6fe4
-export ETH_PRICE_FEED=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
-export DPT_PRICE_FEED=0xc9faD47Fe77500515de29024C076b6d8D87d423E
-export CDC_PRICE_FEED=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
-export LIQ=0x1369a1a0d7bfefc5beafbc1c8ea03ba65e487bf6
-export BURNER=0xd98860b7eef76be5c3f2a8d8845a1e9f0f9fad36
-export WALLET=0xA787E6c6d365641DC9540148E4f8426f81FE235B
-export FIXED_FEE=$(seth --to-uint256 $(seth --to-wei 0 eth))
-export VAR_FEE=$(seth --to-uint256 $(seth --to-wei 1 eth))
-export PROFIT_RATE=$(seth --to-uint256 $(seth --to-wei 0.1 eth))
-export DCDC=0xbF2Fb30C4a6f37dCCb08F987814852A5A7b64337
-export GUARD=0x073d2f0a2722cb8f10de4a3ddb0e7c201b6b38b1
+export dex=$(dapp create DiamondExchange)
+echo -e "DiamondExchange DEPLOYED AT: $dex"
 
-seth send $DPT "transfer(address,uint)" $LIQ $(seth --to-uint256 $(seth --to-wei 1000 eth))
+export asm=$(dapp create SimpleAssetManagement)
+echo -e "ASM DEPLOYED AT: $asm"
 
-export DIAMOND_EXCHANGE=$(dapp create DiamondExchange)
-export SASM=$(dapp create SimpleAssetManagement)
-export GUARD=$(dapp create CdcAuthority)
-
-
-# # CDC=$(dapp create Cdc)
-# CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
-# # export CDC=$CDC
-# # echo -e "Cdc DEPLOYED AT: $CDC"
-# # test -z $CDC && exit 1
-
-# DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A
-# # export DPT=$DPT
-# # echo -e "DPT DEPLOYED AT: $DPT"
-# # test -z $DPT && exit 1
-
-# BURNER=$(dapp create Burner "$DPT")
-# export BURNER=$BURNER
-# echo -e "Burner DEPLOYED AT: $BURNER"
-# test -z $BURNER && exit 1
-
+# ===================== END =========================
 
 # DPT_FEED=0x97e4b0634971c2b286eab779bb672cf69fe525d2
 # export DPT_FEED=$DPT_FEED

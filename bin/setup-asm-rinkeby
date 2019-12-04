@@ -8,7 +8,7 @@ export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
 export ETH_RPC_URL=https://rinkeby.infura.io/v3/47706a887c1245319e35b5e507c7f097
 export ETH_KEYSTORE="$(pwd)"
 export ETH_GAS=8000000
-export ETH_GAS_PRICE=50000000000
+export ETH_GAS_PRICE=20000000000
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export ETH_PASSWORD=~/.eth-pwd
 ################################################################################
@@ -16,19 +16,29 @@ export ETH_PASSWORD=~/.eth-pwd
 # DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin)
 # echo $((${#DATA} / 2 - 1))
 
-echo -e "===================== ######################## =========================="
-echo -e "=====================  Setup Asset Management  =========================="
-echo -e "===================== ######################## =========================="
-export asm=0x12fcf438d8fa751c9c63b7a6d9241f412c2d1803
+# echo -e "===================== ######################## =========================="
+# echo -e "=====================  Setup Asset Management  =========================="
+# echo -e "===================== ######################## =========================="
+export custodian=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
+export eth=0x00000000000000000000000000000000000000ee
 
-# == Decimals ==
+# Deployed contrcts
 export dpt=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
 export cdc=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
-export eth=0x00000000000000000000000000000000000000ee
-export dcdc=0xbF2Fb30C4a6f37dCCb08F987814852A5A7b64337
+export dpass=0x18a7a95d17f2e7208982922a814d49661f23a073
+export ethPriceFeed=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
+export dptPriceFeed=0xc9faD47Fe77500515de29024C076b6d8D87d423E
+export cdcPriceFeed=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
+export wal=0x16bb6010f38effab6238988d72119f3738ebeb6e
+export burner=0x728fe77af990628164fd4f39a9aba163a998d540
+export dcdc=0xae1764f007284bd2ad4add9376bae9cc6bb57dd1
+export liq=0xc633247c3647a33a0adae21335516a1497393834
+export guard=0x9251886d8642df76e1b6bbfb0c28b335d1c61c31
+export dex=0xc708c97cb586f4e790a06e8dfceba757702b976c
+export asm=0x1e0e3f73ec0584993ac7958c2d8256487db6e67d
 
 # DPT
-echo -e "====================== Setup decimals =========================="
+# echo -e "====================== Setup decimals =========================="
 export decimals=$(seth --to-bytes32 $(seth --from-ascii decimals))
 export d18=$(seth --to-bytes32 $(seth --to-uint256 18))
 export bDpt=$(seth --to-bytes32 $(seth --to-uint256 $dpt))
@@ -49,9 +59,6 @@ export bDcdc=$(seth --to-bytes32 $(seth --to-uint256 $dcdc))
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $decimals $bDcdc $d18 $diamonds
 
 # == Price Feed ==
-export dptPriceFeed=0xc9faD47Fe77500515de29024C076b6d8D87d423E
-export cdcPriceFeed=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
-export ethPriceFeed=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
 export priceFeed=$(seth --to-bytes32 $(seth --from-ascii priceFeed))
 export bDptPriceFeed=$(seth --to-bytes32 $(seth --to-uint256 $dptPriceFeed))
 
@@ -73,7 +80,6 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $priceFeed $bEth $bE
 
 # == Custodians ==
 echo -e "====================== Setup Custodians =========================="
-export custodian=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export custodians=$(seth --to-bytes32 $(seth --from-ascii custodians))
 export bCustodian=$(seth --to-bytes32 $(seth --to-uint256 $custodian))
 export bTrue=$(seth --to-bytes32 $(seth --to-uint256 1))
@@ -101,7 +107,6 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dcdcs $bDcdc $bTrue
 
 # == dpasses ==
 echo -e "====================== Setup dpasses =========================="
-export dpass=0xc6188fBa6b826E45C33d8711155C5f10E0790F4a
 export dpasses=$(seth --to-bytes32 $(seth --from-ascii dpasses))
 export bDpass=$(seth --to-bytes32 $(seth --to-uint256 $dpass))
 
@@ -109,7 +114,6 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $dpasses $bDpass $bT
 
 
 echo -e "====================== Setup overCollRatio =========================="
-SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
 
 export overCollRatio=$(seth --to-bytes32 $(seth --from-ascii overCollRatio))
 export b11eth=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 1.1 eth)))
@@ -120,7 +124,6 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $overCollRatio $b11e
 echo -e "====================== ################### =========================="
 echo -e "======================    Setup Exchange   =========================="
 echo -e "====================== ################### =========================="
-export dex=0xb8e16932cebbe14596edbb9b7e5eeb3029238fb5
 
 # We named everything from the point of view of the user. CanSellErc20 means USER Can Sell Erc20 token.
 export canSellErc20=$(seth --to-bytes32 $(seth --from-ascii canSellErc20))
@@ -152,10 +155,6 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bDpt $bDptPriceF
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bEth $bEthPriceFeed
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $priceFeed $bCdc $bCdcPriceFeed
 
-export liq=0x1369a1a0d7bfefc5beafbc1c8ea03ba65e487bf6
-export burner=0xd98860b7eef76be5c3f2a8d8845a1e9f0f9fad36
-export wal=0xA787E6c6d365641DC9540148E4f8426f81FE235B
-
 export bLiq=$(seth --to-bytes32 $(seth --to-uint256 $liq))
 export bBurner=$(seth --to-bytes32 $(seth --to-uint256 $burner))
 export bWal=$(seth --to-bytes32 $(seth --to-uint256 $wal))
@@ -173,7 +172,7 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth -
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii wal)) $bWal $bEmpty
 
 export bFixFee=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 1 eth)))
-export bVarFee=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 0.001 eth)))
+export bVarFee=$(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei 0.01 eth)))
 
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii fixFee)) $bFixFee $bEmpty
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii varFee)) $bVarFee $bEmpty
@@ -185,7 +184,6 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth -
 
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii takeProfitOnlyInDpt)) $bFalse $bEmpty
 
-export guard=0x073d2f0a2722cb8f10de4a3ddb0e7c201b6b38b1
 export ANY=$(seth call $guard "ANY()")
 export bANY=$(seth --to-bytes32 $ANY)
 export uANY=$(seth --to-uint256 $ANY)
@@ -211,9 +209,4 @@ seth send $liq "approve(address,address,uint)" $dpt $dex $uANY
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii liq)) $bLiq $bEmpty
 seth send $liq "setOwner(address)" $dex
 
-seth send $asm "setBasePrice(address,uint,uint)" $dpass $(seth --to-uint256 1) $(seth --to-uint256 $(seth --to-wei 30 eth))
-
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(seth --to-bytes32 $(seth --from-ascii setApproveForAll)) $bDpass $bDex $bTrue
-
-# ???
-# seth send $asm "setAmtForSale(address,uint)" $cdc $(seth --to-uint256 $(seth --to-wei 1000 eth))
