@@ -32,7 +32,6 @@ export ETH_PASSWORD=~/.eth-pwd
 dapp build --extract
 
 hevm flatten --source-file src/DiamondExchange.sol --json-file out/dapp.sol.json > out/DiamondExchange-flatt.sol
-hevm flatten --source-file src/DiamondExchange.t.sol --json-file out/dapp.sol.json > out/DiamondExchange.t-flatt.sol
 hevm flatten --source-file src/Liquidity.sol --json-file out/dapp.sol.json > out/Liquidity-flatt.sol
 hevm flatten --source-file src/Wallet.sol --json-file out/dapp.sol.json > out/Wallet-flatt.sol
 hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Burner-flatt.sol
@@ -88,34 +87,26 @@ hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc
 
 
 export DPT=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
-# export CDC=0x3fc234658ac12c8e823f0a2f6aa2eb1812ca440f
 export CDC=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
 export DPASS=0x2283bf620ee7fdafa009b5f6607dd217eccf6fe4
 export ETH_PRICE_FEED=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
 export DPT_PRICE_FEED=0xc9faD47Fe77500515de29024C076b6d8D87d423E
 export CDC_PRICE_FEED=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
-export LIQ=0x20835e2c6025cdceca3daa11bb169b38726b9c4a
+export LIQ=0x1369a1a0d7bfefc5beafbc1c8ea03ba65e487bf6
 export BURNER=0xd98860b7eef76be5c3f2a8d8845a1e9f0f9fad36
-export ASM=0x0F7F9A6971B28c9a70f9607A5134D9452E30e064
 export WALLET=0xA787E6c6d365641DC9540148E4f8426f81FE235B
 export FIXED_FEE=$(seth --to-uint256 $(seth --to-wei 0 eth))
 export VAR_FEE=$(seth --to-uint256 $(seth --to-wei 1 eth))
 export PROFIT_RATE=$(seth --to-uint256 $(seth --to-wei 0.1 eth))
 export DCDC=0xbF2Fb30C4a6f37dCCb08F987814852A5A7b64337
+export GUARD=0x073d2f0a2722cb8f10de4a3ddb0e7c201b6b38b1
 
 seth send $DPT "transfer(address,uint)" $LIQ $(seth --to-uint256 $(seth --to-wei 1000 eth))
 
-! give access to exchange from liq
-! takeProfitOnlyInDpt = false
-! profitRate = 1eth (1eth 0.5 eth, 0.1 eth...)
+export DIAMOND_EXCHANGE=$(dapp create DiamondExchange)
+export SASM=$(dapp create SimpleAssetManagement)
+export GUARD=$(dapp create CdcAuthority)
 
-1) eth / cdc to wanna buy
-cdc * usd
-
-
-DIAMOND_EXCHANGE=$(dapp create DiamondExchange)
-
-SASM=$(dapp create SimpleAssetManagement)
 
 # # CDC=$(dapp create Cdc)
 # CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
