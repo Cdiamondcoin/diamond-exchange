@@ -26,7 +26,7 @@ contract FeeCalculator is DSMath, DSAuth {
         uint256 sellId_,
         address buyToken_,
         uint256 buyAmtOrId_
-    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_) {
+    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_, uint256 feeV_, uint256 feeSellT_) {
         // calculate expected sell amount when user wants to buy something anc only knows how much he wants to buy from a token and whishes to know how much it will cost.
     }
 

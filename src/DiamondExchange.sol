@@ -37,7 +37,7 @@ contract TrustedFeeCalculator {
         uint256 sellId_,
         address buyToken_,
         uint256 buyAmtOrId_
-    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_) {
+    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_, uint256 feeV_, uint256 feeSellT_) {
         // calculate expected sell amount when user wants to buy something anc only knows how much he wants to buy from a token and whishes to know how much it will cost.
     }
 }
@@ -871,7 +871,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees
+    * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees.
     * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dpt fee,
     */
     function getCosts(
@@ -880,11 +880,16 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
         address buyToken_,                                                      // the token user wants to buy
         uint256 buyAmtOrId_                                                     // the amount user wants to buy
-    ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_) {
-        uint max_;
+    ) public view 
+    returns (
+        uint256 sellAmtOrId_,                                                   // the calculated amount of tokens needed to be solc to get buyToken_
+        uint256 feeDpt_,                                                        // the fee paid in DPT if user has DPT ...
+                                                                                // ... (if you dont want to calculate with user DPT set user address to 0x0
+        uint256 feeV_,                                                          // total fee to be paid in base currency 
+        uint256 feeSellT_                                                       // fee to be paid in sellTokens (this amount will be subtracted as fee from user)
+    ) {
         uint buyV_;
         uint dptBalance_;
-        uint feeV_;
         uint feeDptV_;
 
         if(fca == TrustedFeeCalculator(0)) {
@@ -911,42 +916,27 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             if(canBuyErc20[buyToken_]) {
 
-                max_ = handledByAsm[buyToken_] ?                               // set buy amount to max_ possible
+                buyV_ = handledByAsm[buyToken_] ?                               // set buy amount to max possible
                         asm.getAmtForSale(buyToken_) :                          // if managed by asset management get available
-                        min(                                                    // if not managed by asset management get max_ available
+                        min(                                                    // if not managed by asset management get buyV_ available
                             TrustedDSToken(buyToken_).balanceOf(
                                 custodian20[buyToken_]),
                             TrustedDSToken(buyToken_).allowance(
                                 custodian20[buyToken_], address(this)));
 
-                max_ = min(max_, buyAmtOrId_);
+                buyV_ = min(buyV_, buyAmtOrId_);
 
-                buyV_ = wmulV(max_, _getNewRate(buyToken_), buyToken_);
+                buyV_ = wmulV(buyV_, _getNewRate(buyToken_), buyToken_);
 
             } else {
 
                 buyV_ = getPrice(buyToken_, buyAmtOrId_);
             }
 
-            if(canSellErc20[sellToken_]) {
-
-                sellAmtOrId_ = sellToken_ == eth ?
-                    user.balance :
-                    min(
-                        TrustedDSToken(sellToken_).balanceOf(user),
-                        TrustedDSToken(sellToken_).allowance(
-                            user, address(this)));
-
-                max_ = wmulV(sellAmtOrId_, _getNewRate(sellToken_), sellToken_);
-
-            } else {
-                max_ = getPrice(sellToken_, sellId_);
-            }
-
             dptBalance_ = TrustedDSToken(dpt).balanceOf(user);
 
             feeV_ = add(
-                wmul(min(buyV_, max_), varFee),
+                wmul(buyV_, varFee),
                 fixFee);
 
             feeDpt_ = wmul(
@@ -970,12 +960,14 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
                 }
 
-                sellAmtOrId_ = min(
+                feeSellT_ = wdivT(sub(feeV_, min(feeV_, feeDptV_)), _getNewRate(sellToken_), sellToken_);
+
+                sellAmtOrId_ = add(
                     wdivT(
-                        add(buyV_, sub(feeV_, feeDptV_)),
+                        buyV_,
                         _getNewRate(sellToken_),
                         sellToken_),
-                    sellAmtOrId_);
+                    feeSellT_);
 
             } else {
 

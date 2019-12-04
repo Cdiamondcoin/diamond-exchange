@@ -2863,7 +2863,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
         sendSomeCdcToUser(sellAmtOrId);
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -2873,6 +2873,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             1644000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            27400000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            2740000000000000000,
             dpt);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
@@ -2888,7 +2898,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
         sendSomeCdcToUser(sellAmtOrId);
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -2898,6 +2908,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             812000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            27400000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            3334285714285714286,
             dpt);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
@@ -2913,7 +2933,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
         sendSomeCdcToUser(sellAmtOrId);
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -2923,6 +2943,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             5480000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            27400000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            0,
             dpt);
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
@@ -2939,7 +2969,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         address sellToken = cdc;
         uint sellAmtOrId = 25.89 ether;
         sendSomeCdcToUser(sellAmtOrId);
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, cdc, 0, dpass, dpassId[seller]);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -2951,31 +2981,41 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             5300000000000000000,
             dpt);
 
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            27400000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            128571428571428571,
+            dpt);
+
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
  
     function testFailGetCostsUserZeroDex() public view{
         // error Revert ("dex-user-address-zero")
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, dpass, dpassId[seller]);
-        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_ + feeV_ + feeSellT_; // this is just to suppress warning
     }
 
     function testFailGetCostsSellTokenInvalidDex() public view{
         // error Revert ("dex-selltoken-invalid")
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, address(0xffffff), 0, dpass, dpassId[seller]);
-        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, address(0xffffff), 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_ + feeV_ + feeSellT_; // this is just to suppress warning
     }
 
     function testFailGetCostsBuyTokenInvalidDex() public view {
         // error Revert ("dex-buytoken-invalid")
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, address(0xffeeff), dpassId[seller]);
-        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, address(0xffeeff), dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_ + feeV_ + feeSellT_; // this is just to suppress warning
     }
 
     function testFailGetCostsBothTokensDpassDex() public view {
         // error Revert ("dex-both-tokens-dpass")
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dpass, 0, dpass, dpassId[seller]);
-        sellAmt_ = sellAmt_ + feeDpt_; // this is just to suppress warning
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dpass, 0, dpass, dpassId[seller]);
+        sellAmt_ = sellAmt_ + feeDpt_ + feeV_ + feeSellT_; // this is just to suppress warning
     }
 
     function testGetCostsBuyCdcTakeProfitOnlyDptEnoughDex() public {
@@ -2986,7 +3026,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         sendToken(dpt, user, userDpt);
 
         address sellToken = dai;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -2996,6 +3036,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             1494545454545454545,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            24909090909090909091,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            1341258741258741259,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, uint(-1));
@@ -3009,7 +3059,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         sendToken(dpt, user, userDpt);
 
         address sellToken = dai;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3019,6 +3069,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             812000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            24909090909090909091,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            1603776223776223776,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, uint(-1));
@@ -3032,7 +3092,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         sendToken(dpt, user, userDpt);
 
         address sellToken = dai;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3042,6 +3102,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             4981818181818181818,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            24909090909090909091,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            0,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, uint(-1));
@@ -3055,7 +3125,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         sendToken(dpt, user, userDpt);
 
         address sellToken = dai;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, uint(-1));
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3065,6 +3135,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             4981818181818181818,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            24909090909090909091,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            0,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, uint(-1));
@@ -3079,7 +3159,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         address sellToken = dai;
         uint buyAmt = 10 ether;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3089,6 +3169,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             840000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            14000000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            753846153846153846,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, buyAmt);
@@ -3103,7 +3193,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         address sellToken = dai;
         uint buyAmt = 10 ether;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3113,6 +3203,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             812000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            14000000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            764615384615384615,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, buyAmt);
@@ -3127,7 +3227,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         address sellToken = dai;
         uint buyAmt = 10 ether;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3137,6 +3237,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             2800000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            14000000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            0,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, buyAmt);
@@ -3151,7 +3261,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         address sellToken = dai;
         uint buyAmt = 10 ether;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, dai, 0, cdc, buyAmt);
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
@@ -3161,6 +3271,16 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
             2300000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            14000000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            192307692307692308,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, buyAmt);
@@ -3178,7 +3298,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         address sellToken = dpass;
         uint buyAmt = 10 ether;
-        (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, sellToken, dpassId[user], cdc, buyAmt);
+        (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(user, sellToken, dpassId[user], cdc, buyAmt);
 
         assertEqLog("expected sell amount adds up",
             sellAmt_,
@@ -3186,10 +3306,20 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
-            2120000000000000000,
+            2300000000000000000,
             dpt);
 
-        doExchange(sellToken, dpassId[user], cdc, buyAmt);
+        assertEqDustLog("expected fee value adds up",
+            feeV_,
+            14000000000000000000,
+            dpt);
+
+        assertEqDustLog("expected fee in sellTkns adds up",
+            feeSellT_,
+            0,
+            dpt);
+
+        doExchange(dpass, dpassId[user], cdc, buyAmt);
     }
 //------------------end-of-tests------------------------------------
 

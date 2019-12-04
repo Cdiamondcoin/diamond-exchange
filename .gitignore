@@ -5,3 +5,4 @@ out/
 keystore
 env
 rinkeby.keystore
+.soliumrc.json
