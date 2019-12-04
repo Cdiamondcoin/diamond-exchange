@@ -6,7 +6,6 @@ import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "ds-note/note.sol";
 import "dpass/Dpass.sol";
-import "./Wallet.sol";
 
 
 /**
@@ -18,6 +17,8 @@ contract TrustedFeedLike {
 
 
 contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
+
+    event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
     event LogTransferEth(address src, address dst, uint256 amount);
     event LogBasePrice(address token_, uint256 tokenId_);
@@ -29,7 +30,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     event LogForceUpdateCollateralDpass(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
     event LogForceUpdateCollateralDcdc(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
 
-    // Commented due fit to code size limit 24,576 bytes
     mapping(
         address => mapping(
             uint => uint)) private basePrice;               // the base price used for collateral valuation
@@ -37,8 +37,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     mapping(address => uint)                                // total base currency value of custodians collaterals
         public totalDpassCustV;
     mapping(address => uint) private rate;                  // current rate of a token in base currency
-    mapping(address => uint) private cdcValues;             // base currency value of cdc token
-    mapping(address => uint) private dcdcValues;            // base currency value of dcdc token
+    mapping(address => uint) private cdcV;                  // base currency value of cdc token
+    mapping(address => uint) private dcdcV;                 // base currency value of dcdc token
     mapping(address => uint) private totalDcdcCustV;        // total value of all dcdcs at custodian
     mapping(
         address => mapping(
@@ -59,13 +59,30 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     mapping(bytes32 => uint) private totalDpassV;           // total value of dpass collaterals in base currency
     mapping(bytes32 => uint) private totalDcdcV;            // total value of dcdc collaterals in base currency
     mapping(bytes32 => uint) private totalCdcV;             // total value of cdc tokens issued in base currency
-    mapping(bytes32 => uint) private overCollRatio;         // the totalDpassV >= overCollRatio * totalCdcV
+    mapping(bytes32 => uint)
+        private overCollRatio;                              // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
+    mapping(bytes32 => uint)
+        private overCollRemoveRatio;                        // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
+    mapping(address => uint) private maxCollCustV;          // maximum value of dpass and dcdc tokens a custodian is allowed to mint
+
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool private locked;                                    // variable prevents to exploit by recursively calling funcions
     address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
     /**
      * @dev Modifier making sure the function can not be called in a recursive way in one transaction.
      */
+
+    struct Audit {                                          // struct storing the results of an audit
+        address auditor;                                    // auditor who did the last audit
+        uint256 status;                                     // status of audit if 0, all is well, otherwise represents the value of diamonds that there are problems with
+        bytes32 descriptionHash;                            // hash of the description file that describes the last audit in detail. Auditors must have a detailed description of all the findings they had at custodian, and are legally fully responsible for their documents.
+        bytes32 descriptionUrl;                             // url of the description file that details the results of the audit. File should be digitally signed. And the files total content should be hashed with keccak256() to make sure unmutability.
+        uint nextAuditBefore;                               // proposed time of next audit. The audit should be at least at every 3 months.
+    }
+
+    mapping(address => Audit) public audit;                 // containing the last audit reports for all custodians.
+    uint32 auditInterval = 1776000;                         // represents 3 months of audit interwal in which an audit is mandatory for custodian.
+
     modifier nonReentrant {
         require(!locked, "asm-reentrancy-detected");
         locked = true;
@@ -100,6 +117,13 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             overCollRatio[domain] = uint(value_);
             require(overCollRatio[domain] >= 1 ether, "asm-system-must-be-overcollaterized");
             _requireSystemCollaterized(domain);
+        } else if (what_ == "overCollRemoveRatio") {
+            bytes32 domain = value2_;
+            overCollRemoveRatio[domain] = uint(value_);
+            require(overCollRemoveRatio[domain] >= 1 ether, "asm-must-be-gt-1-ether");
+            require(overCollRemoveRatio[domain] <= overCollRatio[domain], "asm-must-be-lt-overcollratio");
+
+            _requireSystemCollaterized(domain); // TODO: check if this should hold or sthg else
         } else if (what_ == "priceFeed") {
             require(addr(value1_) != address(address(0x0)), "asm-wrong-pricefeed-address");
             require(addr(value_) != address(address(0x0)), "asm-wrong-token-address");
@@ -129,7 +153,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             require(priceFeed[newDcdc] != address(0), "asm-add-pricefeed-first");
             require(decimalsSet[newDcdc],"asm-no-decimals-set-for-token");
             dcdcs[newDcdc] = enable;
-            _updateTotalDcdcValue(newDcdc);
+            _updateTotalDcdcV(newDcdc);
         } else if (what_ == "cdcs") {
             bytes32 domain = value2_;
             address newCdc = addr(value_);
@@ -139,7 +163,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             require(decimalsSet[newCdc], "asm-add-decimals-first");
             require(newCdc != address(0), "asm-cdc-address-zero");
             cdcs[newCdc] = enable;
-            _updateCdcValue(newCdc);
+            _updateCdcV(newCdc);
+            _requireSystemCollaterized(domain);
         } else if (what_ == "dpasses") {
             bytes32 domain = value2_;
             address dpass = addr(value_);
@@ -147,14 +172,14 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             if(enable) domains[dpass] = domain;
             require(dpass != address(0), "asm-dpass-address-zero");
             dpasses[dpass] = enable;
-        } else if (what_ == "approve") {
+        } else if (what_ == "approve") {                            // TODO: remove this for security reasons
             address token = addr(value_);
             address dst = addr(value1_);
             uint value = uint(value2_);
             require(decimalsSet[token],"asm-no-decimals-set-for-token");
             require(dst != address(0), "asm-dst-zero-address");
             DSToken(token).approve(dst, value);
-        }  else if (what_ == "setApproveForAll") {
+        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this for security reasons
             address token = addr(value_);
             address dst = addr(value1_);
             bool enable = uint(value2_) > 0;
@@ -168,6 +193,14 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         }
 
         emit LogConfigChange(msg.sender, what_, value_, value1_);
+    }
+
+    /**
+     * @dev Set rate (price in base currency) for token.
+     */
+    // TODO: test
+    function setRate(address token_, uint256 value_) public nonReentrant auth {
+        setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
 
     /**
@@ -202,17 +235,17 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     /**
      * @dev Get currently stored value in base currency of cdc token.
      */
-    function getCdcValues(address cdc_) public view returns(uint256) {
+    function getCdcV(address cdc_) public view returns(uint256) {
         require(cdcs[cdc_], "asm-token-not-listed");
-        return cdcValues[cdc_];
+        return cdcV[cdc_];
     }
 
     /**
      * @dev Get currently stored total value of dcdc token.
      */
-    function getDcdcValues(address dcdc_) public view returns(uint256) {
+    function getDcdcV(address dcdc_) public view returns(uint256) {
         require(dcdcs[dcdc_], "asm-token-not-listed");
-        return dcdcValues[dcdc_];
+        return dcdcV[dcdc_];
     }
 
     /**
@@ -335,11 +368,13 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     */
     function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public auth {
         require(dpasses[token_], "asm-invalid-token-address");
-        address custodian_ = Dpass(token_).getCustodian(tokenId_); 
+        address custodian_ = Dpass(token_).getCustodian(tokenId_);
         require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
 
         if(Dpass(token_).ownerOf(tokenId_) == address(this)) {
             _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
+            if(price_ >= basePrice[token_][tokenId_])
+                _requireMaxCollCustV(custodian_); // TODO: test
         }
 
         basePrice[token_][tokenId_] = price_;
@@ -375,17 +410,35 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 
     /**
-    * @dev Updates value of cdc_ token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc_ value in the system.
+    * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
     */
-    function updateCdcValue(address cdc_) public stoppable {
-        _updateCdcValue(cdc_);
+    // TODO: test
+    function getMaxCollCustV(address custodian_) public view returns(uint) {
+        require(custodians[custodian_], "asm-should-be-custodian");
+        return maxCollCustV[custodian_];
     }
 
     /**
-    * @dev Updates value of a dcdc_ token. This function should be called by oracles but anyone can call it.
+    * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
     */
-    function updateTotalDcdcValue(address dcdc_) public stoppable {
-        _updateTotalDcdcValue(dcdc_);
+    // TODO: test
+    function setMaxCollCustV(address custodian_, uint256 maxCollCustV_) public nonReentrant auth {
+        require(custodians[custodian_], "asm-should-be-custodian");
+        maxCollCustV[custodian_] = maxCollCustV_;
+    }
+
+    /**
+    * @dev Updates value of cdc_ token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc_ value in the system. This function should be called every time the price of cdc has been updated.
+    */
+    function setCdcV(address cdc_) public stoppable {
+        _updateCdcV(cdc_);
+    }
+
+    /**
+    * @dev Updates value of a dcdc_ token. This function should be called by oracles but anyone can call it. This should be called every time the price of dcdc token was updated.
+    */
+    function setTotalDcdcV(address dcdc_) public stoppable {
+        _updateTotalDcdcV(dcdc_);
     }
 
     /**
@@ -393,8 +446,41 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     * @param dcdc_ address the dcdc_ token we want to update the value for
     * @param custodian_ address the custodian_ whose total dcdc_ values will be updated.
     */
-    function updateDcdcValue(address dcdc_, address custodian_) public stoppable {
-        _updateDcdcValue(dcdc_, custodian_);
+    function setDcdcV(address dcdc_, address custodian_) public stoppable {
+        _updateDcdcV(dcdc_, custodian_);
+    }
+
+    /**
+    * @dev Auditors can propagate their independent audit results here in order to make sure that users' diamonds are safe and there.
+    * @param custodian_ address the custodian, who the audit was done for.
+    * @param status_ uint the status of result. 0 means everything is fine, else should be the value of amount in geopardy or questionable.
+    * @param descriptionHash_ bytes32 keccak256() hash of the full audit statement available at descriptionUrl_. In the document all parameters
+    *   should be described concerning the availability, and quality of collateral at custodian.
+    * @param descriptionUrl_ bytes32 the url of the audit document. Whenever this is published the document must already be online to avoid fraud.
+    * @param auditInterval_ uint the proposed time in seconds until next audit. If auditor thinks more frequent audits are required he can express his wish here.
+    */
+
+    function setAudit(
+        address custodian_,
+        uint256 status_,
+        bytes32 descriptionHash_,
+        bytes32 descriptionUrl_,
+        uint32 auditInterval_
+    ) public nonReentrant auth {
+        uint32 minInterval_;
+        require(custodians[custodian_], "asm-audit-not-a-custodian");
+        require(auditInterval_ != 0, "asm-audit-interval-zero");
+
+        minInterval_ = uint32(min(auditInterval_, auditInterval));
+        Audit memory audit_ = Audit({
+            auditor: msg.sender,
+            status: status_,
+            descriptionHash: descriptionHash_,
+            descriptionUrl: descriptionUrl_,
+            nextAuditBefore: block.timestamp + minInterval_
+        });
+        audit[custodian_] = audit_;
+        emit LogAudit(msg.sender, custodian_, status_, descriptionHash_, descriptionUrl_, minInterval_);
     }
 
     /**
@@ -416,7 +502,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             _updateCollateralDpass(0, basePrice[token_][amtOrId_], custodian);
             totalDpassSoldV[custodian] = add(totalDpassSoldV[custodian], basePrice[token_][amtOrId_]);
 
-            _requireCustodianCollaterized(custodian, _getCustodianCdcV(domain, custodian));
             _requireSystemCollaterized(domain);
 
         } else if (dst_ == address(this) && !dpasses[token_]) {                                  // user sells ERC20 token_ to sellers
@@ -450,7 +535,11 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
 
             _updateCollateralDpass(basePrice[token_][amtOrId_], 0, Dpass(token_).getCustodian(amtOrId_));
 
-        } else {
+        } else if (dpasses[token_]) {                                        // user sells erc721 token_ to custodians
+
+            require(payTokens[token_], "asm-token-not-accepted");
+
+        }  else {
             require(false, "asm-unsupported-tx");
         }
     }
@@ -473,52 +562,72 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         bytes32 domain = domains[token_];
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).mint(dst_, amt_);
-        _updateCdcValue(token_);
+        _updateCdcV(token_);
         _requireSystemCollaterized(domain);
     }
 
     /**
-    * @dev Mints cdc tokens when users buy them. Also updates system collaterization.
-    * @param token_ address cdc token_ that needs to be minted
-    * @param dst_ address the address for whom cdc token_ will be minted for.
+    * @dev Mints dcdc tokens for custodians. This function should only be run by custodians.
+    * @param token_ address dcdc token_ that needs to be minted
+    * @param dst_ address the address for whom dcdc token will be minted for.
     * @param amt_ uint amount to be minted
     */
     function mintDcdc(address token_, address dst_, uint256 amt_) public nonReentrant auth {
+        require(custodians[msg.sender], "asm-not-a-custodian");
         require(!custodians[msg.sender] || dst_ == msg.sender, "asm-can-not-mint-for-dst");
         require(dcdcs[token_], "asm-token-is-not-cdc");
-        require(custodians[msg.sender], "asm-dst-not-a-custodian");
         DSToken(token_).mint(dst_, amt_);
-        _updateDcdcValue(token_, dst_);
+        _updateDcdcV(token_, dst_);
+        _requireMaxCollCustV(dst_); // TODO: test
     }
 
+    /**
+    * @dev Burns dcdc token. This function should be used by custodians.
+    * @param token_ address dcdc token_ that needs to be burnt.
+    * @param src_ address the address from whom dcdc token will be burned.
+    * @param amt_ uint amount to be burnt.
+    */
     function burnDcdc(address token_, address src_, uint256 amt_) public nonReentrant auth {
         bytes32 domain = domains[token_];
-
         uint custodianCdcV = _getCustodianCdcV(domain, src_);
 
+        require(custodians[msg.sender], "asm-not-a-custodian");
+        require(!custodians[msg.sender] || src_ == msg.sender, "asm-can-not-burn-from-src");
         require(dcdcs[token_], "asm-token-is-not-cdc");
-        require(custodians[src_], "asm-dst-not-a-custodian");
         DSToken(token_).burn(src_, amt_);
-        _updateDcdcValue(token_, src_);
+        _updateDcdcV(token_, src_);
 
-        _requireCustodianCollaterized(src_, custodianCdcV);
-        _requireSystemCollaterized(domain);
+        _requireSystemRemoveCollaterized(domain);
         _requirePaidLessThanSold(src_, custodianCdcV);
     }
 
+    /**
+    * @dev Mint dpass tokens and update collateral values.
+    * @param token_ address that is to be minted. Must be a dpass token address.
+    * @param custodian_ address this must be the custodian that we mint the token for. Parameter necessary only for future compatibility.
+    * @param issuer_ bytes3 the issuer of the certificate for diamond
+    * @param report_ bytes16 the report number of the certificate of the diamond.
+    * @param state_ bytes the state of token. Should be "sale" if it is to be sold on market, and "valid" if it is not to be sold.
+    * @param cccc_ bytes20 cut, clarity, color, and carat (carat range) values of the diamond. Only a specific values of cccc_ is accepted.
+    * @param carat_ uint24 exact weight of diamond in carats with 2 decimal precision.
+    * @param attributesHash_ bytes32 the hash of ALL the attributes that are not stored on blockckhain to make sure no one can change them later on.
+    * @param currentHashingAlgorithm_ bytes8 the algorithm that is used to construct attributesHash_. Together these values make meddling with diamond data very hard.
+    * @param price_ uint256 the base price of diamond (not per carat price)
+    */
     function mintDpass(
         address token_,
         address custodian_,
-        bytes32 issuer_,
-        bytes32 report_,
-        bytes32 state_,
-        bytes32 cccc_,
+        bytes3 issuer_,
+        bytes16 report_,
+        bytes8 state_,
+        bytes20 cccc_,
         uint24 carat_,
         bytes32 attributesHash_,
         bytes8 currentHashingAlgorithm_,
-        uint price_
+        uint256 price_
     ) public nonReentrant auth returns (uint256 id_) {
         require(dpasses[token_], "asm-mnt-not-a-dpass-token");
+        require(custodians[msg.sender], "asm-not-a-custodian");
         require(!custodians[msg.sender] || custodian_ == msg.sender, "asm-mnt-no-mint-to-others");
 
         id_ = Dpass(token_).mintDiamondTo(
@@ -533,18 +642,59 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             currentHashingAlgorithm_);
 
         setBasePrice(token_, id_, price_);
+        _requireMaxCollCustV(custodian_); // TODO: test
     }
 
-    function setStateDpass(address token_, uint256 tokenId_, bytes32 state_) public nonReentrant auth {
+    /*
+    * @dev Set state for dpass. Should be used primarily by custodians.
+    */
+    // TODO: test
+    function setStateDpass(address token_, uint256 tokenId_, bytes8 state_) public nonReentrant auth {
+        bytes32 prevState_;
+        address custodian_;
+
         require(dpasses[token_], "asm-mnt-not-a-dpass-token");
+
+        custodian_ = Dpass(token_).getCustodian(tokenId_);
         require(
             !custodians[msg.sender] ||
-            msg.sender == Dpass(token_).getCustodian(tokenId_),
+            msg.sender == custodian_,
             "asm-sds-not-authorized");
-        Dpass(token_).changeStateTo(state_, tokenId_);
+
+        prevState_ = Dpass(token_).getState(tokenId_);
+
+        if(
+            prevState_ != "invalid" &&
+            prevState_ != "removed" &&
+            (
+                state_ == "invalid" ||
+                state_ == "removed"
+            )
+        ) {
+            _updateCollateralDpass(0, basePrice[token_][tokenId_], custodian_);
+            _requireSystemRemoveCollaterized(domains[token_]);
+            _requirePaidLessThanSold(custodian_, _getCustodianCdcV(domains[token_], custodian_));
+
+        } else if(
+            prevState_ == "redeemed" ||
+            prevState_ == "invalid" ||
+            prevState_ == "removed" ||
+            (
+                state_ != "invalid" &&
+                state_ != "removed" &&
+                state_ != "redeemed"
+            )
+        ) {
+            _updateCollateralDpass(basePrice[token_][tokenId_], 0, custodian_);
+        }
+
+        Dpass(token_).setState(state_, tokenId_);
     }
 
-    function setStateDpass(address token_, uint256[] memory tokenIds_, bytes32 state_) public nonReentrant auth {
+    /*
+    * @dev Set state for multiple dpass tokens in one transaction. No more than 15 tokens should be updated at once.
+    */
+    function setStateDpass(address token_, uint256[] memory tokenIds_, bytes8 state_) public nonReentrant auth {
         require(dpasses[token_], "asm-sds-not-a-dpass-token");
 
         for(uint idx_ = 0; idx_ < tokenIds_.length; idx_++) {
@@ -554,16 +704,21 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
                 msg.sender == Dpass(token_).getCustodian(tokenIds_[idx_]),
                 "asm-sds-not-authorized");
 
-            Dpass(token_).changeStateTo(state_, tokenIds_[idx_]);
+            Dpass(token_).setState(state_, tokenIds_[idx_]);
         }
     }
 
-    function getWithdrawValue(address custodian_) public view returns(uint) {
+    /*
+    * @dev Custodians can find out how much token they can withdraw.
+    */
+    function getWithdrawV(address custodian_) public view returns(uint) {
         require(custodians[custodian_], "asm-not-a-custodian");
         uint custodianCdcV_ = _getCustodianCdcV(domains[custodian_], custodian_);
+
         uint totalSoldV_ = add(
             custodianCdcV_,
             totalDpassSoldV[custodian_]);
+
         if (add(totalSoldV_, dust) > totalPaidV[custodian_]) {
             return sub(totalSoldV_, totalPaidV[custodian_]);
         } else {
@@ -571,6 +726,10 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         }
     }
 
+    /*
+    * @dev Withdraw tokens for selling dpass, and cdc. Custodians do not receive money directly from selling dpass, ot cdc, but
+    * they must withdraw their tokens.
+    */
     function withdraw(address token_, uint256 amt_) public nonReentrant auth {
         address custodian = msg.sender;
         bytes32 domain = domains[custodian];
@@ -586,10 +745,13 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         sendToken(token_, address(this), msg.sender, amt_);
     }
 
+    /*
+    * @dev Return how much cdc token can be minted based on current collaterization.
+    * @param token_ address cdc token that we want to find out how much is mintable.
+    */
     function getAmtForSale(address token_) external view returns(uint256) {
         bytes32 domain = domains[token_];
         require(cdcs[token_], "asm-token-is-not-cdc");
-        // Commented due fit to code size limit 24,576 bytes
         return wdivT(
             sub(
                 wdiv(
@@ -620,7 +782,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens at custodian.
     */
-    function updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
+    function setCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDpass(positiveV_, negativeV_, custodian_);
 
         emit LogForceUpdateCollateralDpass(msg.sender, positiveV_, negativeV_, custodian_);
@@ -629,18 +791,21 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens custodian.
     */
-    function updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
+    function setCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
         emit LogForceUpdateCollateralDcdc(msg.sender, positiveV_, negativeV_, custodian_);
     }
 
+    /*
+    * @dev  Default function for eth payment. We accept ether as payment.
+    */
     function () external payable {
     }
 
     function _burn(address token_, uint256 amt_) internal {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(amt_);
-        _updateCdcValue(token_);
+        _updateCdcV(token_);
     }
 
     /**
@@ -651,28 +816,37 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         rate[token_] = rate_;
     }
 
-    function _updateCdcValue(address cdc_) internal {
+    /*
+    * @dev Updates totalCdcV and cdcV based on feed price of cdc token, and its total supply.
+    */
+    function _updateCdcV(address cdc_) internal {
         require(cdcs[cdc_], "asm-not-a-cdc-token");
         bytes32 domain = domains[cdc_];
         uint newValue = wmulV(DSToken(cdc_).totalSupply(), _updateRate(cdc_), cdc_);
 
-        totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcValues[cdc_]);
+        totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcV[cdc_]);
 
-        cdcValues[cdc_] = newValue;
+        cdcV[cdc_] = newValue;
 
-        emit LogCdcValue(totalCdcV[domain], domain, cdcValues[cdc_], cdc_);
+        emit LogCdcValue(totalCdcV[domain], domain, cdcV[cdc_], cdc_);
     }
 
-    function _updateTotalDcdcValue(address dcdc_) internal {
+    /*
+    * @dev Updates totalDdcV and dcdcV based on feed price of dcdc token, and its total supply.
+    */
+    function _updateTotalDcdcV(address dcdc_) internal {
         require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
         bytes32 domain = domains[dcdc_];
         uint newValue = wmulV(DSToken(dcdc_).totalSupply(), _updateRate(dcdc_), dcdc_);
-        totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcValues[dcdc_]);
-        dcdcValues[dcdc_] = newValue;
-        emit LogDcdcValue(totalDcdcV[domain], domain, cdcValues[dcdc_], dcdc_);
+        totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcV[dcdc_]);
+        dcdcV[dcdc_] = newValue;
+        emit LogDcdcValue(totalDcdcV[domain], domain, cdcV[dcdc_], dcdc_);
     }
 
-    function _updateDcdcValue(address dcdc_, address custodian_) internal {
+    /*
+    * @dev Updates totalDdcCustV and dcdcCustV for a specific custodian, based on feed price of dcdc token, and its total supply.
+    */
+    function _updateDcdcV(address dcdc_, address custodian_) internal {
         require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
         require(custodians[custodian_], "asm-not-a-custodian");
         uint newValue = wmulV(DSToken(dcdc_).balanceOf(custodian_), _updateRate(dcdc_), dcdc_);
@@ -687,7 +861,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
 
         emit LogDcdcCustodianValue(totalDcdcCustV[custodian_], dcdcCustV[dcdc_][custodian_], dcdc_, custodian_);
 
-        _updateTotalDcdcValue(dcdc_);
+        _updateTotalDcdcV(dcdc_);
     }
 
     /**
@@ -712,23 +886,28 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         }
     }
 
+    /*
+    * @dev Get the total value share of custodian from the total cdc minted.
+    */
     function _getCustodianCdcV(bytes32 domain_, address custodian_) internal view returns(uint) {
         return wmul(
             totalCdcV[domain_],
-            add(totalDpassV[domain_], totalDcdcV[domain_]) > 0 ?
-                wdiv(
-                    add(
-                        totalDpassCustV[custodian_],
-                        totalDcdcCustV[custodian_]),
-                    add(
-                        totalDpassV[domain_],
-                        totalDcdcV[domain_])):
-                1 ether);
+            add(
+                totalDpassV[domain_],
+                totalDcdcV[domain_]) > 0 ?
+            wdiv(
+                add(
+                    totalDpassCustV[custodian_],
+                    totalDcdcCustV[custodian_]),
+                add(
+                    totalDpassV[domain_],
+                    totalDcdcV[domain_])):
+            1 ether);
     }
-    /**
-    * @dev System must be overcollaterized at all time. Whenever collaterization shrinks this function must be called.
-    */
 
+    /**
+    * @dev System must be overcollaterized at all time. When it is not, then no cdc can be minted.
+    */
     function _requireSystemCollaterized(bytes32 domain_) internal view returns(uint) {
         require(
             add(
@@ -743,24 +922,28 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 
     /**
-    * @dev Custodian's total collateral value must be more or equal than proportional cdc value and dpasses sold
+    * @dev System must be overcollaterized at all time. When total cdc value times overCollRatio is not greater but
+    * equal to total dpass value plus total dcdc value: no more cdc can be minted, but since overCollRemoveRatio is
+    * less than overCollRatio, diamonds still can be removed by custodians. This is very helpful for them if system
+    * is low on collateral.
     */
-    function _requireCustodianCollaterized(address custodian_, uint256 custodianCdcV_) internal view {
+    function _requireSystemRemoveCollaterized(bytes32 domain_) internal view returns(uint) {
         require(
-            custodianCdcV_
-                 <=
             add(
                 add(
-                    totalDpassCustV[custodian_],
-                    totalDcdcCustV[custodian_]),
-                dust)
-            , "asm-custodian-undercollaterized");
+                    totalDpassV[domain_],
+                    totalDcdcV[domain_]),
+                dust) >=
+            wmul(
+                overCollRemoveRatio[domain_],
+                totalCdcV[domain_])
+            , "asm-system-undercollaterized");
     }
 
     /**
     * @dev The total value paid to custodian must be less then the total value of sold assets
     */
-    function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view returns(uint) {
+    function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view {
         require(
             add(
                 add(
@@ -771,6 +954,24 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
             , "asm-too-much-withdrawn");
     }
 
+    /*
+    * @dev This function will revert if custodian has reached his maxCollCustV. Asm enables to limit how much total worth
+    * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians.
+    */
+    function _requireMaxCollCustV(address custodian_) internal view {
+        require(
+            maxCollCustV[custodian_] <=
+            add(
+                add(
+                    totalDpassCustV[custodian_],
+                    totalDcdcCustV[custodian_]),
+                dust),
+            "asm-custodian-reached-maximum-coll-value");
+    }
+
+    /*
+    * @dev Updates total dpass value of a custodian, and the total dpass value of a domain.
+    */
     function _updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) internal {
         require(custodians[custodian_], "asm-not-a-custodian");
         bytes32 domain = domains[custodian_];
@@ -780,7 +981,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
                 totalDpassCustV[custodian_],
                 positiveV_),
             negativeV_);
-        
+
         totalDpassV[domain] = sub(
             add(
                 totalDpassV[domain],
@@ -790,6 +991,9 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         emit LogDpassValue(totalDpassCustV[custodian_], totalDpassV[domain], custodian_, domain);
     }
 
+    /**
+    * @dev Updates total dcdc customer value and total dcdc value for domain based on custodian collateral change.
+    */
     function _updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) internal {
         require(custodians[custodian_], "asm-not-a-custodian");
         bytes32 domain = domains[custodian_];
@@ -809,7 +1013,6 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         emit LogDcdcTotalCustodianValue(totalDcdcCustV[custodian_], totalDcdcV[domain], custodian_, domain);
     }
 
-// TODO: comment out next function if wallet is inherited from
     /**
     * @dev send token or ether to destination
     */
@@ -819,7 +1022,7 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
         address payable dst,
         uint256 amount
     ) internal returns (bool){
-        TrustedErc20Wallet erc20 = TrustedErc20Wallet(token);
+        DSToken erc20 = DSToken(token);
         if (token == eth && amount > 0) {
             require(src == address(this), "wal-ether-transfer-invalid-src");
             dst.transfer(amount);
@@ -831,8 +1034,8 @@ contract SimpleAssetManagement is DSAuth, DSStop, DSMath {
     }
 }
 
-// TODO: be able to ban custodian sale 
-// TODO: update Wallet.sol to handle dpass tokens as well
+// TODO: redeem func
+// TODO: auditor func at least a Log
+// TODO: be able to ban custodian sale
 // TODO: document functions
-// TODO: auth thests
 // TODO: auth thests

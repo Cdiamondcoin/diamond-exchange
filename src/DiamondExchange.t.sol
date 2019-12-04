@@ -2671,6 +2671,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         Dpass(dpass).approve(exchange, dpassId[user]);
 
         SimpleAssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
+
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
 
@@ -2767,6 +2768,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testDenyTokenDex() public {
         DiamondExchange(exchange).setDenyToken(cdc, true);
         DiamondExchange(exchange).setDenyToken(cdc, false);
+
         testForFixCdcBuyUserDpassUserHasNoDptDex();
     }
 
@@ -2988,12 +2990,12 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         assertEqDustLog("expected sell amount adds up",
             sellAmt_,
-            1000000000000000000000,
+            10921678321678321679,
             cdc);
 
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
-            1812000000000000000,
+            1494545454545454545,
             dpt);
 
         doExchange(sellToken, uint(-1), cdc, uint(-1));
@@ -3167,6 +3169,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testGetCostsSellDpassBuyFixCdcTakeAllCostsInDptDptNotEnoughDex() public {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
+        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass), b(true), "diamonds");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
 
@@ -3177,14 +3180,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         uint buyAmt = 10 ether;
         (uint sellAmt_, uint feeDpt_) = DiamondExchange(exchange).getCosts(user, sellToken, dpassId[user], cdc, buyAmt);
 
-        assertEqDustLog("expected sell amount adds up",
+        assertEqLog("expected sell amount adds up",
             sellAmt_,
-            5576923076923076923,
-            cdc);
+            1);
 
         assertEqDustLog("expected dpt fee adds up",
             feeDpt_,
-            2300000000000000000,
+            2120000000000000000,
             dpt);
 
         doExchange(sellToken, dpassId[user], cdc, buyAmt);
@@ -3541,12 +3543,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         assertEqDust(actual_, expected_);
     }
 
-    function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
+    function assertEqLog(bytes32 logMsg, uint actual_, uint expected_) public {
         logMsgActualExpected(logMsg, actual_, expected_, false);
         assertEq(actual_, expected_);
     }
-
-    function assertEqLog(bytes32 logMsg, uint256 actual_, uint256 expected_) public {
+    function assertEqLog(bytes32 logMsg, address actual_, address expected_) public {
         logMsgActualExpected(logMsg, actual_, expected_, false);
         assertEq(actual_, expected_);
     }
@@ -4127,7 +4128,11 @@ contract DiamondExchangeTester is Wallet, DSTest {
     function doTransferFrom721(address token, address from, address to, uint amount) public {
         Dpass(token).transferFrom(from, to, amount);
     }
-
+ 
+    function doSetState(address token, uint256 tokenId, bytes8 state) public {
+        Dpass(token).setState(state, tokenId);
+    }
+ 
     function doSetBuyPrice(address token, uint256 tokenId, uint256 price) public {
         DiamondExchange(exchange).setBuyPrice(token, tokenId, price);
     }

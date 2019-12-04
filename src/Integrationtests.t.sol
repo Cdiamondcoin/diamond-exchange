@@ -1,8 +1,9 @@
 pragma solidity ^0.5.11;
 
-// user sells diamonds
-// setup scenario
-// invalid diamond who does what
+// TODO: asm move to other asm test!!!!! PRIORITY
+// TODO: user sells diamonds
+// TODO: setup scenario
+// TODO: invalid diamond who does what
 // TODO: simple setup scenario
 // TODO: custodian adds diamond wrong this is how we correnct ir
 // TODO: upgrade asm or dex functionality
@@ -621,7 +622,7 @@ contract IntegrationsTest is DSTest {
         guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
 
         guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
         guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -773,16 +774,16 @@ contract TrustedSASMTester is Wallet {
         asm.setBasePrice(token, tokenId, price);
     }
 
-    function doUpdateCdcValue(address cdc) public {
-        asm.updateCdcValue(cdc);
+    function doSetCdcV(address cdc) public {
+        asm.setCdcV(cdc);
     }
 
-    function doUpdateTotalDcdcValue(address dcdc) public {
-        asm.updateTotalDcdcValue(dcdc);
+    function doUpdateTotalDcdcV(address dcdc) public {
+        asm.setTotalDcdcV(dcdc);
     }
 
-    function doUpdateDcdcValue(address dcdc, address custodian) public {
-        asm.updateDcdcValue(dcdc, custodian);
+    function doSetDcdcV(address dcdc, address custodian) public {
+        asm.setDcdcV(dcdc, custodian);
     }
 
     function doNotifyTransferFrom(address token, address src, address dst, uint256 amtOrId) public {
@@ -800,14 +801,14 @@ contract TrustedSASMTester is Wallet {
     function doMintDpass(
         address token_,
         address custodian_,
-        bytes32 issuer_,
-        bytes32 report_,
-        bytes32 state_,
-        bytes32 cccc_,
+        bytes3 issuer_,
+        bytes16 report_,
+        bytes8 state_,
+        bytes20 cccc_,
         uint24 carat_,
         bytes32 attributesHash_,
         bytes8 currentHashingAlgorithm_,
-        uint price_
+        uint256 price_
     ) public returns (uint) {
 
         return asm.mintDpass(
@@ -836,11 +837,11 @@ contract TrustedSASMTester is Wallet {
     }
 
     function doUpdateCollateralDpass(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDpass(positiveV, negativeV, custodian);
+        asm.setCollateralDpass(positiveV, negativeV, custodian);
     }
 
     function doUpdateCollateralDcdc(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDcdc(positiveV, negativeV, custodian);
+        asm.setCollateralDcdc(positiveV, negativeV, custodian);
     }
 
     function doApprove(address token, address dst, uint256 amt) public {

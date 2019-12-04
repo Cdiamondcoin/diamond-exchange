@@ -201,7 +201,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetTotalDpassCustVAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
@@ -309,42 +309,42 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetCdcValuesMintAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcValues(cdc), 17 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 17 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
     }
 
     function testGetCdcValuesMintBurnAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcValues(cdc), 17 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 17 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
 
         DSToken(cdc).transfer(address(asm), 1 ether);
         asm.burn(cdc, 0.5 ether);
-        assertEq(asm.getCdcValues(cdc), 8.5 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 8.5 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintAsm() public {
         uint mintAmt = 1 ether;
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcValues(dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcValues(dcdc1), 0 ether);
-        assertEq(asm.getDcdcValues(dcdc2), 0 ether);
+        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.getDcdcV(dcdc1), 0 ether);
+        assertEq(asm.getDcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintBurnAsm() public {
@@ -354,9 +354,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         TrustedSASMTester(custodian).doApprove(dcdc, address(asm),uint(-1));
         TrustedSASMTester(custodian).doBurnDcdc(dcdc, custodian, burnAmt);
-        assertEq(asm.getDcdcValues(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
-        assertEq(asm.getDcdcValues(dcdc1), 0 ether);
-        assertEq(asm.getDcdcValues(dcdc2), 0 ether);
+        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
+        assertEq(asm.getDcdcV(dcdc1), 0 ether);
+        assertEq(asm.getDcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintBurnStoppedAsm() public {
@@ -367,18 +367,18 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         TrustedSASMTester(custodian).doApprove(dcdc, address(asm),uint(-1));
         TrustedSASMTester(custodian).doBurnDcdc(dcdc, custodian, burnAmt);
-        assertEq(asm.getDcdcValues(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
-        assertEq(asm.getDcdcValues(dcdc1), 0 ether);
-        assertEq(asm.getDcdcValues(dcdc2), 0 ether);
+        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt - burnAmt));
+        assertEq(asm.getDcdcV(dcdc1), 0 ether);
+        assertEq(asm.getDcdcV(dcdc2), 0 ether);
     }
 
     function testGetDcdcValuesMintStoppedAsm() public {
         uint mintAmt = 1 ether;
         asm.stop();
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
-        assertEq(asm.getDcdcValues(dcdc), wmul(usdRate[dcdc], mintAmt));
-        assertEq(asm.getDcdcValues(dcdc1), 0 ether);
-        assertEq(asm.getDcdcValues(dcdc2), 0 ether);
+        assertEq(asm.getDcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
+        assertEq(asm.getDcdcV(dcdc1), 0 ether);
+        assertEq(asm.getDcdcV(dcdc2), 0 ether);
     }
 
     function testGetTotalDcdcValuesMintAsm() public {
@@ -403,7 +403,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetBasePriceAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
@@ -417,62 +417,62 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testStoppedMintStillWorksAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
         asm.stop();
         asm.mint(cdc, address(this), 1 ether);
         asm.start();
-        assertEq(asm.getCdcValues(cdc), 17 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 17 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
-        asm.updateCdcValue(cdc);
+        asm.setCdcV(cdc);
 
-        assertEq(asm.getCdcValues(cdc), 30 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 30 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
     }
 
     function testUpdateCdcValueAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcValues(cdc), 17 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 17 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
-        asm.updateCdcValue(cdc);
+        asm.setCdcV(cdc);
 
-        assertEq(asm.getCdcValues(cdc), 30 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 30 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
     }
 
     function testFailUpdateCdcValueAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setBasePrice(dpass, id_, price_);
 
         asm.mint(cdc, address(this), 1 ether);
-        assertEq(asm.getCdcValues(cdc), 17 ether);
-        assertEq(asm.getCdcValues(cdc1), 0 ether);
-        assertEq(asm.getCdcValues(cdc2), 0 ether);
+        assertEq(asm.getCdcV(cdc), 17 ether);
+        assertEq(asm.getCdcV(cdc1), 0 ether);
+        assertEq(asm.getCdcV(cdc2), 0 ether);
 
         TestFeedLike(feed[cdc]).setRate(30 ether);
         asm.stop();
-        asm.updateCdcValue(cdc);
+        asm.setCdcV(cdc);
     }
 
     function testUpdateTotalDcdcValueAsm() public {
@@ -484,7 +484,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
-        asm.updateTotalDcdcValue(dcdc);
+        asm.setTotalDcdcV(dcdc);
         assertEq(asm.getTotalDcdcV("diamonds"), wmul(rate_, mintAmt));
 
     }
@@ -499,7 +499,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.stop();
-        asm.updateTotalDcdcValue(dcdc);
+        asm.setTotalDcdcV(dcdc);
     }
 
     function testUpdateDcdcValueAsm() public {
@@ -511,7 +511,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.getDcdcCustV(custodian, dcdc2), 0);
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
-        asm.updateDcdcValue(dcdc, custodian);
+        asm.setDcdcV(dcdc, custodian);
         assertEq(asm.getDcdcCustV(custodian, dcdc), wmul(rate_, mintAmt));
     }
 
@@ -525,7 +525,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         TestFeedLike(feed[dcdc]).setRate(rate_);
         asm.stop();
-        asm.updateDcdcValue(dcdc, custodian);
+        asm.setDcdcV(dcdc, custodian);
     }
 
     function testWmulVAsm() public {
@@ -585,7 +585,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetTotalPaidVDaiAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint amt = 10 ether;
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
@@ -608,7 +608,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetTotalDpassSoldVAsm() public logs_gas {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint amt = 10 ether;
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
@@ -631,7 +631,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testGetTotalDpassVAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
@@ -664,7 +664,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testNotifyTransferFromDpassAsm() public {
         uint price_ = 101 ether;
         uint id_;
-        bytes32 cccc_ = "BR,I3,D,10.00";
+        bytes20 cccc_ = "BR,I3,D,10.00";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(user, custodian, "GIA", "3333333", "sale", cccc_, 1, b(0xef), "20191107");
 
@@ -692,8 +692,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint price1_ = 100 ether;
         uint id_;
         uint id1_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 cccc1_ = "BR,I1,G,5.99";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc1_ = "BR,I1,G,5.99";
         uint amtToWithdraw = 100 ether;
         require(amtToWithdraw <= price_ + price1_, "test-too-high-withdrawal value");
 
@@ -733,8 +733,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint price1_ = 100 ether;
         uint id_;
         uint id1_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 cccc1_ = "BR,I1,G,5.99";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc1_ = "BR,I1,G,5.99";
         uint amtToWithdraw = 200 ether;
         require(amtToWithdraw <= price_ + price1_, "test-too-high-withdrawal value");
 
@@ -793,8 +793,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintDcdcAmt = 11 ether;
         uint mintCdc = 1 ether;
         uint delta = 1 ether;
-        uint cdcValue = wmul(mintCdc, usdRate[cdc]);
-        uint price_ = add(cdcValue, delta);
+        uint cdcV = wmul(mintCdc, usdRate[cdc]);
+        uint price_ = add(cdcV, delta);
         require(price_ > wmul(mintCdc, usdRate[cdc]), "test-price-too-high");
         require(mintCdc * usdRate[cdc] <= mintDcdcAmt * usdRate[dcdc], "test-mintCdc-too-high");
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintDcdcAmt);
@@ -827,14 +827,14 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(exchange).doSendToken(dai, user, address(asm), price_);
         asm.notifyTransferFrom(dai, user, address(asm), price_);
 
-        assertEq(asm.getWithdrawValue(custodian), wmul(mintCdc, usdRate[cdc]));
+        assertEq(asm.getWithdrawV(custodian), wmul(mintCdc, usdRate[cdc]));
     }
 
     function testGetWithdrawValueDpassAsm() public {
 
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
@@ -843,7 +843,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
 
-        assertEq(asm.getWithdrawValue(custodian), price_);
+        assertEq(asm.getWithdrawV(custodian), price_);
     }
 
     function testGetAmtForSaleDcdcAsm() public {
@@ -865,7 +865,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint overCollRatio_ = 1.2 ether;
 
         require(overCollRatio_ > 0, "test-overcoll-ratio-zero");
@@ -885,7 +885,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintCdc = 1 ether;
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint overCollRatio_ = 1.2 ether;
 
         require(overCollRatio_ > 0, "test-overcoll-ratio-zero");
@@ -918,22 +918,22 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
     function testUpdateCollateralDpassAsm() public {
 
-        asm.updateCollateralDpass(1 ether, 0, custodian);
+        asm.setCollateralDpass(1 ether, 0, custodian);
         assertEq(asm.getTotalDpassCustV(custodian), 1 ether);
         assertEq(asm.getTotalDpassV("diamonds"), 1 ether);
 
-        asm.updateCollateralDpass(0, 1 ether, custodian);
+        asm.setCollateralDpass(0, 1 ether, custodian);
         assertEq(asm.getTotalDpassCustV(custodian), 0 ether);
         assertEq(asm.getTotalDpassV("diamonds"), 0 ether);
     }
 
     function testUpdateCollateralDcdcAsm() public {
 
-        asm.updateCollateralDcdc(1 ether, 0, custodian);
+        asm.setCollateralDcdc(1 ether, 0, custodian);
         assertEq(asm.getTotalDcdcCustV(custodian), 1 ether);
         assertEq(asm.getTotalDcdcV("diamonds"), 1 ether);
 
-        asm.updateCollateralDcdc(0, 1 ether, custodian);
+        asm.setCollateralDcdc(0, 1 ether, custodian);
         assertEq(asm.getTotalDcdcCustV(custodian), 0 ether);
         assertEq(asm.getTotalDcdcV("diamonds"), 0 ether);
     }
@@ -943,7 +943,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintDcdcAmt = 11 ether;
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint overCollRatio_ = 1.2 ether;
 
         require(overCollRatio_ > 0, "test-overcoll-ratio-zero");
@@ -960,30 +960,30 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(user).doSendToken(cdc, user, address(asm), mintCdc);
         asm.burn(cdc, mintCdc / 2);
         assertEq(asm.getTotalCdcV("diamonds"), wmul(mintCdc / 2, usdRate[cdc]));
-        assertEq(asm.getCdcValues(cdc), wmul(mintCdc / 2, usdRate[cdc]));
-        assertEq(asm.getWithdrawValue(custodian), wmul(mintCdc / 2, usdRate[cdc]));
+        assertEq(asm.getCdcV(cdc), wmul(mintCdc / 2, usdRate[cdc]));
+        assertEq(asm.getWithdrawV(custodian), wmul(mintCdc / 2, usdRate[cdc]));
         assertEq(asm.getAmtForSale(cdc), wdiv(sub(wdiv(add(price_, wmul(mintDcdcAmt, usdRate[dcdc])), overCollRatio_), wmul(mintCdc / 2, usdRate[cdc])), usdRate[cdc]));
     }
 
     function testMintDpassAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
 
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = asm.mintDpass(dpass, custodian, "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
         (
             bytes32 issuer,
             bytes32 report,
             bytes32 state,
-            bytes32 cccc,
+            bytes20 cccc,
             uint24 carat,
             bytes32 attributesHash) = Dpass(dpass).getDiamond(id_);
 
         assertEqLog("owner is asm", Dpass(dpass).ownerOf(id_), address(asm));
         assertEqLog("custodian is custodian", Dpass(dpass).getCustodian(id_), custodian);
         assertEqLog("GIA is GIA", Dpass(dpass).getCustodian(id_), custodian);
-        assertEqLog("issuer is what is set", issuer, "GIA_spec");
+        assertEqLog("issuer is what is set", issuer, "GIa");
         assertEqLog("report is what is set", report, "11211211");
         assertEqLog("state is what is set", state, "sale");
         assertEqLog("cccc is what is set", cccc, cccc_);
@@ -996,34 +996,34 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         // error Revert ("asm-mnt-can-not-mint-for-dst")
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
 
         Dpass(dpass).setCccc(cccc_, true);
 
         guard.permit(address(custodian), address(asm), ANY);
-        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, address(asm), "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, address(asm), "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
     }
 
     function testFailCustodianMintNotDpassAsm() public {
         // error Revert ("asm-mnt-not-a-dpass-token")
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
 
         Dpass(dpass).setCccc(cccc_, true);
 
         guard.permit(address(custodian), address(asm), ANY);
-        id_ = TrustedSASMTester(custodian).doMintDpass(cdc, address(asm), "GIA_spec", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(cdc, address(asm), "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
     }
 
     function testSetStateDpassAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 stateTo_ = "invalid";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
 
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
         asm.setStateDpass(dpass, id_, stateTo_);
         (
             ,
@@ -1039,24 +1039,24 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint price_ = 100 ether;
         uint id_;
         uint id1_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 stateTo_ = "invalid";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
         uint[] memory tokenIds_;
 
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
-        id1_ = asm.mintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id1_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
         tokenIds_ = new uint[](2);
         tokenIds_[0] = id_;
         tokenIds_[1] = id1_;
 
-        asm.setStateDpass(dpass, tokenIds_, stateTo_);
+        TrustedSASMTester(custodian).doSetStateDpass(dpass, tokenIds_, stateTo_);
 
         (
             bytes32 issuer,
             bytes32 report,
             bytes32 state,
-            bytes32 cccc,
+            bytes20 cccc,
             uint24 carat,
             bytes32 attributesHash) = Dpass(dpass).getDiamond(id_);
 
@@ -1145,23 +1145,23 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testFailAuthCheckMintDpassAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
 
         Dpass(dpass).setCccc(cccc_, true);
         asm.setOwner(user);
-        guard.forbid(address(this), address(asm), ANY);
+        guard.forbid(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
 
-        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
     }
 
     function testFailAuthCheckSetStateDpassAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 stateTo_ = "invalid";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
 
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
         asm.setOwner(user);
         guard.forbid(address(this), address(asm), ANY);
 
@@ -1172,13 +1172,13 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint price_ = 100 ether;
         uint id_;
         uint id1_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
-        bytes32 stateTo_ = "invalid";
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
         uint[] memory tokenIds_;
 
         Dpass(dpass).setCccc(cccc_, true);
-        id_ = asm.mintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
-        id1_ = asm.mintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        id1_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "2222222", "valid", cccc_, 1, b(0xef), "20191107", price_);
         tokenIds_ = new uint[](2);
         tokenIds_[0] = id_;
         tokenIds_[1] = id1_;
@@ -1192,7 +1192,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testFailAuthCheckWithdrawAsm() public {
         uint price_ = 100 ether;
         uint id_;
-        bytes32 cccc_ = "BR,IF,F,0.01";
+        bytes20 cccc_ = "BR,IF,F,0.01";
         uint amt = 10 ether;
         Dpass(dpass).setCccc(cccc_, true);
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
@@ -1216,14 +1216,14 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setOwner(user);
         guard.forbid(address(this), address(asm), ANY);
 
-        asm.updateCollateralDpass(1 ether, 0,  custodian);
+        asm.setCollateralDpass(1 ether, 0,  custodian);
     }
 
     function testFailAuthCheckUpdateCollateralDcdcAsm() public {
         asm.setOwner(user);
         guard.forbid(address(this), address(asm), ANY);
 
-        asm.updateCollateralDcdc(1 ether, 0,  custodian);
+        asm.setCollateralDcdc(1 ether, 0,  custodian);
     }
 //----------------------end-of-tests-------------------------------------------------------------
 
@@ -1425,9 +1425,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
 
         guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian, address(asm), bytes4(keccak256("setStateDpass(address,uint256[],bytes8)")));
         guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
         guard.permit(custodian, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -1441,9 +1442,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
 
         guard.permit(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("setStateDpass(address,uint256[],bytes8)")));
         guard.permit(custodian1, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian1, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
         guard.permit(custodian1, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -1456,9 +1458,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.permit(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
         guard.permit(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, address(asm), bytes4(keccak256("setStateDpass(address,uint256[],bytes8)")));
         guard.permit(custodian2, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian2, dpass, bytes4(keccak256("mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")));
         guard.permit(custodian2, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
@@ -1609,15 +1612,15 @@ contract TrustedDpassTester {
     }
 
     function doSetSaleStatus(uint tokenId) public {
-        dpass.setSaleStatus(tokenId);
+        dpass.setSaleState(tokenId);
     }
 
     function doRedeem(uint tokenId) public {
         dpass.redeem(tokenId);
     }
 
-    function doChangeStateTo(bytes32 state, uint tokenId) public {
-        dpass.changeStateTo(state, tokenId);
+    function doSetState(bytes8 state, uint tokenId) public {
+        dpass.setState(state, tokenId);
     }
 
     function doSetCustodian(uint tokenId, address newCustodian) public {
@@ -1652,16 +1655,24 @@ contract TrustedSASMTester is Wallet {
         asm.setBasePrice(token, tokenId, price);
     }
 
-    function doUpdateCdcValue(address cdc) public {
-        asm.updateCdcValue(cdc);
+    function doSetCdcV(address cdc) public {
+        asm.setCdcV(cdc);
     }
 
-    function doUpdateTotalDcdcValue(address dcdc) public {
-        asm.updateTotalDcdcValue(dcdc);
+    function doSetStateDpass(address token, uint tokenId, bytes8 state) public {
+        asm.setStateDpass(token, tokenId, state);
     }
 
-    function doUpdateDcdcValue(address dcdc, address custodian) public {
-        asm.updateDcdcValue(dcdc, custodian);
+    function doSetStateDpass(address token, uint[] memory tokenIds, bytes8 state) public {
+        asm.setStateDpass(token, tokenIds, state);
+    }
+
+    function doSetTotalDcdcV(address dcdc) public {
+        asm.setTotalDcdcV(dcdc);
+    }
+
+    function doSetDcdcV(address dcdc, address custodian) public {
+        asm.setDcdcV(dcdc, custodian);
     }
 
     function doNotifyTransferFrom(address token, address src, address dst, uint256 amtOrId) public {
@@ -1679,10 +1690,10 @@ contract TrustedSASMTester is Wallet {
     function doMintDpass(
         address token_,
         address custodian_,
-        bytes32 issuer_,
-        bytes32 report_,
-        bytes32 state_,
-        bytes32 cccc_,
+        bytes3 issuer_,
+        bytes16 report_,
+        bytes8 state_,
+        bytes20 cccc_,
         uint24 carat_,
         bytes32 attributesHash_,
         bytes8 currentHashingAlgorithm_,
@@ -1714,12 +1725,12 @@ contract TrustedSASMTester is Wallet {
         asm.withdraw(token, amt);
     }
 
-    function doUpdateCollateralDpass(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDpass(positiveV, negativeV, custodian);
+    function doSetCollateralDpass(uint positiveV, uint negativeV, address custodian) public {
+        asm.setCollateralDpass(positiveV, negativeV, custodian);
     }
 
-    function doUpdateCollateralDcdc(uint positiveV, uint negativeV, address custodian) public {
-        asm.updateCollateralDcdc(positiveV, negativeV, custodian);
+    function doSetCollateralDcdc(uint positiveV, uint negativeV, address custodian) public {
+        asm.setCollateralDcdc(positiveV, negativeV, custodian);
     }
 
     function doApprove(address token, address dst, uint256 amt) public {
