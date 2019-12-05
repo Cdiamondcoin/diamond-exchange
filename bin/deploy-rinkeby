@@ -24,7 +24,7 @@ export ETH_GAS=9965875
 
 # 1000000000 wei = 1 gwei
 # export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
-export ETH_GAS_PRICE=10000000000
+export ETH_GAS_PRICE=20000000000
 
 # export ETH_FROM=$(seth rpc eth_coinbase)
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
@@ -32,59 +32,66 @@ export ETH_PASSWORD=~/.eth-pwd
 
 dapp build --extract
 
-hevm flatten --source-file src/DiamondExchange.sol --json-file out/dapp.sol.json > out/DiamondExchange-flatt.sol
+hevm flatten --source-file src/DSToken.sol --json-file out/dapp.sol.json > out/DSToken-flatt.sol
+hevm flatten --source-file src/TestFeedLike.sol --json-file out/dapp.sol.json > out/TestFeedLike-flatt.sol
 hevm flatten --source-file src/Liquidity.sol --json-file out/dapp.sol.json > out/Liquidity-flatt.sol
 hevm flatten --source-file src/Wallet.sol --json-file out/dapp.sol.json > out/Wallet-flatt.sol
 hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Burner-flatt.sol
-hevm flatten --source-file src/SimpleAssetManagement.sol --json-file out/dapp.sol.json > out/SimpleAssetManagement-flatt.sol
 hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc-flatt.sol
+hevm flatten --source-file src/CdcAuthority.sol --json-file out/dapp.sol.json > out/CdcAuthority-flatt.sol
+hevm flatten --source-file src/DiamondExchange.sol --json-file out/dapp.sol.json > out/DiamondExchange-flatt.sol
+hevm flatten --source-file src/SimpleAssetManagement.sol --json-file out/dapp.sol.json > out/SimpleAssetManagement-flatt.sol
 
-export dpt=0xb30041ff94fc8fc071029f0abc925a60b5a2059a
-export cdc=0x3b5822b3cb38b82ffe49bcb3c6c6483b68b61971
-export dpass=0x18a7a95d17f2e7208982922a814d49661f23a073
-export ethPriceFeed=0x2Ed2b811A048683E7f2CE00587f73CcfdB86D219
-export dptPriceFeed=0xc9faD47Fe77500515de29024C076b6d8D87d423E
-export cdcPriceFeed=0x1D2A08e056059a066D98B516BDEab01DFbD0D45F
+################################################################################
+# max is 24576
+# DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin)
+# echo $((${#DATA} / 2 - 1))
+################################################################################
 
-# export liq=0xc633247c3647a33a0adae21335516a1497393834
-# export wal=0x16bb6010f38effab6238988d72119f3738ebeb6e
-# export burner=0x728fe77af990628164fd4f39a9aba163a998d540
-# export dcdc=0xae1764f007284bd2ad4add9376bae9cc6bb57dd1
-# export guard=0x9251886d8642df76e1b6bbfb0c28b335d1c61c31
+# DPT
+# 10 mln
+export SUPPLY=10000000000000000000000000000
+dpt=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii DPT)))
+echo -e "DPT DEPLOYED AT: $dpt"
+seth send $dpt "mint(uint)" $(seth --to-uint256 $SUPPLY)
 
+# CDC
+cdc=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii CDC)))
+echo -e "CDC DEPLOYED AT: $CDC"
 
-# # ETH feed
-# export RATE=120
-# export FEED_VALID=true
-# ethPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "ETH Price Fedd DEPLOYED AT: $ethPriceFeed"
+# ETH feed
+export RATE=140
+export FEED_VALID=true
+ethPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+echo -e "ETH Price Fedd DEPLOYED AT: $ethPriceFeed"
 
-# # DPT feed
-# export RATE=12
-# dptPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "DPT Price Fedd DEPLOYED AT: $dptPriceFeed"
+# DPT feed
+export RATE=12
+dptPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+echo -e "DPT Price Fedd DEPLOYED AT: $dptPriceFeed"
 
-# # CDC feed
-# export RATE=70
-# cdcPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-# echo -e "CDC Price Fedd DEPLOYED AT: $cdcPriceFeed"
+# CDC feed
+export RATE=70
+cdcPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
+echo -e "CDC Price Fedd DEPLOYED AT: $cdcPriceFeed"
 
 export liq=$(dapp create Liquidity)
 echo -e "Liquiditiy DEPLOYED AT: $liq"
 seth send $dpt "transfer(address,uint)" $liq $(seth --to-uint256 $(seth --to-wei 10000 eth))
 
-# export wal=$(dapp create Wallet)
-# echo -e "Wallet DEPLOYED AT: $wal"
+export wal=$(dapp create Wallet)
+echo -e "Wallet DEPLOYED AT: $wal"
 
-# burner=$(dapp create Burner "$dpt")
-# echo -e "Burner DEPLOYED AT: $burner"
+burner=$(dapp create Burner "$dpt")
+echo -e "Burner DEPLOYED AT: $burner"
 
-# export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
-# export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
-# dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
-# echo -e "DCDC DEPLOYED AT: $dcdc"
+export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
+export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
+dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
+echo -e "DCDC DEPLOYED AT: $dcdc"
 
-# export guard=$(dapp create CdcAuthority)
+export guard=$(dapp create CdcAuthority)
+echo -e "Guard DEPLOYED AT: $guard"
 
 export dex=$(dapp create DiamondExchange)
 echo -e "DiamondExchange DEPLOYED AT: $dex"
@@ -92,32 +99,23 @@ echo -e "DiamondExchange DEPLOYED AT: $dex"
 export asm=$(dapp create SimpleAssetManagement)
 echo -e "ASM DEPLOYED AT: $asm"
 
+set +x
+
+echo -e "export dpt=$dpt"
+echo -e "export cdc=$cdc"
+echo -e "export ethPriceFeed=$ethPriceFeed"
+echo -e "export dptPriceFeed=$dptPriceFeed"
+echo -e "export cdcPriceFeed=$cdcPriceFeed"
+echo -e "export liq=$liq"
+echo -e "export wal=$wal"
+echo -e "export burner=$burner"
+echo -e "export dcdc=$dcdc"
+echo -e "export guard=$guard"
+echo -e "export dex=$dex"
+echo -e "export asm=$asm"
+
+
 # ===================== END =========================
-
-# DPT_FEED=0x97e4b0634971c2b286eab779bb672cf69fe525d2
-# export DPT_FEED=$DPT_FEED
-# echo -e "DPT Medianizer DEPLOYED AT: $DPT_FEED"
-
-# ETH_FEED=$(dapp create TestMedianizerLike $(seth --to-uint256 $(seth --to-wei 250 eth)) true)
-# export ETH_FEED=$ETH_FEED
-# echo -e "ETH MedianizerLike DEPLOYED AT: $ETH_FEED"
-# test -z $ETH_FEED && exit 1
-
-# CDC_FEED=$(dapp create TestMedianizerLike $(seth --to-uint256 $(seth --to-wei 30 eth)) true)
-# export CDC_FEED=$CDC_FEED
-# echo -e "CDC MedianizerLike DEPLOYED AT: $CDC_FEED"
-# test -z $CDC_FEED && exit 1
-
-# CdcExchange=$(dapp create CdcExchange "$CDC" "$DPT" "$CDC_FEED" "$DPT_FEED" "$ETH_FEED" "$ETH_FROM" "$BURNER" $(seth --to-uint256 $(seth --to-wei 12 eth)) $(seth --to-uint256 $(seth --to-wei 30 eth)) $(seth --to-uint256 $(seth --to-wei 230 eth)))
-# export CdcExchange=$CdcExchange
-# echo -e "CdcExchange DEPLOYED AT: $CdcExchange"
-
-# CdcAuthority=$(dapp create CdcAuthority)
-# export CdcAuthority=$CdcAuthority
-# echo -e "CdcAuthority DEPLOYED AT: $CdcAuthority"
-
-# seth send $CdcExchange "setAuthority(address)" $CdcAuthority
-
 # # enable CdcExchange to manage Cdc tokens
 # seth send $CDC "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
@@ -125,8 +123,6 @@ echo -e "ASM DEPLOYED AT: $asm"
 # seth send $DPT "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
-# # seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0
-# # seth --from-wei $(seth --to-dec $(seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0))
 
 # # Get data from price feed
 # # seth call 0x97e4b0634971c2b286eab779bb672cf69fe525d2 "peek()(bytes32, bool)"
