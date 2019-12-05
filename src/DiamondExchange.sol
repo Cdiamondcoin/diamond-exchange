@@ -7,7 +7,7 @@ import "ds-stop/stop.sol";
 import "ds-note/note.sol";
 import "./Liquidity.sol";
 import "dpass/Dpass.sol";
-
+import "./Redeemer.sol";
 /**
 * @dev Contract to get ETH/USD price
 */
@@ -117,7 +117,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             address => mapping(
                 uint => uint))) public buyPrice;            // buyPrice[token][owner][tokenId] price of dpass token ...
                                                             // ... defined by owner of dpass token
-
+    mapping(address => bool) redeemFeeToken;                // tokens allowed to pay redeem fee with
     TrustedFeeCalculator public fca;                        // fee calculator contract
 
     address payable public liq;                             // contract providing DPT liquidity to pay for fee
@@ -142,9 +142,10 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     address eth = address(0xee);                            // to handle ether the same way as tokens we associate a fake address to it
     bool kycEnabled;                                        // if true then user must be on the kyc list in order to use the system
     mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
+    address payable public redeemer;                                // redeemer contract to handle physical diamond delivery to users
 
 //-----------included-from-ds-math---------------------------------begin
-    uint constant WAD = 10 ** 18;
+    uint constant WAD = 1 ether;
 
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x, "ds-math-add-overflow");
@@ -193,7 +194,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             profitRate = uint256(value_);
 
-            require(profitRate <= 10 ** 18, "dex-profit-rate-out-of-range");
+            require(profitRate <= 1 ether, "dex-profit-rate-out-of-range");
 
         } else if (what_ == "rate") {
             address token = addr(value_);
@@ -224,6 +225,12 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             varFee = uint256(value_);
 
             require(varFee <= 1 ether, "dex-var-fee-too-high");
+
+        } else if (what_ == "redeemFeeToken") {         // TODO: test
+
+            address token = addr(value_);
+            require(token != address(0), "dex-zero-address-redeemfee-token");
+            redeemFeeToken[token] = uint256(value1_) > 0;
 
         } else if (what_ == "manualRate") {
 
@@ -380,11 +387,11 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             dpt = addr(value_);
 
-        } else if (what_ == "owner") {
+        } else if (what_ == "redeemer") {
 
-            require(addr(value_) != address(0x0), "dex-wrong-address");
+            require(addr(value_) != address(0x0), "dex-wrong-redeemer-address");
 
-            setOwner(addr(value_));
+            redeemer = address(uint160(addr(value_)));
 
         } else {
 
@@ -392,6 +399,40 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         }
 
         emit LogConfigChange(what_, value_, value1_);
+    }
+    
+    /**
+    * @dev Redeem token and pay fee for redeem.
+    */
+    //TODO: test
+    function redeem(
+        address redeemToken_,
+        uint256 redeemAmtOrId_,
+        address feeToken_,
+        uint256 feeAmt_
+    ) public payable stoppable nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
+
+        if(canBuyErc721[redeemToken_] || canSellErc721[redeemToken_]) {
+
+            TrustedErc721(redeemToken_)                                // transfer token to redeemer
+            .transferFrom(
+                msg.sender,
+                redeemer,
+                redeemAmtOrId_);
+
+        } else if (canBuyErc20[redeemToken_] || canSellErc20[redeemToken_]) {
+
+            _sendToken(redeemToken_, msg.sender, redeemer, redeemAmtOrId_);
+
+        } else {
+            require(false, "dex-token-can-not-be-redeemed");
+        }
+        
+        if (redeemFeeToken[feeToken_] || feeToken_ == dpt) {
+            _sendToken(redeemToken_, msg.sender, redeemer, redeemAmtOrId_);
+        }
+
+        return Redeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_);
     }
 
     /**
@@ -866,7 +907,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(basePrice_ != 0, "dex-zero-price-not-allowed");
             return basePrice_;
         } else {
-            return buyPrice[token_][owner_][tokenId_];
+            return buyPrice_;
         }
     }
 
@@ -1272,7 +1313,6 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         address payable dst_,
         uint256 amount_
     ) internal returns(bool) {
-        TrustedDSToken erc20_ = TrustedDSToken(token_);
 
         if (token_ == eth && amount_ > dust) {                          // if token_ is Ether and amount_ is higher than dust limit
             require(src_ == msg.sender || src_ == address(this),
@@ -1287,7 +1327,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
                 if( handledByAsm[token_] && src_ == address(asm)) {     // if token_ is handled by asm (so it is minted and burnt) and we have to mint it
                     asm.mint(token_, dst_, amount_);
                 } else {
-                    erc20_.transferFrom(src_, dst_, amount_);           // transfer all of token_ to dst_
+                    TrustedDSToken(token_).transferFrom(src_, dst_, amount_);           // transfer all of token_ to dst_
                 }
             }
         }

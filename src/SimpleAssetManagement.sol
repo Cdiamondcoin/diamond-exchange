@@ -146,7 +146,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             require(overCollRemoveRatio[domain] >= 1 ether, "asm-must-be-gt-1-ether");
             require(overCollRemoveRatio[domain] <= overCollRatio[domain], "asm-must-be-lt-overcollratio");
 
-            _requireSystemCollaterized(domain); // TODO: check if this should hold or sthg else
+            _requireSystemRemoveCollaterized(domain); // TODO: check if this should hold or sthg else
         } else if (what_ == "priceFeed") {
             require(addr(value1_) != address(address(0x0)), "asm-wrong-pricefeed-address");
             require(addr(value_) != address(address(0x0)), "asm-wrong-token-address");
@@ -353,16 +353,31 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         address custodian;
         bytes32 domain = domains[token_];
 
-        require(dpasses[token_] || cdcs[token_] || payTokens[token_], "asm-invalid-token");
-        require(!dpasses[token_] || Dpass(token_).getState(amtOrId_) == "sale", "asm-ntf-token-state-not-sale");
-        if(dpasses[token_] && src_ == address(this)) {                        // custodian sells dpass to user
+        require(
+            dpasses[token_] || cdcs[token_] || payTokens[token_],
+            "asm-invalid-token");
+        
+            require(
+            !dpasses[token_] || Dpass(token_).getState(amtOrId_) == "sale",
+            "asm-ntf-token-state-not-sale");
+        
+        if(dpasses[token_] && src_ == address(this)) {                     // custodian sells dpass to user
             custodian = Dpass(token_).getCustodian(amtOrId_);
-            _updateCollateralDpass(0, basePrice[token_][amtOrId_], custodian);
-            totalDpassSoldV[custodian] = add(totalDpassSoldV[custodian], basePrice[token_][amtOrId_]);
-
+            
+            _updateCollateralDpass(
+                0,
+                basePrice[token_][amtOrId_],
+                custodian);
+            
+            totalDpassSoldV[custodian] = add(
+                totalDpassSoldV[custodian],
+                basePrice[token_][amtOrId_]);
+            
+            Dpass(token_).setState("valid", amtOrId_);
+            
             _requireSystemCollaterized(domain);
 
-        } else if (dst_ == address(this) && !dpasses[token_]) {                                  // user sells ERC20 token_ to sellers
+        } else if (dst_ == address(this) && !dpasses[token_]) {             // user sells ERC20 token_ to sellers
             require(payTokens[token_], "asm-we-dont-accept-this-token");
 
             if (cdcs[token_]) {
@@ -387,13 +402,18 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             }
 
 
-        } else if (dst_ == address(this) && dpasses[token_]) {                                        // user sells erc721 token_ to custodians
+        } else if (dst_ == address(this) && dpasses[token_]) {               // user sells erc721 token_ to custodians
 
             require(payTokens[token_], "asm-token-not-accepted");
 
-            _updateCollateralDpass(basePrice[token_][amtOrId_], 0, Dpass(token_).getCustodian(amtOrId_));
+            _updateCollateralDpass(
+                basePrice[token_][amtOrId_],
+                0,
+                Dpass(token_).getCustodian(amtOrId_));
 
-        } else if (dpasses[token_]) {                                        // user sells erc721 token_ to custodians
+            Dpass(token_).setState("valid", amtOrId_);
+
+        } else if (dpasses[token_]) {                                        // user sells erc721 token_ to other users
 
             require(payTokens[token_], "asm-token-not-accepted");
 
@@ -403,7 +423,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /**
-    * @dev Burns cdc tokens when users pay with them. Also updates system collaterization.
+    * @dev Burns cdc tokens. Also updates system collaterization. Cdc tokens are burnt when users pay with cdc on exchange or when users redeem cdcs.
     * @param token_ address cdc token_ that needs to be burnt
     * @param amt_ uint the amount to burn.
     */
@@ -778,7 +798,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             wmul(
                 overCollRemoveRatio[domain_],
                 totalCdcV[domain_])
-            , "asm-system-undercollaterized");
+            , "asm-sys-remove-undercollaterized");
     }
 
     /**
