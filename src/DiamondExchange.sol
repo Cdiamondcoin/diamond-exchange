@@ -106,8 +106,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     mapping(address => bool) public canSellErc20;           // stores allowed ERC20 tokens to sell
     mapping(address => bool) public canBuyErc721;           // stores allowed ERC20 tokens to buy
     mapping(address => bool) public canSellErc721;          // stores allowed ERC20 tokens to sell
-    mapping(address => mapping(address => bool))            // stores tokens that seller does not accept
-        public denyToken;
+    mapping(address => mapping(address => bool))            // stores tokens that seller does not accept, ...
+        public denyToken;                                   // ... and also token pairs that can not be traded
     mapping(address => uint) public decimals;               // stores decimals for each ERC20 token
     mapping(address => bool) public decimalsSet;            // stores if decimals were set for ERC20 token
     mapping(address => address payable) public custodian20; // custodian that holds an ERC20 token for Exchange
@@ -142,7 +142,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     address eth = address(0xee);                            // to handle ether the same way as tokens we associate a fake address to it
     bool kycEnabled;                                        // if true then user must be on the kyc list in order to use the system
     mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
-    address payable public redeemer;                                // redeemer contract to handle physical diamond delivery to users
+    address payable public redeemer;                        // redeemer contract to handle physical diamond delivery to users
 
 //-----------included-from-ds-math---------------------------------begin
     uint constant WAD = 1 ether;
@@ -216,6 +216,28 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(user_ != address(0x0), "dex-wrong-address");
 
             kyc[user_] = uint(value1_) > 0;
+        } else if (what_ == "allowTokenPair") {
+
+            address sellToken_ = addr(value_);
+            address buyToken_ = addr(value1_);
+
+            require(canSellErc20[sellToken_] || canSellErc721[sellToken_],
+                "dex-selltoken-not-listed");
+            require(canBuyErc20[buyToken_] || canBuyErc721[buyToken_],
+                "dex-buytoken-not-listed");
+
+            denyToken[sellToken_][buyToken_] = false;
+        } else if (what_ == "denyTokenPair") {
+
+            address sellToken_ = addr(value_);
+            address buyToken_ = addr(value1_);
+
+            require(canSellErc20[sellToken_] || canSellErc721[sellToken_],
+                "dex-selltoken-not-listed");
+            require(canBuyErc20[buyToken_] || canBuyErc721[buyToken_],
+                "dex-buytoken-not-listed");
+
+            denyToken[sellToken_][buyToken_] = true;
         } else if (what_ == "fixFee") {
 
             fixFee = uint256(value_);
@@ -450,6 +472,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint feeV_;
         uint sellT_;
         uint buyT_;
+        
+        require(!denyToken[sellToken_][buyToken_], "dex-cant-use-this-token-to-buy");
 
         _updateRates(sellToken_, buyToken_);    // update currency rates
 
@@ -794,7 +818,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             sellT_ = sellAmtOrId_;
         }
 
-        require(!denyToken[payTo_][sellToken_],
+        require(!denyToken[sellToken_][payTo_],
             "dex-token-denied-by-seller");
 
         if (payTo_ == address(asm) ||
@@ -814,7 +838,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     */
     function setDenyToken(address token_, bool denyOrAccept_) public {
         require(canSellErc20[token_] || canSellErc721[token_], "dex-can-not-use-anyway");
-        denyToken[msg.sender][token_] = denyOrAccept_;
+        denyToken[token_][msg.sender] = denyOrAccept_;
     }
 
     /*
@@ -833,7 +857,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         return (canSellErc20[token_] ||
                 canSellErc721[token_]) &&
-                !denyToken[seller_][token_];
+                !denyToken[token_][seller_];
     }
 
 

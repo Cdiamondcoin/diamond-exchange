@@ -63,7 +63,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         public overCollRatio;                              // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
     mapping(bytes32 => uint)
         public overCollRemoveRatio;                        // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
-    mapping(address => uint) public maxCollCustV;          // maximum value of dpass and dcdc tokens a custodian is allowed to mint
+    mapping(address => uint) public capCustV;          // maximum value of dpass and dcdc tokens a custodian is allowed to mint
 
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool public locked;                                    // variable prevents to exploit by recursively calling funcions
@@ -269,7 +269,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         if(Dpass(token_).ownerOf(tokenId_) == address(this)) {
             _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
             if(price_ >= basePrice[token_][tokenId_])
-                _requireMaxCollCustV(custodian_); // TODO: test
+                _requireCapCustV(custodian_); // TODO: test
         }
 
         basePrice[token_][tokenId_] = price_;
@@ -280,9 +280,9 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
     */
     // TODO: test
-    function setMaxCollCustV(address custodian_, uint256 maxCollCustV_) public nonReentrant auth {
+    function setCapCustV(address custodian_, uint256 capCustV_) public nonReentrant auth {
         require(custodians[custodian_], "asm-should-be-custodian");
-        maxCollCustV[custodian_] = maxCollCustV_;
+        capCustV[custodian_] = capCustV_;
     }
 
     /**
@@ -456,7 +456,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(dcdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).mint(dst_, amt_);
         _updateDcdcV(token_, dst_);
-        _requireMaxCollCustV(dst_); // TODO: test
+        _requireCapCustV(dst_); // TODO: test
     }
 
     /**
@@ -520,7 +520,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             currentHashingAlgorithm_);
 
         setBasePrice(token_, id_, price_);
-        _requireMaxCollCustV(custodian_); // TODO: test
+        _requireCapCustV(custodian_); // TODO: test
     }
 
     /*
@@ -661,6 +661,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @dev  Default function for eth payment. We accept ether as payment.
     */
     function () external payable {
+        require(msg.value > 0, "asm-check-the-function-signature");
     }
 
     function _burn(address token_, uint256 amt_) internal {
@@ -802,7 +803,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /**
-    * @dev The total value paid to custodian must be less then the total value of sold assets
+    * @dev The total value paid to custodian must be less then the total value of current cdc share, and dpass sold. 
     */
     function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view {
         require(
@@ -816,12 +817,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /*
-    * @dev This function will revert if custodian has reached his maxCollCustV. Asm enables to limit how much total worth
-    * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians.
+    * @dev This function will revert if custodian has reached his value cap (capCustV - custodian capacity
+    * value in base currency). Asset management enables to limit how much total worth
+    * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians, and avoid some custodian fraud cases.
     */
-    function _requireMaxCollCustV(address custodian_) internal view {
+    function _requireCapCustV(address custodian_) internal view {
         require(
-            maxCollCustV[custodian_] <=
+            capCustV[custodian_] <=
             add(
                 add(
                     totalDpassCustV[custodian_],

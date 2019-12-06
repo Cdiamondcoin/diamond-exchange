@@ -216,3 +216,5 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         feeToCustodianT_ = sub(feeAmt_, feeT_);
     }
 }
+// TODO: event fire
+// TODO: redeemId
