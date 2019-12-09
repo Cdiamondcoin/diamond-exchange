@@ -216,7 +216,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(user_ != address(0x0), "dex-wrong-address");
 
             kyc[user_] = uint(value1_) > 0;
-        } else if (what_ == "allowTokenPair") {
+        } else if (what_ == "allowTokenPair") {         // TODO: test
 
             address sellToken_ = addr(value_);
             address buyToken_ = addr(value1_);
@@ -227,7 +227,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
                 "dex-buytoken-not-listed");
 
             denyToken[sellToken_][buyToken_] = false;
-        } else if (what_ == "denyTokenPair") {
+        } else if (what_ == "denyTokenPair") {          // TODO: test
 
             address sellToken_ = addr(value_);
             address buyToken_ = addr(value1_);
@@ -274,14 +274,6 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
                 "dex-wrong-pricefeed-address");
 
             priceFeed[addr(value_)] = TrustedFeedLikeDex(addr(value1_));
-
-        } else if (what_ == "fixFee") {
-
-            fixFee = uint256(value_);
-
-        } else if (what_ == "varFee") {
-
-            varFee = uint256(value_);
 
         } else if (what_ == "takeProfitOnlyInDpt") {
 
@@ -431,9 +423,12 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         address redeemToken_,
         uint256 redeemAmtOrId_,
         address feeToken_,
-        uint256 feeAmt_
+        uint256 feeAmt_,
+        address payable custodian_
     ) public payable stoppable nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
 
+        require(redeemFeeToken[feeToken_] || feeToken_ == dpt, "dex-token-not-to-pay-redeem-fee");
+        
         if(canBuyErc721[redeemToken_] || canSellErc721[redeemToken_]) {
 
             TrustedErc721(redeemToken_)                                // transfer token to redeemer
@@ -450,11 +445,9 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(false, "dex-token-can-not-be-redeemed");
         }
         
-        if (redeemFeeToken[feeToken_] || feeToken_ == dpt) {
-            _sendToken(redeemToken_, msg.sender, redeemer, redeemAmtOrId_);
-        }
+        _sendToken(feeToken_, msg.sender, redeemer, feeAmt_);
 
-        return Redeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_);
+        return Redeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
     }
 
     /**
@@ -914,8 +907,15 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     * @dev Get sell price of dpass token if price 0 return
     */
     function setBuyPrice(address token_, uint256 tokenId_, uint256 price_) public {
+        address seller_ = msg.sender;
         require(canBuyErc721[token_], "dex-token-not-for-sale");
-        buyPrice[token_][msg.sender][tokenId_] = price_;
+
+        if (                                                                //TODO: test
+            msg.sender == Dpass(token_).getCustodian(tokenId_) &&
+            address(asm) == Dpass(token_).ownerOf(tokenId_)
+        ) seller_ = address(asm);
+
+        buyPrice[token_][seller_][tokenId_] = price_;
     }
 
     /**

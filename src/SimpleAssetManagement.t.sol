@@ -52,9 +52,12 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     mapping(address => uint) public decimals;               // decimal precision of token
     mapping(address => uint) dust;
     mapping(address => bool) dustSet;
+    mapping(address => uint) cap;                           // custodian max collateral capacity
 
     SimpleAssetManagement public asm;                       // SimpleAssetManagement()
     bool showActualExpected;
+    uint price1;
+    uint overCollRemoveRatio;
 
     function setUp() public {
         _createActors();
@@ -65,6 +68,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         _setDecimals();
         _setRates();
         _setFeeds();
+        _setCustodianCap();
         _configAsm();
     }
 
@@ -73,6 +77,10 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.getRate(cdc), 10);
     }
 
+    function testSetRateAsm() public {
+        asm.setRate(cdc, 12.1232312345 ether );
+        assertEq(asm.getRate(cdc), 12.1232312345 ether);
+    }
     function testSetPriceFeedAsm() public {
         asm.setConfig("priceFeed", b(cdc), b(address(0xe)), "diamonds");
         assertEq(asm.priceFeed(cdc), address(0xe));
@@ -306,6 +314,15 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertTrue(asm.priceFeed(eng) == feed[eng]);
     }
 
+    function testSetCapCustV() public {
+        asm.setCapCustV(custodian, 1.231264 ether);
+        asm.setCapCustV(custodian1, 1.231265 ether);
+        asm.setCapCustV(custodian2, 1.231266 ether);
+        assertEqLog("cust setCapCustV() actually set", asm.capCustV(custodian), 1.231264 ether);
+        assertEqLog("cust1 setCapCustV() actually set", asm.capCustV(custodian1), 1.231265 ether);
+        assertEqLog("cust2 setCapCustV() actually set", asm.capCustV(custodian2), 1.231266 ether);
+    }
+    
     function testGetCdcValuesMintAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -345,6 +362,22 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
         assertEq(asm.dcdcV(dcdc1), 0 ether);
         assertEq(asm.dcdcV(dcdc2), 0 ether);
+    }
+
+    function testMintDcdcValuesMintCapNotReachedAsm() public {
+        uint mintAmt = 1 ether;
+        uint capCustV_ = wmul(usdRate[dcdc], mintAmt) + .001 ether;
+        asm.setCapCustV(custodian1, capCustV_);
+        TrustedSASMTester(custodian1).doMintDcdc(dcdc, custodian1, mintAmt);
+        assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
+    }
+
+    function testFailMintDcdcValuesMintAsm() public {
+        // error Revert ("asm-custodian-reached-maximum-coll-value")
+        uint mintAmt = 1 ether;
+        uint capCustV_ = wmul(usdRate[dcdc], mintAmt) - .001 ether;
+        asm.setCapCustV(custodian1, capCustV_);
+        TrustedSASMTester(custodian1).doMintDcdc(dcdc, custodian1, mintAmt);
     }
 
     function testGetDcdcValuesMintBurnAsm() public {
@@ -412,6 +445,32 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.basePrice(dpass, id_), price_ * 2);
         asm.setBasePrice(dpass, id_, price_ * 3);
         assertEq(asm.basePrice(dpass, id_), price_ * 3);
+    }
+
+    function testSetBasePriceCapCustVNotReachedAsm() public {
+        uint price_ = 100 ether;
+        uint capCustV_ = 100.1 ether;
+        require( capCustV_ >= price_, "test-customer-cap-gt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, price_);
+        assertEq(asm.basePrice(dpass, id_), price_);
+    }
+
+    function testFailSetBasePriceCapCustVReachedAsm() public {
+        // error Revert ("asm-custodian-reached-maximum-coll-value")
+        uint price_ = 100 ether;
+        uint capCustV_ = 80 ether;
+        require( capCustV_ <= price_, "test-customer-cap-lt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, price_);
     }
 
     function testStoppedMintStillWorksAsm() public {
@@ -992,6 +1051,46 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEqLog( "price is what was set", asm.basePrice(dpass, id_), price_);
     }
 
+    function testMintDpassCapCustSetAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        asm.setCapCustV(custodian1, price_); 
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        (
+            bytes32 issuer,
+            bytes32 report,
+            bytes32 state,
+            bytes20 cccc,
+            uint24 carat,
+            bytes32 attributesHash) = Dpass(dpass).getDiamond(id_);
+
+        assertEqLog("owneo is asm", Dpass(dpass).ownerOf(id_), address(asm));
+        assertEqLog("custodian1 is custodian1", Dpass(dpass).getCustodian(id_), custodian1);
+        assertEqLog("GIA is GIA", Dpass(dpass).getCustodian(id_), custodian1);
+        assertEqLog("issuer is what is set", issuer, "GIa");
+        assertEqLog("report is what is set", report, "11211211");
+        assertEqLog("state is what is set", state, "sale");
+        assertEqLog("cccc is what is set", cccc, cccc_);
+        assertEqLog("carat is what is set", carat, 1);
+        assertEqLog("attr.hash is what is set", attributesHash, b(0xef));
+        assertEqLog( "price is what was set", asm.basePrice(dpass, id_), price_);
+    }
+
+    function testFailMintDpassCapCustSetAsm() public {
+        // error Revert ("asm-custodian-reached-maximum-coll-value")
+        uint price_ = 100 ether;
+        uint capCustV_ = price_ - .0001 ether;
+        require(capCustV_ < price_, "test-cap-lt-dpass-value");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        asm.setCapCustV(custodian1, price_); 
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+
+    }
+
     function testFailCustodianMintDpassNotToSelfAsm() public {
         // error Revert ("asm-mnt-can-not-mint-for-dst")
         uint price_ = 100 ether;
@@ -1034,6 +1133,319 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
             ) = Dpass(dpass).getDiamond(id_);
         assertEqLog("state did change", state, stateTo_);
     }
+
+    function testSetStateDpassSaleInvalidCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), 0);
+
+    }
+
+    function testSetStateDpassSaleRemovedCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "removed"; // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
+        Dpass(dpass).enableTransition("sale", stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), 0);
+
+    }
+
+    function testSetStateDpassValidInvalidCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "invalid";
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), 0);
+
+    }
+
+    function testSetStateDpassValidRemovedCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateTo_ = "removed"; // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107", price_);
+        Dpass(dpass).enableTransition("valid", stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), 0);
+
+    }
+
+    function testSetStateDpassRedeemedValidCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "redeemed"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "valid";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassInvalidValidCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "invalid"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "valid";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassRemovedValidCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "removed"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "valid";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassRedeemedSaleCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "redeemed"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "sale";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassInvalidSaleCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "invalid"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "sale";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassRemovedSaleCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "removed"; // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "sale";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+        assertEqLog("minted redeemed no coll change", asm.totalDpassCustV(custodian), 0);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to zero", asm.totalDpassCustV(custodian), price_);
+
+    }
+
+    function testSetStateDpassSaleRemoveCollateralChangeAsm() public {
+        uint price_ = 100 ether;
+        price1 = 200 ether;
+        uint cdcV_ = 95.23 ether;
+        overCollRemoveRatio = 1.05 ether;
+        uint cdcT_ = asm.wdivT(cdcV_, usdRate[cdc], cdc);
+        uint id_;
+        uint id1_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "sale";     // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "removed";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        asm.setConfig("overCollRatio", b(uint(overCollRemoveRatio)), "", "diamonds");
+        asm.setConfig("overCollRemoveRatio", b(uint(overCollRemoveRatio)), "", "diamonds");
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+
+
+        asm.mint(cdc, address(this), cdcT_);
+
+        id1_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211212", stateFrom_, cccc_, 1, b(0xef), "20191107", price1);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id1_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id1_);
+        assertEqLog("state did change", state, stateTo_);
+        assertEqLog("collateral went to price_", asm.totalDpassCustV(custodian), price_);
+
+    }
+    uint daiV;
+    uint daiT;
+    uint price2;
+    uint id;
+    uint id1;
+    uint id2;
+    function testFailSetStateDpassSaleRemoveCollateralChangePaidLessThanSoldAsm() public {
+        // error Revert ("asm-too-much-withdrawn")
+        uint price_ = 50 ether;
+        price1 = 50 ether;
+        price2 = 1000 ether;
+        uint cdcV_ = 95.23 ether;
+        daiV = cdcV_;
+        overCollRemoveRatio = 1.05 ether;
+        uint cdcT_ = asm.wdivT(cdcV_, usdRate[cdc], cdc);
+        daiT = asm.wdivT(daiV, usdRate[dai], dai);
+        uint id_;
+        uint id1_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        bytes8 stateFrom_ = "sale";     // DO NOT CHANGE THIS
+        bytes8 stateTo_ = "removed";    // DO NOT CHANGE THIS
+
+        Dpass(dpass).setCccc(cccc_, true);
+        asm.setConfig("overCollRatio", b(uint(overCollRemoveRatio)), "", "diamonds");
+        asm.setConfig("overCollRemoveRatio", b(uint(overCollRemoveRatio)), "", "diamonds");
+        id_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211211", stateFrom_, cccc_, 1, b(0xef), "20191107", price_);
+
+
+
+        id1_ = TrustedSASMTester(custodian).doMintDpass(dpass, custodian, "GIA", "11211212", stateFrom_, cccc_, 1, b(0xef), "20191107", price1);
+        asm.mint(cdc, address(this), cdcT_);
+        DSToken(dai).transfer(address(asm), daiT);
+        asm.notifyTransferFrom(dai, address(this), address(asm), daiT);
+        TrustedSASMTester(custodian1).doWithdraw(dai, daiT);
+
+        id2 = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIA", "11211213", stateFrom_, cccc_, 1, b(0xef), "20191107", price2);
+        Dpass(dpass).enableTransition(stateFrom_, stateTo_);
+        asm.setStateDpass(dpass, id1_, stateTo_);
+        (
+            ,
+            ,
+            bytes32 state,
+            ,
+            ,
+            ) = Dpass(dpass).getDiamond(id1_);
+        assertEqLog("state did change", state, stateTo_);
+    }
+
 /*
     function testSetStateDpassArrayAsm() public {
         uint price_ = 100 ether;
@@ -1078,6 +1490,20 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         guard.forbid(address(this), address(asm), ANY);
 
         asm.setConfig("overCollRatio", b(overCollRatio_), "", "diamonds");
+    }
+
+    function testFailAuthCheckSetRateAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setRate(cdc, 1 ether);
+    }
+
+    function testFailAuthCheckSetCapCustVAsm() public {
+        asm.setOwner(user);
+        guard.forbid(address(this), address(asm), ANY);
+
+        asm.setCapCustV(custodian, 1 ether);
     }
 
     function testFailAuthCheckGetRateNewestAsm() public {
@@ -1528,6 +1954,12 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         feed[dcdc2] = address(new TestFeedLike(usdRate[dcdc2], true));
     }
 
+    function _setCustodianCap() internal {
+       cap[custodian] = uint(-1);           // we set infinite cap on custodian 
+       cap[custodian1] = uint(-1);           // we set infinite cap on custodian 
+       cap[custodian2] = uint(-1);           // we set infinite cap on custodian 
+    }
+
     function _configAsm() internal {
         asm.setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
         asm.setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
@@ -1559,6 +1991,11 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("custodians", b(custodian), b(true), "diamonds");
         asm.setConfig("custodians", b(custodian1), b(true), "diamonds");
         asm.setConfig("custodians", b(custodian2), b(true), "diamonds");
+
+        asm.setCapCustV(custodian, cap[custodian]);
+        asm.setCapCustV(custodian1, cap[custodian1]);
+        asm.setCapCustV(custodian2, cap[custodian2]);
+
 
         asm.setConfig("payTokens", b(dpt), b(true), "diamonds");
         asm.setConfig("payTokens", b(dai), b(true), "diamonds");

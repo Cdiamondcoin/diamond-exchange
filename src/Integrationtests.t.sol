@@ -1,12 +1,13 @@
 pragma solidity ^0.5.11;
 
 // TODO: asm move to other asm test!!!!! PRIORITY
+// TODO: show how to introduce new buy token (denyToken, feeds, etc)
 // TODO: user sells diamonds
 // TODO: setup scenario
 // TODO: invalid diamond who does what
 // TODO: simple setup scenario
 // TODO: custodian adds diamond wrong this is how we correnct ir
-// TODO: upgrade asm or dex functionality
+// TODO: upgrade asm or exchange functionality
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: test for each basic use-case to demonstrate usability
 
@@ -32,6 +33,7 @@ import "./SimpleAssetManagement.sol";
 import "./Liquidity.sol";
 import "./Dcdc.sol";
 import "./FeeCalculator.sol";
+import "./Redeemer.sol";
 
 contract IntegrationsTest is DSTest {
 
@@ -47,6 +49,7 @@ contract IntegrationsTest is DSTest {
     address payable exchange;
     address payable liq;
     address fca;
+    address payable red;
 
     address payable user;
     address payable user1;
@@ -110,7 +113,7 @@ contract IntegrationsTest is DSTest {
         _createContracts();
         _createActors();
         _setupGuard();
-        _prepareTestMintCdcInt();
+        _setupContracts();
     }
 
     function test1MintCdcInt() public {             // use-case 1. Mint Cdc
@@ -132,7 +135,7 @@ contract IntegrationsTest is DSTest {
                                         );
         SimpleAssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
-                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from dex to mint to user
+                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
         assertEqLog("cdc-minted-to-user", DSToken(cdc).balanceOf(user), 1 ether);
     }
 
@@ -140,7 +143,7 @@ contract IntegrationsTest is DSTest {
 
         SimpleAssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
-                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from dex to mint to user
+                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
     }
 
     function test2MintDpassInt() public {              // use-case 2. Mint Dpass
@@ -169,10 +172,10 @@ contract IntegrationsTest is DSTest {
 
         uint daiPaid = 100 ether; 
 
-        DSToken(dai).transfer(user, daiPaid);      // send 10 DAI to user, so he can use it to buy CDC
+        DSToken(dai).transfer(user, daiPaid);       // send 10 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
+            .doApprove(dai, exchange, uint(-1));         // user must approve exchange in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
@@ -303,7 +306,7 @@ contract IntegrationsTest is DSTest {
             daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
             dpass,
             id
-        );                                          // error Revert ("dex-sell-amount-exceeds-allowance")
+        );                                          // error Revert ("exchange-sell-amount-exceeds-allowance")
 
         logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
         logUint("varFee", DiamondExchange(exchange).varFee(), 18);
@@ -314,6 +317,49 @@ contract IntegrationsTest is DSTest {
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
     }
 
+    function test4RedeemCdcInt() public {
+
+        uint daiPaid = 4000 ether; 
+        require(daiPaid > 500 ether, "daiPaid should cover the costs of redeem");
+        TesterActor(custodian).doMintDcdc(dcdc, custodian, 1000 ether);         // custodian mints 1000 dcdc token, meaning he has 1000 actual physical cdc diamonds on its stock
+
+        DSToken(dai).transfer(user, daiPaid);                                   // send 4000 DAI to user, so he can use it to buy CDC
+
+        TesterActor(user)
+            .doApprove(dai, exchange, uint(-1));                                     // user must approve exchange in order to trade
+
+        TesterActor(user)
+            .doApprove(cdc, exchange, uint(-1));                                     // user must approve exchange in order to trade
+
+        TesterActor(user).doBuyTokensWithFee(dai, daiPaid - 500 ether, cdc, uint(-1));      // user buys cdc that he will redeem later
+
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+        logUint("user-cdc-balance-before-red", DSToken(cdc).balanceOf(user), 18);
+
+        uint redeemId =  TesterActor(user).doRedeem(                            // user redeems cdc token
+                                   cdc,                                         // cdc is the token user wants to redeem
+                                   uint(DSToken(cdc).balanceOf(user)),          // user sends all cdc he has got
+                                   dai,                                         // user pays redeem fee in dai
+                                   uint(500 ether),                             // the amount is determined by frontend and must cover shipping cost of ...
+                                                                                // ... custodian and 3% of redeem cost for Cdiamondcoin
+                                   custodian);                                  // the custodian user gets diamonds from. This is also set by frontend.
+
+        logUint("fixFee !! DISPLAYS WRONG 0.03:", Redeemer(red).fixFee(), 18);                          // DISPLAYS 0.03 wrong, this is a bug!
+        logUint("varFee", Redeemer(red).varFee(), 18);
+        logUint("user-cdc-balance-after-red", DSToken(cdc).balanceOf(user), 18);
+        logUint("user-redeem-id", redeemId, 18);
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
+        logUint("custodian-dai-balance", DSToken(dai).balanceOf(custodian), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+    }
+
+//---------------------------end-of-tests-------------------------------------------------------------------
     function logUint(bytes32 what, uint256 num, uint256 dec) public {
         emit LogUintIpartUintFpart( what, num / 10 ** dec, num % 10 ** dec);
     }
@@ -351,7 +397,7 @@ contract IntegrationsTest is DSTest {
         //--------------------oracles-update-price-data--------------------------------end
     }
 
-    function _prepareTestMintCdcInt() internal {
+    function _setupContracts() internal {
         cdcUsdRate = 80 ether;
         dptUsdRate = 100 ether;
         ethUsdRate = 150 ether;
@@ -457,18 +503,21 @@ contract IntegrationsTest is DSTest {
         // DiamondExchange(exchange).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
         DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));     // set eth as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(exchange).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
         DiamondExchange(exchange).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
         DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dai), b(true));     // set dai as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
         DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
         DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dpt), b(true));     // set dpt as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("dpt", b(dpt), "");                         // tell exhcange which one is the DPT token
         DiamondExchange(exchange).setConfig("liq", b(liq), "");                         // set liquidity contract
@@ -477,11 +526,10 @@ contract IntegrationsTest is DSTest {
         DiamondExchange(exchange).setConfig("wal", b(wal), b(""));                      // set wallet to store cost part of fee received from users
 
         DiamondExchange(exchange).setConfig("fixFee", b(uint(0 ether)), b(""));         // fixed part of fee that is independent of purchase value
-        DiamondExchange(exchange).setConfig("varFee", b(uint(0.04 ether)), b(""));      // percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
+        DiamondExchange(exchange).setConfig("varFee", b(uint(0.03 ether)), b(""));      // percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
         DiamondExchange(exchange).setConfig("profitRate", b(uint(0.1 ether)), b(""));   // percentage value telling how much of total fee goes to profit of DPT owners
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
-
-        //-------------setup-asm------------------------------------------------------------
+       //-------------setup-asm------------------------------------------------------------
 
         SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for exchange)
         SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
@@ -503,9 +551,37 @@ contract IntegrationsTest is DSTest {
         SimpleAssetManagement(asm).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
 
         SimpleAssetManagement(asm).setConfig("overCollRatio", b(uint(1.1 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
-        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by dex
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));   // enable the dpass tokens of asm to be handled by dex
+        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by exchange
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));        // enable the dpass tokens of asm to be handled by exchange
         SimpleAssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
+        SimpleAssetManagement(asm).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
+
+        SimpleAssetManagement(asm).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asm as for exchange)
+        SimpleAssetManagement(asm).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        SimpleAssetManagement(asm).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18
+        SimpleAssetManagement(asm).setConfig("dcdcs", b(dcdc), b(true), "diamonds");                 // tell asm that dcdc is indeed a dcdc token
+        SimpleAssetManagement(asm).setConfig("rate", b(dcdc), b(cdcUsdRate), "diamonds");            // set rate for token
+
+
+//--------------setup-redeemer-------------------------------------------------------
+        Redeemer(red).setConfig("asm", b(asm), "", "");                             // tell redeemer the address of asset management
+        Redeemer(red).setConfig("exchange", b(exchange), "", "");                             // tell redeemer the address of exchange
+        Redeemer(red).setConfig("burner", b(burner), "", "");                       // tell redeemer the address of burner
+        Redeemer(red).setConfig("wal", b(wal), "", "");                             // tell redeemer the address of burner
+        Redeemer(red).setConfig("fixFee", b(uint(0 ether)), "", "");                      // tell redeemer the fixed fee in base currency that is taken from total redeem fee is 0
+
+        Redeemer(red).setConfig("varFee", b(0.03 ether), "", "");                   // tell redeemer the variable fee, or fee percent
+        
+        Redeemer(red).setConfig(
+            "profitRate",
+            b(DiamondExchange(exchange).profitRate()), "", "");                          // tell redeemer the profitRate (should be same as we set in exchange), the rate of profit belonging to dpt owners
+        
+        Redeemer(red).setConfig("dcdcOfCdc", b(cdc), b(dcdc), "");                  // do a match between cdc and matching dcdc token
+        Redeemer(red).setConfig("dpt", b(dpt), "", "");                             // set dpt token address for redeemer
+        Redeemer(red).setConfig("liq", b(liq), "", "");                             // set liquidity contract address for redeemer
+        Redeemer(red).setConfig("liqBuysDpt", b(false), "", "");                    // set if liquidity contract should buy dpt on the fly for sending as fee
+        // Redeemer(red).setConfig("dust", b(uint(1000)), "", "");                  // it is optional to set dust, its default value is 1000
+        DiamondExchange(exchange).setConfig("redeemer", b(red), b(""));                      // set wallet to store cost part of fee received from users
     }
 
     function _createTokens() internal {
@@ -570,10 +646,12 @@ contract IntegrationsTest is DSTest {
         emit LogTest("cerate DiamondExchange");
         exchange = address(uint160(address(new DiamondExchange())));
         emit LogTest(ourGas - gasleft());
+        red = address(uint160(address(new Redeemer())));
 
         liq = address(uint160(address(new Liquidity())));                           // DPT liquidity pprovider contract
         DSToken(dpt).transfer(liq, INITIAL_BALANCE);
         Liquidity(liq).approve(dpt, exchange, uint(-1));
+        Liquidity(liq).approve(dpt, red, uint(-1));
 
         fca = address(uint160(address(new FeeCalculator())));                       // fee calculation contract
     }
@@ -610,11 +688,17 @@ contract IntegrationsTest is DSTest {
         guard.permit(address(asm), cdc, ANY);
         guard.permit(address(asm), cdc1, ANY);
         guard.permit(address(asm), cdc2, ANY);
+        guard.permit(address(asm), dcdc, ANY);
+        guard.permit(address(asm), dcdc1, ANY);
+        guard.permit(address(asm), dcdc2, ANY);
         guard.permit(address(asm), dpass, ANY);
         guard.permit(address(asm), dpass1, ANY);
         guard.permit(address(asm), dpass2, ANY);
         guard.permit(exchange, asm, ANY);
         guard.permit(exchange, liq, ANY);
+        guard.permit(red, liq, ANY);
+        guard.permit(red, asm, ANY);
+        guard.permit(red, exchange, ANY);
 
         guard.permit(custodian, address(asm), bytes4(keccak256("getRateNewest(address)")));
         guard.permit(custodian, address(asm), bytes4(keccak256("getRate(address)")));
@@ -932,6 +1016,34 @@ contract DiamondExchangeTester is Wallet, DSTest {
         } else {
 
             DiamondExchange(exchange).buyTokensWithFee(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+        }
+    }
+
+    function doRedeem(
+        address redeemToken_,
+        uint256 redeemAmtOrId_,
+        address feeToken_,
+        uint256 feeAmt_,
+        address payable custodian_
+    ) public payable returns (uint) {
+        if (feeToken_ == address(0xee)) {
+
+            return  DiamondExchange(exchange)
+                .redeem
+                .value(feeAmt_ == uint(-1) ? address(this).balance : feeAmt_ > address(this).balance ? address(this).balance : feeAmt_)
+
+                (redeemToken_,
+                redeemAmtOrId_,
+                feeToken_,
+                feeAmt_,
+                custodian_);
+        } else {
+            return  DiamondExchange(exchange).redeem(
+                redeemToken_,
+                redeemAmtOrId_,
+                feeToken_,
+                feeAmt_,
+                custodian_);
         }
     }
 

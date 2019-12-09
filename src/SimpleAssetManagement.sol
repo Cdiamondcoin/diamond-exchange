@@ -21,7 +21,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
     event LogTransferEth(address src, address dst, uint256 amount);
-    event LogBasePrice(address token_, uint256 tokenId_);
+    event LogBasePrice(address sender_, address token_, uint256 tokenId_, uint256 price_);
     event LogCdcValue(uint256 totalCdcV, bytes32 domain, uint256 cdcValue, address token);
     event LogDcdcValue(uint256 totalDcdcV, bytes32 domain, uint256 ddcValue, address token);
     event LogDcdcCustodianValue(uint256 totalDcdcCustV, uint256 dcdcCustV, address dcdc, address custodian);
@@ -29,12 +29,17 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     event LogDpassValue(uint256 totalDpassCustV, uint256 totalDpassV, address custodian, bytes32 domain);
     event LogForceUpdateCollateralDpass(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
     event LogForceUpdateCollateralDcdc(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
+    //TODO: remove LogTest
+    event LogTest(uint256 what);
+    event LogTest(bool what);
+    event LogTest(address what);
+    event LogTest(bytes32 what);
 
     mapping(
         address => mapping(
             uint => uint)) public basePrice;               // the base price used for collateral valuation
-    mapping(address => bool) public custodians;                    // returns true for custodians
-    mapping(address => uint)                                // total base currency value of custodians collaterals
+    mapping(address => bool) public custodians;            // returns true for custodians
+    mapping(address => uint)                               // total base currency value of custodians collaterals
         public totalDpassCustV;
     mapping(address => uint) private rate;                  // current rate of a token in base currency
     mapping(address => uint) public cdcV;                  // base currency value of cdc token
@@ -90,7 +95,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         locked = false;
     }
 
-  //-----------included-from-ds-math---------------------------------begin
+//-----------included-from-ds-math---------------------------------begin
     uint constant WAD = 10 ** 18;
 
     function add(uint x, uint y) internal pure returns (uint z) {
@@ -221,7 +226,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     /**
      * @dev Set rate (price in base currency) for token.
      */
-    // TODO: test
     function setRate(address token_, uint256 value_) public nonReentrant auth {
         setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
@@ -259,27 +263,15 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /**
-    * @dev Set base price_ for a diamond. This function should be used by oracles to update values of diamonds for sale.
+    * @dev Set base price_ for a diamond. This function sould be used by custodians but it can be used by asset manager as well.
     */
-    function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public auth {
-        require(dpasses[token_], "asm-invalid-token-address");
-        address custodian_ = Dpass(token_).getCustodian(tokenId_);
-        require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
-
-        if(Dpass(token_).ownerOf(tokenId_) == address(this)) {
-            _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
-            if(price_ >= basePrice[token_][tokenId_])
-                _requireCapCustV(custodian_); // TODO: test
-        }
-
-        basePrice[token_][tokenId_] = price_;
-        emit LogBasePrice(token_, tokenId_);
+    function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public nonReentrant auth {
+        _setBasePrice(token_, tokenId_, price_);
     }
 
     /**
     * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
     */
-    // TODO: test
     function setCapCustV(address custodian_, uint256 capCustV_) public nonReentrant auth {
         require(custodians[custodian_], "asm-should-be-custodian");
         capCustV[custodian_] = capCustV_;
@@ -456,7 +448,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(dcdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).mint(dst_, amt_);
         _updateDcdcV(token_, dst_);
-        _requireCapCustV(dst_); // TODO: test
+        _requireCapCustV(dst_);
     }
 
     /**
@@ -519,14 +511,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             attributesHash_,
             currentHashingAlgorithm_);
 
-        setBasePrice(token_, id_, price_);
-        _requireCapCustV(custodian_); // TODO: test
+        _setBasePrice(token_, id_, price_);
+        _requireCapCustV(custodian_);
     }
 
     /*
     * @dev Set state for dpass. Should be used primarily by custodians.
     */
-    // TODO: test
     function setStateDpass(address token_, uint256 tokenId_, bytes8 state_) public nonReentrant auth {
         bytes32 prevState_;
         address custodian_;
@@ -537,7 +528,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(
             !custodians[msg.sender] ||
             msg.sender == custodian_,
-            "asm-sds-not-authorized");
+            "asm-ssd-not-authorized");
 
         prevState_ = Dpass(token_).getState(tokenId_);
 
@@ -650,11 +641,33 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /*
-    * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens custodian.
+    * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dcdc tokens of custodian.
     */
     function setCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
         emit LogForceUpdateCollateralDcdc(msg.sender, positiveV_, negativeV_, custodian_);
+    }
+
+    
+    /**
+    * @dev Set base price_ for a diamond. 
+    */
+    function _setBasePrice(address token_, uint256 tokenId_, uint256 price_) internal {
+        bytes32 state_;
+        require(dpasses[token_], "asm-invalid-token-address");
+        state_ = Dpass(token_).getState(tokenId_);
+        address custodian_ = Dpass(token_).getCustodian(tokenId_);
+        require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
+
+        if(Dpass(token_).ownerOf(tokenId_) == address(this) &&
+          (state_ == "valid" || state_ == "sale")) {                                        // TODO: test
+            _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
+            if(price_ >= basePrice[token_][tokenId_])
+                _requireCapCustV(custodian_); 
+        }
+
+        basePrice[token_][tokenId_] = price_;
+        emit LogBasePrice(msg.sender, token_, tokenId_, price_);
     }
 
     /*
@@ -822,13 +835,12 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians, and avoid some custodian fraud cases.
     */
     function _requireCapCustV(address custodian_) internal view {
+        if(capCustV[custodian_] != uint(-1))
         require(
-            capCustV[custodian_] <=
-            add(
+            add(capCustV[custodian_], dust) >=
                 add(
                     totalDpassCustV[custodian_],
                     totalDcdcCustV[custodian_]),
-                dust),
             "asm-custodian-reached-maximum-coll-value");
     }
 
@@ -896,7 +908,5 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 }
 
-// TODO: redeem func
 // TODO: be able to ban custodian sale
-// TODO: document functions
-// TODO: auth thests
+// TODO: check price multiplier for base price!! implement it to multiply basePrice and to be able to change the prices with only one tx.

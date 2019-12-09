@@ -4290,6 +4290,34 @@ contract DiamondExchangeTester is Wallet, DSTest {
         }
     }
 
+    function doRedeem(
+        address redeemToken_,
+        uint256 redeemAmtOrId_,
+        address feeToken_,
+        uint256 feeAmt_,
+        address payable custodian_
+    ) public payable returns (uint) {
+        if (feeToken_ == address(0xee)) {
+
+            return  DiamondExchange(exchange)
+                .redeem
+                .value(feeAmt_ == uint(-1) ? address(this).balance : feeAmt_ > address(this).balance ? address(this).balance : feeAmt_)
+
+                (redeemToken_,
+                redeemAmtOrId_,
+                feeToken_,
+                feeAmt_,
+                custodian_);
+        } else {
+            return  DiamondExchange(exchange).redeem(
+                redeemToken_,
+                redeemAmtOrId_,
+                feeToken_,
+                feeAmt_,
+                custodian_);
+        }
+    }
+
     function doSetConfig(bytes32 what, address value_, address value1_) public { doSetConfig(what, b32(value_), b32(value1_)); }
     function doSetConfig(bytes32 what, address value_, bytes32 value1_) public { doSetConfig(what, b32(value_), value1_); }
     function doSetConfig(bytes32 what, address value_, uint256 value1_) public { doSetConfig(what, b32(value_), b32(value1_)); }
