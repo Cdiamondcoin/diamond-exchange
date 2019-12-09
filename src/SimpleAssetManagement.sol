@@ -340,7 +340,12 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @param dst_ address the destination address the token_ has been sent to
     * @param amtOrId_ uint the amount of tokens sent if token_ is a DSToken or the id of token_ if token_ is a Dpass token_.
     */
-    function notifyTransferFrom(address token_, address src_, address dst_, uint256 amtOrId_) external nonReentrant auth {
+    function notifyTransferFrom(
+        address token_,
+        address src_,
+        address dst_,
+        uint256 amtOrId_
+    ) external nonReentrant auth {
         uint balance;
         address custodian;
         bytes32 domain = domains[token_];
@@ -407,7 +412,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
 
         } else if (dpasses[token_]) {                                        // user sells erc721 token_ to other users
 
-            require(payTokens[token_], "asm-token-not-accepted");
+            // require(payTokens[token_], "asm-token-not-accepted");
 
         }  else {
             require(false, "asm-unsupported-tx");

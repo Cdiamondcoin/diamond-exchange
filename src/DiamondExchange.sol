@@ -431,7 +431,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         
         if(canBuyErc721[redeemToken_] || canSellErc721[redeemToken_]) {
 
-            TrustedErc721(redeemToken_)                                // transfer token to redeemer
+            Dpass(redeemToken_)                                // transfer token to redeemer
             .transferFrom(
                 msg.sender,
                 redeemer,

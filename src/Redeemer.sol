@@ -158,7 +158,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         if( asm.dpasses(redeemToken_) ) {
 
             Dpass(redeemToken_).redeem(redeemAmtOrId_);
-            custodian_ = address(uint160(Dpass(redeemToken_).getCustodian(redeemAmtOrId_)));
+            require(custodian_ == address(uint160(Dpass(redeemToken_).getCustodian(redeemAmtOrId_))), "red-wrong-custodian-provided");
 
         } else if ( asm.cdcs(redeemToken_) ) {
 

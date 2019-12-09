@@ -170,7 +170,7 @@ contract IntegrationsTest is DSTest {
 
     function test3CdcPurchaseInt() public {
 
-        uint daiPaid = 100 ether; 
+        uint daiPaid = 100 ether;
 
         DSToken(dai).transfer(user, daiPaid);       // send 10 DAI to user, so he can use it to buy CDC
 
@@ -211,10 +211,10 @@ contract IntegrationsTest is DSTest {
         logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
     }
-    
-    function test4DpassPurchaseInt() public {       // use-case 4. Dpass purchase 
 
-        uint daiPaid = 4000 ether; 
+    function test4DpassPurchaseInt() public returns(uint id) {       // use-case 4. Dpass purchase
+
+        uint daiPaid = 4000 ether;
 
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
@@ -222,13 +222,13 @@ contract IntegrationsTest is DSTest {
             .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
-        
+
         DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
             "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
-        
-        uint id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
+
+        id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
             .doMintDpass(
             dpass,
             custodian,
@@ -242,7 +242,7 @@ contract IntegrationsTest is DSTest {
             "20191107",
             2928.03 ether
         );
-       
+
         TesterActor(user).doBuyTokensWithFee(
             dai,
             daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
@@ -257,12 +257,13 @@ contract IntegrationsTest is DSTest {
         logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
         logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+        assertEqLog("user-is-owner", Dpass(dpass).ownerOf(id), user);
     }
 
-    
-    function testFail4DpassPurchaseInt() public {       // use-case 4. Dpass purchase failure - because single dpass is a collateral to cdc minted. 
 
-        uint daiPaid = 4000 ether; 
+    function testFail4DpassPurchaseInt() public {       // use-case 4. Dpass purchase failure - because single dpass is a collateral to cdc minted.
+
+        uint daiPaid = 4000 ether;
 
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
@@ -270,12 +271,12 @@ contract IntegrationsTest is DSTest {
             .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
-        
+
         DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
             "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
-        
+
         uint id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
             .doMintDpass(
             dpass,
@@ -301,7 +302,7 @@ contract IntegrationsTest is DSTest {
        //-this-is-the-difference-form-previous-test----------------------------------------
 
         TesterActor(user).doBuyTokensWithFee(       // THIS WILL FAIL!! Because if the only dpass is sold, there would be nothing ...
-                                                    // ... to back the value of CDC sold in previous step.  
+                                                    // ... to back the value of CDC sold in previous step.
             dai,
             daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
             dpass,
@@ -317,38 +318,41 @@ contract IntegrationsTest is DSTest {
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
     }
 
-    function test4RedeemCdcInt() public {
+    function test5RedeemCdcInt() public {
 
-        uint daiPaid = 4000 ether; 
+        uint daiPaid = 4000 ether;
         require(daiPaid > 500 ether, "daiPaid should cover the costs of redeem");
-        TesterActor(custodian).doMintDcdc(dcdc, custodian, 1000 ether);         // custodian mints 1000 dcdc token, meaning he has 1000 actual physical cdc diamonds on its stock
+        TesterActor(custodian).doMintDcdc(dcdc, custodian, 1000 ether);             // custodian mints 1000 dcdc token, meaning he has 1000 actual physical cdc diamonds on its stock
 
-        DSToken(dai).transfer(user, daiPaid);                                   // send 4000 DAI to user, so he can use it to buy CDC
-
-        TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));                                     // user must approve exchange in order to trade
+        DSToken(dai).transfer(user, daiPaid);                                       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(cdc, exchange, uint(-1));                                     // user must approve exchange in order to trade
+            .doApprove(dai, exchange, uint(-1));                                    // user must approve exchange in order to trade
 
-        TesterActor(user).doBuyTokensWithFee(dai, daiPaid - 500 ether, cdc, uint(-1));      // user buys cdc that he will redeem later
+        TesterActor(user)
+            .doApprove(cdc, exchange, uint(-1));                                    // user must approve exchange in order to trade
+
+        TesterActor(user).doBuyTokensWithFee(                                       // user buys cdc that he will redeem later
+            dai, daiPaid - 500 ether, cdc, uint(-1));
 
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
         logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
         logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
         logUint("user-cdc-balance-before-red", DSToken(cdc).balanceOf(user), 18);
+        logUint("user-cdc-balance-before-red", DSToken(cdc).balanceOf(user), 18);
 
-        uint redeemId =  TesterActor(user).doRedeem(                            // user redeems cdc token
-                                   cdc,                                         // cdc is the token user wants to redeem
-                                   uint(DSToken(cdc).balanceOf(user)),          // user sends all cdc he has got
-                                   dai,                                         // user pays redeem fee in dai
-                                   uint(500 ether),                             // the amount is determined by frontend and must cover shipping cost of ...
-                                                                                // ... custodian and 3% of redeem cost for Cdiamondcoin
-                                   custodian);                                  // the custodian user gets diamonds from. This is also set by frontend.
+        uint redeemId =  TesterActor(user).doRedeem(                                // user redeems cdc token
+                                   cdc,                                             // cdc is the token user wants to redeem
+                                   uint(DSToken(cdc).balanceOf(user)),              // user sends all cdc he has got
+                                   dai,                                             // user pays redeem fee in dai
+                                   uint(500 ether),                                 // the amount is determined by frontend and must cover shipping cost of ...
+                                                                                    // ... custodian and 3% of redeem cost for Cdiamondcoin
+                                   custodian);                                      // the custodian user gets diamonds from. This is also set by frontend.
 
-        logUint("fixFee !! DISPLAYS WRONG 0.03:", Redeemer(red).fixFee(), 18);                          // DISPLAYS 0.03 wrong, this is a bug!
-        logUint("varFee", Redeemer(red).varFee(), 18);
+        logUint("redeemer fixFee 0.03:",                                            // DISPLAYS 0.03 wrong, this is a bug!
+                Redeemer(red).fixFee(), 18);
+        logUint("redeemer varFee", Redeemer(red).varFee(), 18);
         logUint("user-cdc-balance-after-red", DSToken(cdc).balanceOf(user), 18);
         logUint("user-redeem-id", redeemId, 18);
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
@@ -359,38 +363,160 @@ contract IntegrationsTest is DSTest {
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
     }
 
+    function test6RedeemDpassInt() public {
+        uint daiPaid = 400 ether;
+
+        DSToken(dai).transfer(user, daiPaid);                                       // send 4000 DAI to user, so he can use it to buy CDC
+
+        TesterActor(user)
+            .doApprove(dai, exchange, uint(-1));                                    // user must approve exchange in order to trade
+
+        uint id = test4DpassPurchaseInt();                                          // first purchase dpass token
+
+        TesterActor(user).doApprove721(dpass, exchange, id);
+
+        uint gas = gasleft();
+        uint redeemId = TesterActor(user).doRedeem(                                 // redeem dpass
+            dpass,
+            id,
+            dai,
+            daiPaid,
+            address(uint160(address(Dpass(dpass).getCustodian(id)))));
+
+        logUint("redeem-gas-used", gas - gasleft(), 18);                            // gas used by redeeming dpass otken
+
+        assertEqLog("diamond-state-is-redeemed",
+                 Dpass(dpass).getState(id), b("redeemed"));
+        logUint("redeemer fixFee (0.03):",                                          // DISPLAYS 0.03 wrong, this is a bug!
+                Redeemer(red).fixFee(), 18);
+        logUint("redeemer varFee", Redeemer(red).varFee(), 18);
+        logUint("user-redeem-id", redeemId, 18);
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
+        logUint("custodian-dai-balance", DSToken(dai).balanceOf(custodian), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+    }
+
+    function test7CreateNewSetOfParametersForDpass() public {
+        Dpass(dpass).setCccc("BR,IF,D,5.00", true);
+
+        uint id = TesterActor(custodian).doMintDpass(
+            dpass,
+            custodian,
+            "GIA",
+            "2134567890",
+            "sale",
+            "BR,IF,D,5.00",
+            511,
+            0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff,
+
+            "20191107",                                                             // here is a hashing algorithm
+            2928.03 ether
+        );
+
+        TesterActor(custodian).doMintDpass(
+            dpass,
+            custodian,
+            "GIA",
+            "2222222222",
+            "sale",
+            "BR,IF,D,5.00",
+            511,
+            0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff,
+
+            "20200101",                                                             // here is a new hashing algorithm
+            2928.03 ether
+        );
+
+        Dpass(dpass).updateAttributesHash(                                          // we update old diamond algo
+            id,
+            0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,
+            "20200101");
+
+        (,
+         bytes32[6] memory attrs,
+         ) = Dpass(dpass).getDiamondInfo(id);
+        
+         assertEqLog("attribute-has-changed",                                       // hash did change
+            attrs[4],
+            0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
+
+        assertEqLog("hashing-algo-has-changed", attrs[5], "20200101");              // hashing algo did change
+
+    }
+    
+    function test8SellDpassToOtherUser() public {
+        uint id = test4DpassPurchaseInt();                      // First user buys dpass token
+        uint daiPaid = 4000 ether;
+
+        DSToken(dai).transfer(user1, daiPaid);                  // send 4000 DAI to the buyer user, so he can use it to buy CDC
+
+        TesterActor(user1)
+            .doApprove(dai, exchange, uint(-1));                // buyer user must approve exchange in order to trade
+
+        TesterActor(user).doApprove721(dpass, exchange, id);    // seller user must approve the exchange
+        TesterActor(user).doSetState(dpass, "sale", id);        // set state to "sale" is also needed in order to work on exchange
+        assertEqLog("user1-has-dai", DSToken(dai).balanceOf(user1), daiPaid);
+        TesterActor(user1).doBuyTokensWithFee(
+            dai,                                                // buyer user wants to pay with dai
+            uint(-1),                                           // buyer user does not set an upper limit for payment, if he has enough token to sell, then the transaction goes through if not then not.
+            dpass,
+            id
+        );
+
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("user1-dai-balance", DSToken(dai).balanceOf(user1), 18);
+        assertEqLog("user-dpass-balance", Dpass(dpass).balanceOf(user), 0);
+        assertEqLog("user1-dpass-balance", Dpass(dpass).balanceOf(user1), 1);
+
+        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
+        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
+        logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
+        logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
+        logUint("liq-dpt-balance", DSToken(dpt).balanceOf(liq), 18);
+        logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
+        assertEqLog("buyer-user-is-now-owner", Dpass(dpass).ownerOf(id), user1);
+
+    }
+
+    function test9CurrencyExchangesWork() public {
+       // TODO: start from here 
+    }
 //---------------------------end-of-tests-------------------------------------------------------------------
     function logUint(bytes32 what, uint256 num, uint256 dec) public {
         emit LogUintIpartUintFpart( what, num / 10 ** dec, num % 10 ** dec);
     }
-    
+
     function _prepareDai() public {
        daiUsdRate = 1 ether;
 
-        daiFeed = new Medianizer();                                          // create medianizer that calculates single price from multiple price sources
+        daiFeed = new Medianizer();                    // create medianizer that calculates single price from multiple price sources
 
-        daiPriceOracle0 = new PriceFeed();                                    // oracle is a single price source that receives price data from several sources
-        daiPriceOracle1 = new PriceFeed();                                    // dai price is updated every once a week
+        daiPriceOracle0 = new PriceFeed();             // oracle is a single price source that receives price data from several sources
+        daiPriceOracle1 = new PriceFeed();             // dai price is updated every once a week
         daiPriceOracle2 = new PriceFeed();
 
-        daiFeed.set(address(daiPriceOracle0));                                                   // add oracle to medianizer to get price data from
+        daiFeed.set(address(daiPriceOracle0));         // add oracle to medianizer to get price data from
         daiFeed.set(address(daiPriceOracle1));
         daiFeed.set(address(daiPriceOracle2));
 
         //--------------------oracles-update-price-data--------------------------------begin
-        daiPriceOracle0.poke(                                                           // oracle update dai price every once a week
+        daiPriceOracle0.poke(                          // oracle update dai price every once a week
             uint128(daiUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        daiPriceOracle1.poke(                                                           // oracle update dai price every once a week
+        daiPriceOracle1.poke(                          // oracle update dai price every once a week
             uint128(daiUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        daiPriceOracle1.poke(                                                           // oracle update dai price every once a week
+        daiPriceOracle1.poke(                          // oracle update dai price every once a week
             uint128(daiUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
         daiFeed.poke();
 
@@ -401,88 +527,88 @@ contract IntegrationsTest is DSTest {
         cdcUsdRate = 80 ether;
         dptUsdRate = 100 ether;
         ethUsdRate = 150 ether;
-        
+
         _prepareDai();
 
-        cdcFeed = new Medianizer();                                          // create medianizer that calculates single price from multiple price sources
+        cdcFeed = new Medianizer();                    // create medianizer that calculates single price from multiple price sources
 
-        cdcPriceOracle0 = new PriceFeed();                                    // oracle is a single price source that receives price data from several sources
-        cdcPriceOracle1 = new PriceFeed();                                    // cdc price is updated every once a week
+        cdcPriceOracle0 = new PriceFeed();             // oracle is a single price source that receives price data from several sources
+        cdcPriceOracle1 = new PriceFeed();             // cdc price is updated every once a week
         cdcPriceOracle2 = new PriceFeed();
 
-        cdcFeed.set(address(cdcPriceOracle0));                                                   // add oracle to medianizer to get price data from
+        cdcFeed.set(address(cdcPriceOracle0));         // add oracle to medianizer to get price data from
         cdcFeed.set(address(cdcPriceOracle1));
         cdcFeed.set(address(cdcPriceOracle2));
 
         //--------------------oracles-update-price-data--------------------------------begin
-        cdcPriceOracle0.poke(                                                           // oracle update cdc price every once a week
+        cdcPriceOracle0.poke(                          // oracle update cdc price every once a week
             uint128(cdcUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        cdcPriceOracle1.poke(                                                           // oracle update cdc price every once a week
+        cdcPriceOracle1.poke(                          // oracle update cdc price every once a week
             uint128(cdcUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        cdcPriceOracle1.poke(                                                           // oracle update cdc price every once a week
+        cdcPriceOracle1.poke(                          // oracle update cdc price every once a week
             uint128(cdcUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
         cdcFeed.poke();
 
         //--------------------oracles-update-price-data--------------------------------end
-        dptFeed = new Medianizer();                                          // create medianizer that calculates single price from multiple price sources
+        dptFeed = new Medianizer();                    // create medianizer that calculates single price from multiple price sources
 
-        dptPriceOracle0 = new PriceFeed();                                    // oracle is a single price source that receives price data from several sources
-        dptPriceOracle1 = new PriceFeed();                                    // dpt price is updated every once a week
+        dptPriceOracle0 = new PriceFeed();             // oracle is a single price source that receives price data from several sources
+        dptPriceOracle1 = new PriceFeed();             // dpt price is updated every once a week
         dptPriceOracle2 = new PriceFeed();
 
-        dptFeed.set(address(dptPriceOracle0));                                          // add oracle to medianizer to get price data from
+        dptFeed.set(address(dptPriceOracle0));         // add oracle to medianizer to get price data from
         dptFeed.set(address(dptPriceOracle1));
         dptFeed.set(address(dptPriceOracle2));
         //--------------------oracles-update-price-data--------------------------------begin
-        dptPriceOracle0.poke(                                                           // oracle update dpt price every once a week
+        dptPriceOracle0.poke(                          // oracle update dpt price every once a week
             uint128(dptUsdRate),
-            60 * 60 * 12                                                                // the data is valid for 12 hours
+            60 * 60 * 12                               // the data is valid for 12 hours
         );
 
-        dptPriceOracle1.poke(                                                           // oracle update dpt price every once a week
+        dptPriceOracle1.poke(                          // oracle update dpt price every once a week
             uint128(dptUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        dptPriceOracle1.poke(                                                           // oracle update dpt price every once a week
+        dptPriceOracle1.poke(                          // oracle update dpt price every once a week
             uint128(dptUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
         dptFeed.poke();
         //--------------------oracles-update-price-data--------------------------------end
 
         ethFeed = new Medianizer();
 
-        ethPriceOracle0 = new PriceFeed();                                              // oracle is a single price source that receives price data from several sources
-        ethPriceOracle1 = new PriceFeed();                                              // eth price is updated every time the price changes more than 2%
+        ethPriceOracle0 = new PriceFeed();             // oracle is a single price source that receives price data from several sources
+        ethPriceOracle1 = new PriceFeed();             // eth price is updated every time the price changes more than 2%
         ethPriceOracle2 = new PriceFeed();
 
-        ethFeed.set(address(ethPriceOracle0));                                          // add oracle to medianizer to get price data from
+        ethFeed.set(address(ethPriceOracle0));         // add oracle to medianizer to get price data from
         ethFeed.set(address(ethPriceOracle1));
         ethFeed.set(address(ethPriceOracle2));
 
         //--------------------oracles-update-price-data--------------------------------begin
-        ethPriceOracle0.poke(                                                           // oracle update eth price every once a week
+        ethPriceOracle0.poke(                          // oracle update eth price every once a week
             uint128(ethUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        ethPriceOracle1.poke(                                                           // oracle update eth price every once a week
+        ethPriceOracle1.poke(                          // oracle update eth price every once a week
             uint128(ethUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
-        ethPriceOracle1.poke(                                                           // oracle update eth price every once a week
+        ethPriceOracle1.poke(                          // oracle update eth price every once a week
             uint128(ethUsdRate),
-            60 * 60 * 24 * 8                                                            // the data is valid for 8 days
+            60 * 60 * 24 * 8                           // the data is valid for 8 days
         );
 
         ethFeed.poke();
@@ -503,21 +629,21 @@ contract IntegrationsTest is DSTest {
         // DiamondExchange(exchange).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
         DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));     // set eth as a token with which redeem fee can be paid
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(exchange).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
         DiamondExchange(exchange).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
         DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dai), b(true));     // set dai as a token with which redeem fee can be paid
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
         DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
         DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dpt), b(true));     // set dpt as a token with which redeem fee can be paid
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dpt), b(true));         // set dpt as a token with which redeem fee can be paid
 
         DiamondExchange(exchange).setConfig("dpt", b(dpt), "");                         // tell exhcange which one is the DPT token
         DiamondExchange(exchange).setConfig("liq", b(liq), "");                         // set liquidity contract
@@ -571,17 +697,17 @@ contract IntegrationsTest is DSTest {
         Redeemer(red).setConfig("fixFee", b(uint(0 ether)), "", "");                      // tell redeemer the fixed fee in base currency that is taken from total redeem fee is 0
 
         Redeemer(red).setConfig("varFee", b(0.03 ether), "", "");                   // tell redeemer the variable fee, or fee percent
-        
+
         Redeemer(red).setConfig(
             "profitRate",
             b(DiamondExchange(exchange).profitRate()), "", "");                          // tell redeemer the profitRate (should be same as we set in exchange), the rate of profit belonging to dpt owners
-        
+
         Redeemer(red).setConfig("dcdcOfCdc", b(cdc), b(dcdc), "");                  // do a match between cdc and matching dcdc token
         Redeemer(red).setConfig("dpt", b(dpt), "", "");                             // set dpt token address for redeemer
         Redeemer(red).setConfig("liq", b(liq), "", "");                             // set liquidity contract address for redeemer
         Redeemer(red).setConfig("liqBuysDpt", b(false), "", "");                    // set if liquidity contract should buy dpt on the fly for sending as fee
         // Redeemer(red).setConfig("dust", b(uint(1000)), "", "");                  // it is optional to set dust, its default value is 1000
-        DiamondExchange(exchange).setConfig("redeemer", b(red), b(""));                      // set wallet to store cost part of fee received from users
+        DiamondExchange(exchange).setConfig("redeemer", b(red), b(""));             // set wallet to store cost part of fee received from users
     }
 
     function _createTokens() internal {
@@ -691,6 +817,9 @@ contract IntegrationsTest is DSTest {
         guard.permit(address(asm), dcdc, ANY);
         guard.permit(address(asm), dcdc1, ANY);
         guard.permit(address(asm), dcdc2, ANY);
+        guard.permit(address(this), dpass, ANY);
+        guard.permit(address(this), dpass1, ANY);
+        guard.permit(address(this), dpass2, ANY);
         guard.permit(address(asm), dpass, ANY);
         guard.permit(address(asm), dpass1, ANY);
         guard.permit(address(asm), dpass2, ANY);
@@ -938,6 +1067,16 @@ contract TrustedSASMTester is Wallet {
 
     function doSendDpassToken(address token, address src, address payable dst, uint256 id_) public {
         Dpass(token).transferFrom(src, dst, id_);
+    }
+
+    function doUpdateAttributesHash(address token, uint _tokenId, bytes32 _attributesHash, bytes8 _currentHashingAlgorithm) public {
+        require(asm.dpasses(token), "test-token-is-not-dpass");
+        Dpass(token).updateAttributesHash(_tokenId, _attributesHash, _currentHashingAlgorithm);
+    }
+
+    function doSetState(address token_, bytes8 newState_, uint tokenId_) public {
+        require(asm.dpasses(token_), "test-token-is-not-dpass");
+        Dpass(token_).setState(newState_, tokenId_);
     }
 
     function () external payable {
