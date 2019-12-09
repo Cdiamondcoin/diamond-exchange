@@ -565,7 +565,7 @@ contract IntegrationsTest is DSTest {
 
 //--------------setup-redeemer-------------------------------------------------------
         Redeemer(red).setConfig("asm", b(asm), "", "");                             // tell redeemer the address of asset management
-        Redeemer(red).setConfig("exchange", b(exchange), "", "");                             // tell redeemer the address of exchange
+        Redeemer(red).setConfig("dex", b(exchange), "", "");                             // tell redeemer the address of exchange
         Redeemer(red).setConfig("burner", b(burner), "", "");                       // tell redeemer the address of burner
         Redeemer(red).setConfig("wal", b(wal), "", "");                             // tell redeemer the address of burner
         Redeemer(red).setConfig("fixFee", b(uint(0 ether)), "", "");                      // tell redeemer the fixed fee in base currency that is taken from total redeem fee is 0

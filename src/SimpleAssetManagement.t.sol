@@ -652,8 +652,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
         assertTrue(Dpass(dpass).isApprovedForAll(address(asm), exchange));
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
 
         DSToken(dai).transfer(user, amt);
         TrustedSASMTester(user).doApprove(dai, exchange, amt);
@@ -675,8 +675,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
         assertTrue(Dpass(dpass).isApprovedForAll(address(asm), exchange));
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
 
         DSToken(dai).transfer(user, amt);
         TrustedSASMTester(user).doApprove(dai, exchange, amt);
@@ -763,8 +763,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "sale", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
 
         DSToken(dai).transfer(user, price_);
         TrustedSASMTester(user).doApprove(dai, exchange, price_);
@@ -774,8 +774,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id1_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "22222222", "sale", cccc1_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id1_, price1_);
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id1_);
         asm.notifyTransferFrom(dpass, address(asm), user, id1_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id1_);
 
         DSToken(dai).transfer(user, price1_);
         TrustedSASMTester(user).doApprove(dai, exchange, price1_);
@@ -804,8 +804,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id_, price_);
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
 
         DSToken(dai).transfer(user, price_);
         TrustedSASMTester(user).doApprove(dai, exchange, price_);
@@ -815,8 +815,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id1_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "22222222", "valid", cccc1_, 1, b(0xef), "20191107");
 
         asm.setBasePrice(dpass, id1_, price1_);
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id1_);
         asm.notifyTransferFrom(dpass, address(asm), user, id1_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id1_);
 
         DSToken(dai).transfer(user, price1_);
         TrustedSASMTester(user).doApprove(dai, exchange, price1_);
@@ -899,8 +899,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
         asm.setBasePrice(dpass, id_, price_);
-        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
         asm.notifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
 
         assertEq(asm.withdrawV(custodian), price_);
     }
@@ -1085,7 +1085,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         require(capCustV_ < price_, "test-cap-lt-dpass-value");
         uint id_;
         bytes20 cccc_ = "BR,IF,F,0.01";
-        asm.setCapCustV(custodian1, price_); 
+        asm.setCapCustV(custodian1, capCustV_); 
         Dpass(dpass).setCccc(cccc_, true);
         id_ = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
 

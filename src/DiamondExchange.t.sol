@@ -3967,6 +3967,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         SimpleAssetManagement(asm).setConfig("rate", b(eng), b(usdRate[eng]), "diamonds");
 
         SimpleAssetManagement(asm).setConfig("custodians", b(seller), b(true), "diamonds");
+        SimpleAssetManagement(asm).setCapCustV(seller, 1000000 ether);
         SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
     }
 

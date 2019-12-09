@@ -226,7 +226,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     /**
      * @dev Set rate (price in base currency) for token.
      */
-    function setRate(address token_, uint256 value_) public nonReentrant auth {
+    function setRate(address token_, uint256 value_) public auth {  //TODO: change to nonReentrant after it does not use setConfig() anymore
         setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
     /**
