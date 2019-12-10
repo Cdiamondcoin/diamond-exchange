@@ -6,6 +6,7 @@ import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "ds-note/note.sol";
 import "./SimpleAssetManagement.sol";
+import "./SimpleAssetManagementCore.sol";
 import "./DiamondExchange.sol";
 import "dpass/Dpass.sol";
 import "./Liquidity.sol";
@@ -21,16 +22,17 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     address public eth = address(0xee);
     event LogTransferEth(address src, address dst, uint256 amount);
 
-    mapping(address => address) public dcdc;                 // dcdc[cdc] returns the dcdc token associated (having the same values) as cdc token
+    mapping(address => address) public dcdc;                // dcdc[cdc] returns the dcdc token associated (having the same values) as cdc token
     uint256 public fixFee;                                  // Fixed part of fee charged by Cdiamondcoin from redeemToken_ in base currency
     uint256 public varFee;                                  // Variable part of fee charged by Cdiamondcoin from redeemToken_
     address public dpt;                                     // dpt token address
     SimpleAssetManagement public asm;                       // asset management contract
+    SimpleAssetManagementCore public asc;                   // asset management contract
     DiamondExchange public dex;
-    address payable public liq;                                     // liquidity providing contract address
-    bool public liqBuysDpt;                              // true if liquidity contract buys dpt on the fly, false otherwise
-    address payable public burner;                                  // burner contract to take dpt owners' profit
-    address payable wal;                                    // wallet to receive the operational costs
+    address payable public liq;                             // liquidity providing contract address
+    bool public liqBuysDpt;                                 // true if liquidity contract buys dpt on the fly, false otherwise
+    address payable public burner;                          // burner contract to take dpt owners' profit
+    address payable public wal;                             // wallet to receive the operational costs
     uint public profitRate;                                 // profit that is sent from fees to dpt owners
     bool locked;                                            // variable to avoid reentrancy attacks against this contract
     uint redeemId;                                          // id of the redeem transaction user can refer to
@@ -55,13 +57,13 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
         } else if (what_ == "asc") {
 
-            require(addr(value_) != address(0x0), "red-zero-red-address");
+            require(addr(value_) != address(0x0), "red-zero-asc-address");
 
-            dex = DiamondExchange(address(uint160(addr(value_))));
+            asc = SimpleAssetManagementCore(address(uint160(addr(value_))));
 
         } else if (what_ == "dex") {
 
-            require(addr(value_) != address(0x0), "red-zero-red-address");
+            require(addr(value_) != address(0x0), "red-zero-dex-address");
 
             dex = DiamondExchange(address(uint160(addr(value_))));
 

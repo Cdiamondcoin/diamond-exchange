@@ -61,7 +61,7 @@ pragma solidity ^0.5.11;
     uint32 public auditInterval = 1776000;                  // represents 3 months of audit interwal in which an audit is mandatory for custodian.
     mapping(address => bool) allowed;                       // contracts that are allowed to use us
 
-    constructor(address owner) {
+    constructor(address owner) public {
         allowed[owner] = true;
     }
     

@@ -30,6 +30,7 @@ import "./DiamondExchange.sol";
 import "./Burner.sol";
 import "./Wallet.sol";
 import "./SimpleAssetManagement.sol";
+import "./SimpleAssetManagementCore.sol";
 import "./Liquidity.sol";
 import "./Dcdc.sol";
 import "./FeeCalculator.sol";
@@ -46,6 +47,7 @@ contract IntegrationsTest is DSTest {
     address burner;
     address payable wal;
     address payable asm;
+    address payable asc;
     address payable exchange;
     address payable liq;
     address fca;
@@ -657,6 +659,8 @@ contract IntegrationsTest is DSTest {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
        //-------------setup-asm------------------------------------------------------------
 
+        
+        SimpleAssetManagement(asm).setConfig("asc", b(address(asc)), "", "diamods"); // set price feed (sam as for exchange)
         SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for exchange)
         SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
         SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
@@ -765,6 +769,8 @@ contract IntegrationsTest is DSTest {
         wal = address(uint160(address(new Wallet()))); // DptTester()               // wallet contract
         uint ourGas = gasleft();
         asm = address(uint160(address(new SimpleAssetManagement())));               // asset management contract
+        asc = address(uint160(address(
+            new SimpleAssetManagementCore(address(this)))));                        // asset management contract
         emit LogTest("cerate SimpleAssetManagement");
         emit LogTest(ourGas - gasleft());
 
@@ -783,11 +789,11 @@ contract IntegrationsTest is DSTest {
     }
 
     function _createActors() internal {
-        user = address(new TesterActor(address(exchange), address(asm)));
-        user1 = address(new TesterActor(address(exchange), address(asm)));
-        custodian = address(new TesterActor(address(exchange), address(asm)));
-        custodian1 = address(new TesterActor(address(exchange), address(asm)));
-        custodian2 = address(new TesterActor(address(exchange), address(asm)));
+        user = address(new TesterActor(address(exchange), address(asm), address(asc)));
+        user1 = address(new TesterActor(address(exchange), address(asm), address(asc)));
+        custodian = address(new TesterActor(address(exchange), address(asm), address(asc)));
+        custodian1 = address(new TesterActor(address(exchange), address(asm), address(asc)));
+        custodian2 = address(new TesterActor(address(exchange), address(asm), address(asc)));
     }
 
     function _setupGuard() internal {
@@ -798,6 +804,7 @@ contract IntegrationsTest is DSTest {
         DiamondExchange(exchange).setAuthority(guard);
         Liquidity(liq).setAuthority(guard);
         FeeCalculator(fca).setAuthority(guard);
+        SimpleAssetManagementCore(asc).setAllowed(address(asm), true);
         DSToken(dpt).setAuthority(guard);
         DSToken(dai).setAuthority(guard);
         DSToken(eng).setAuthority(guard);
@@ -974,9 +981,11 @@ contract IntegrationsTest is DSTest {
 //----------------end-of-IntegrationsTest--------------------------------------------
 contract TrustedSASMTester is Wallet {
     SimpleAssetManagement asm;
+    SimpleAssetManagementCore asc;
 
-    constructor(address payable asm_) public {
+    constructor(address payable asm_, address payable asc_) public {
         asm = SimpleAssetManagement(asm_);
+        asc = SimpleAssetManagementCore(asc_);
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {
@@ -1070,12 +1079,12 @@ contract TrustedSASMTester is Wallet {
     }
 
     function doUpdateAttributesHash(address token, uint _tokenId, bytes32 _attributesHash, bytes8 _currentHashingAlgorithm) public {
-        require(asm.dpasses(token), "test-token-is-not-dpass");
+        require(asc.dpasses(token), "test-token-is-not-dpass");
         Dpass(token).updateAttributesHash(_tokenId, _attributesHash, _currentHashingAlgorithm);
     }
 
     function doSetState(address token_, bytes8 newState_, uint tokenId_) public {
-        require(asm.dpasses(token_), "test-token-is-not-dpass");
+        require(asc.dpasses(token_), "test-token-is-not-dpass");
         Dpass(token_).setState(newState_, tokenId_);
     }
 
@@ -1261,6 +1270,7 @@ contract DiamondExchangeTester is Wallet, DSTest {
 contract TesterActor is TrustedSASMTester, DiamondExchangeTester {
     constructor(
         address payable exchange_,
-        address payable asm_
-    ) public TrustedSASMTester(asm_) DiamondExchangeTester(exchange_) {}
+        address payable asm_,
+        address payable asc_
+    ) public TrustedSASMTester(asm_, asc_) DiamondExchangeTester(exchange_) {}
 }
