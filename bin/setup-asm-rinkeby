@@ -76,7 +76,11 @@ function htu() {
 }
 
 function toKeccak () {
-    echo $(python3 -c "from Crypto.Hash import keccak; v = keccak.new(digest_bits=256).update(b'$1').hexdigest(); print(f'0x{v}')")
+    echo $(seth keccak $1)
+}
+
+function sigTob () {
+    echo $(seth --to-bytes32 $(seth sig $1))
 }
 
 export true=$(ntb 1)
@@ -88,6 +92,11 @@ export b18=$(ntb 18)
 export any="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 export uAny=$(htu $any)
 export bAny=$(htb $any)
+
+
+#----------------------------------------setup-liquidity--------------------------------------------------------
+
+seth send $liq "approve(address,address,uint)" $dpt $dex $uAny
 
 #----------------------------------------setup-guard------------------------------------------------------------
 seth send $burner "setAuthority(address)" $guard
@@ -101,23 +110,27 @@ seth send $cdc "setAuthority(address)" $guard
 seth send $dcdc "setAuthority(address)" $guard
 seth send $dpass "setAuthority(address)" $guard
 
-caller, toContract, permissions
+# caller, toContract, permissions
 seth send $guard "permit(address,address,bytes32)" $asm $cdc $bAny
 seth send $guard "permit(address,address,bytes32)" $asm $dpass $bAny
 seth send $guard "permit(address,address,bytes32)" $dex $asm $bAny
 seth send $guard "permit(address,address,bytes32)" $dex $liq $bAny
-seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(atb $asm) $(toKeccak "getRate(address)")
+
+seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "getRate(address)")
 
 # Permissions to custodian
-# seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "getRate(address)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "getRateNewest(address)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "burn(address,address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "mint(address,address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "burnDcdc(address,address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "mintDcdc(address,address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(toKeccak "withdraw(address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $dpass $(toKeccak "linkOldToNewToken(uint256,uint256)")
+# seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRate(address)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRateNewest(address)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "burn(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mint(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "burnDcdc(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDcdc(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "withdraw(address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "setStateDpass(address,uint256,bytes8)")
+
+seth send $guard "permit(address,address,bytes32)" $custodian $dpass $(sigTob "linkOldToNewToken(uint256,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $dpass $(sigTob "mintDiamondTo(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8)")
 
 
 #----------------------------------------setup-dex------------------------------------------------------------
@@ -153,7 +166,7 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb rate) $(atb $eth) $(et
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $eth) $true
 
 
-# user can sell cdc tokens
+# user can sell dpt tokens
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc20) $(atb $dpt) $true
 # decimal precision of dpt tokens is 18
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $dpt) $(ntb 18)
@@ -175,6 +188,8 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb burner) $(atb $burner)
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb asm) $(atb $asm) $empty
 # set wallet to store cost part of fee received from users
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb wal) $(atb $wal) $empty
+# tell exhcange which one is the CDC token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb cdc) $(atb $cdc) $empty
 
 
 # fixed part of fee that is independent of purchase value
@@ -185,6 +200,12 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb varFee) $(etb 0.03) $e
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 0.1) $empty
 # if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb takeProfitOnlyInDpt) $false $empty
+
+# user can buy dpass
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc721) $(atb $dpass) $true
+# user can sell dpass
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc721) $(atb $dpass) $true
+
 
 #----------------------------------------setup-asm------------------------------------------------------------
 

@@ -32,8 +32,8 @@ export ETH_PASSWORD=~/.eth-pwd
 
 dapp build --extract
 
-hevm flatten --source-file src/DSToken.sol --json-file out/dapp.sol.json > out/DSToken-flatt.sol
-hevm flatten --source-file src/TestFeedLike.sol --json-file out/dapp.sol.json > out/TestFeedLike-flatt.sol
+hevm flatten --source-file lib/ds-token/src/token.sol --json-file out/dapp.sol.json > out/DSToken-flatt.sol
+hevm flatten --source-file src/DiamondExchange.t.sol --json-file out/dapp.sol.json > out/TestFeedLike-flatt.sol
 hevm flatten --source-file src/Liquidity.sol --json-file out/dapp.sol.json > out/Liquidity-flatt.sol
 hevm flatten --source-file src/Wallet.sol --json-file out/dapp.sol.json > out/Wallet-flatt.sol
 hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Burner-flatt.sol
