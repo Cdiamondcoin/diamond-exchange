@@ -57,13 +57,18 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     mapping(address => address) public priceFeed;           // price feed address for token
     mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
-    mapping(address => uint) public totalPaidV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
-    mapping(address => uint) public dpassSoldCustV;         // totoal amount of all dpass tokens that have been sold by custodian
+    mapping(address => uint) public paidDpassCustV;         // total amount that has been withdrawn by custodian for dpasses and cdc in base currency
+    mapping(address => uint) public paidCdcCustV;           // total amount that has been withdrawn by custodian for dpasses and cdc in base currency
+    mapping(address => uint) public soldDpassCustV;         // totoal amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => bytes32) public domains;             // the domain that connects the set of cdc, dpass, and dcdc tokens, and custodians
     mapping(bytes32 => uint) public totalDpassV;            // total value of dpass collaterals in base currency
     mapping(bytes32 => uint) public totalDcdcV;             // total value of dcdc collaterals in base currency
     mapping(bytes32 => uint) public totalCdcV;              // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalSoldDpassV;        // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalSoldCdcV;          // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalPaidDpassV;        // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalPaidCdcV;          // total value of cdc tokens issued in base currency
     mapping(bytes32 => uint)
         public overCollRatio;                               // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
     mapping(bytes32 => uint)
@@ -369,9 +374,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 basePrice[token_][amtOrId_],
                 custodian);
 
-            dpassSoldCustV[custodian] = add(
-                dpassSoldCustV[custodian],
+            soldDpassCustV[custodian] = add(
+                soldDpassCustV[custodian],
                 basePrice[token_][amtOrId_]);
+
+            totalSoldDpassV[domain] = add(                                  // TODO: test
+                totalSoldDpassV[domain],
+                basePrice[token_][amtOrId_]);      
 
             Dpass(token_).setState("valid", amtOrId_);
 
@@ -411,6 +420,18 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 0,
                 Dpass(token_).getCustodian(amtOrId_));
 
+            soldDpassCustV[custodian] = sub(
+                soldDpassCustV[custodian],
+                min(
+                    basePrice[token_][amtOrId_],
+                    soldDpassCustV[custodian]));
+
+            totalSoldDpassV[domain] = sub(                                  // TODO: test
+                totalSoldDpassV[domain],
+                min(
+                    basePrice[token_][amtOrId_],
+                    totalSoldDpassV[domain]));      
+
             Dpass(token_).setState("valid", amtOrId_);
 
         } else if (dpasses[token_]) {                                        // user sells erc721 token_ to other users
@@ -441,6 +462,11 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).mint(dst_, amt_);
         _updateCdcV(token_);
+
+        totalSoldCdcV[domain] = add(
+            totalSoldCdcV[domain], 
+            wmulV(amt_, _updateRate(token_), token_)); // TODO: test
+
         _requireSystemCollaterized(domain);
     }
 
@@ -467,7 +493,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     */
     function burnDcdc(address token_, address src_, uint256 amt_) public nonReentrant auth {
         bytes32 domain = domains[token_];
-        uint custodianCdcV = _getCustodianCdcV(domain, src_);
 
         require(custodians[msg.sender], "asm-not-a-custodian");
         require(!custodians[msg.sender] || src_ == msg.sender, "asm-can-not-burn-from-src");
@@ -476,7 +501,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         _updateDcdcV(token_, src_);
 
         _requireSystemRemoveCollaterized(domain);
-        _requirePaidLessThanSold(src_, custodianCdcV);
+        _requireTotalPaidIsLessOrEqualThanStockAndSold(src_);
     }
 
     /**
@@ -550,7 +575,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         ) {
             _updateCollateralDpass(0, basePrice[token_][tokenId_], custodian_);
             _requireSystemRemoveCollaterized(domains[token_]);
-            _requirePaidLessThanSold(custodian_, _getCustodianCdcV(domains[token_], custodian_));
+            _requireTotalPaidIsLessOrEqualThanStockAndSold(custodian_);
 
         } else if(
             prevState_ == "redeemed" ||
@@ -569,24 +594,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /*
-    * @dev Custodians can find out how much token they can withdraw.
-    */
-    function withdrawV(address custodian_) public view returns(uint) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        uint custodianCdcV_ = _getCustodianCdcV(domains[custodian_], custodian_);
-
-        uint totalSoldV_ = add(
-            custodianCdcV_,
-            dpassSoldCustV[custodian_]);
-
-        if (add(totalSoldV_, dust) > totalPaidV[custodian_]) {
-            return sub(totalSoldV_, totalPaidV[custodian_]);
-        } else {
-            return 0;
-        }
-    }
-
-    /*
     * @dev Withdraw tokens for selling dpass, and cdc. Custodians do not receive money directly from selling dpass, ot cdc, but
     * they must withdraw their tokens.
     */
@@ -598,9 +605,30 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(tokenPurchaseRate[token_] > 0, "asm-token-purchase-rate-invalid");
 
         uint tokenV = wmulV(tokenPurchaseRate[token_], amt_, token_);
-
-        totalPaidV[msg.sender] = add(totalPaidV[msg.sender], tokenV);
-        _requirePaidLessThanSold(custodian, _getCustodianCdcV(domain, custodian));
+        uint withdrawDpassV = min(
+            tokenV, 
+            sub(
+                soldDpassCustV[custodian], 
+                min(
+                    paidDpassCustV[custodian],
+                    soldDpassCustV[custodian])
+            ));
+        paidDpassCustV[custodian] = add(paidDpassCustV[custodian], withdrawDpassV);
+        totalPaidDpassV[domain] = add(totalPaidDpassV[domain], withdrawDpassV);
+        tokenV -= withdrawDpassV;  // this is never going to underflow
+        uint custodianCdcV = cdcCustV(custodian);
+        require(tokenV <= 
+            add(
+                sub(
+                    custodianCdcV,
+                    min(
+                        custodianCdcV,
+                        paidCdcCustV[custodian])),
+                dust),
+            "asm-too-much-to-withdraw");
+        paidCdcCustV[custodian] = add(paidCdcCustV[custodian], tokenV);
+        totalPaidCdcV[domain] = add(totalPaidCdcV[domain], tokenV);
+        _requireTotalPaidIsLessOrEqualThanStockAndSold(custodian);
 
         sendToken(token_, address(this), msg.sender, amt_);
     }
@@ -611,17 +639,43 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     */
     function getAmtForSale(address token_) external view returns(uint256) {
         bytes32 domain = domains[token_];
+        uint maxMintableCdcV = 
+            wdiv(
+                add(
+                    totalDpassV[domain],
+                    totalDcdcV[domain]),
+                overCollRatio[domain]);
         require(cdcs[token_], "asm-token-is-not-cdc");
+
         return wdivT(
             sub(
-                wdiv(
-                    add(
-                        totalDpassV[domain],
-                        totalDcdcV[domain]),
-                    overCollRatio[domain]),
-                totalCdcV[domain]),
+                maxMintableCdcV,
+                min(
+                    totalCdcV[domain],
+                    maxMintableCdcV)),
             _getNewRate(token_),
             token_);
+    }
+
+    /*
+    * @dev Get the total value share of custodian from the total cdc minted.
+    */
+    function cdcCustV(address custodian_) public view returns(uint) {
+        bytes32 domain_ = domains[custodian_];
+        return wmul(
+            totalSoldCdcV[domain_],
+            add(
+                totalDpassV[domain_],
+                totalDcdcV[domain_]) 
+            > 0 ?
+            wdiv(
+                add(
+                    totalDpassCustV[custodian_],
+                    totalDcdcCustV[custodian_]),
+                add(
+                    totalDpassV[domain_],
+                    totalDcdcV[domain_])):
+            1 ether);
     }
 
     /*
@@ -688,6 +742,17 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _burn(address token_, uint256 amt_) internal {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(amt_);
+        bytes32 domain = domains[token_];
+
+        totalSoldCdcV[domain] = sub(
+            totalSoldCdcV[domain], 
+            min(
+                wmulV(
+                    amt_,
+                    _updateRate(token_),
+                    token_),
+                totalSoldCdcV[domain])); // TODO: test
+
         _updateCdcV(token_);
     }
 
@@ -705,11 +770,18 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateCdcV(address cdc_) internal {
         require(cdcs[cdc_], "asm-not-a-cdc-token");
         bytes32 domain = domains[cdc_];
-        uint newValue = wmulV(DSToken(cdc_).totalSupply(), _updateRate(cdc_), cdc_);
+        uint newCdcV_ = wmulV(DSToken(cdc_).totalSupply(), _updateRate(cdc_), cdc_);
 
-        totalCdcV[domain] = sub(add(totalCdcV[domain], newValue), cdcV[cdc_]);
+        uint incrTotalCdcV = add(totalCdcV[domain], newCdcV_);
 
-        cdcV[cdc_] = newValue;
+        totalCdcV[domain] = 
+            sub(
+                incrTotalCdcV,
+                min(
+                    cdcV[cdc_],
+                    incrTotalCdcV));
+
+        cdcV[cdc_] = newCdcV_;
 
         emit LogCdcValue(totalCdcV[domain], domain, cdcV[cdc_], cdc_);
     }
@@ -720,9 +792,16 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateTotalDcdcV(address dcdc_) internal {
         require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
         bytes32 domain = domains[dcdc_];
-        uint newValue = wmulV(DSToken(dcdc_).totalSupply(), _updateRate(dcdc_), dcdc_);
-        totalDcdcV[domain] = sub(add(totalDcdcV[domain], newValue), dcdcV[dcdc_]);
-        dcdcV[dcdc_] = newValue;
+        uint newDcdcV = wmulV(DSToken(dcdc_).totalSupply(), _updateRate(dcdc_), dcdc_);
+        uint newTotalDcdcV = add(totalDcdcV[domain], newDcdcV);
+        totalDcdcV[domain] = 
+            sub(
+                newTotalDcdcV,
+                min(
+                    dcdcV[dcdc_],
+                    newTotalDcdcV));
+        
+        dcdcV[dcdc_] = newDcdcV;
         emit LogDcdcValue(totalDcdcV[domain], domain, cdcV[dcdc_], dcdc_);
     }
 
@@ -732,15 +811,17 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateDcdcV(address dcdc_, address custodian_) internal {
         require(dcdcs[dcdc_], "asm-not-a-dcdc-token");
         require(custodians[custodian_], "asm-not-a-custodian");
-        uint newValue = wmulV(DSToken(dcdc_).balanceOf(custodian_), _updateRate(dcdc_), dcdc_);
+        uint newDcdcCustV = wmulV(DSToken(dcdc_).balanceOf(custodian_), _updateRate(dcdc_), dcdc_);
+        uint newTotalDcdcCustV = add(totalDcdcCustV[custodian_], newDcdcCustV);
 
-        totalDcdcCustV[custodian_] = sub(
-            add(
-                totalDcdcCustV[custodian_],
-                newValue),
-            dcdcCustV[dcdc_][custodian_]);
+        totalDcdcCustV[custodian_] = 
+            sub(
+                newTotalDcdcCustV,
+                min(
+                    dcdcCustV[dcdc_][custodian_],
+                    newTotalDcdcCustV));
 
-        dcdcCustV[dcdc_][custodian_] = newValue;
+        dcdcCustV[dcdc_][custodian_] = newDcdcCustV;
 
         emit LogDcdcCustodianValue(totalDcdcCustV[custodian_], dcdcCustV[dcdc_][custodian_], dcdc_, custodian_);
 
@@ -767,26 +848,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             require(manualRate[token_], "Manual rate not allowed");     // if feed invalid revert if manualEthRate is NOT allowed
             rate_ = rate[token_];
         }
-    }
-
-    /*
-    * @dev Get the total value share of custodian from the total cdc minted.
-    */
-    function _getCustodianCdcV(bytes32 domain_, address custodian_) internal view returns(uint) {
-        return wmul(
-            totalCdcV[domain_],
-            add(
-                totalDpassV[domain_],
-                totalDcdcV[domain_]) 
-            > 0 ?
-            wdiv(
-                add(
-                    totalDpassCustV[custodian_],
-                    totalDcdcCustV[custodian_]),
-                add(
-                    totalDpassV[domain_],
-                    totalDcdcV[domain_])):
-            1 ether);
     }
 
     /**
@@ -825,17 +886,22 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /**
-    * @dev The total value paid to custodian must be less then the total value of current cdc share, and dpass sold.
+    * @dev The total value of tokens withdrawn by custodian as payment for their services must be less 
+    *      than the total value of current dpass and dcdc stock, and total of dpass sold.
     */
-    function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view {
+    function _requireTotalPaidIsLessOrEqualThanStockAndSold(address custodian_) internal view {
         require(
             add(
                 add(
-                    custodianCdcV_,
-                    dpassSoldCustV[custodian_]),
+                    add(
+                        totalDpassCustV[custodian_],
+                        totalDcdcCustV[custodian_]),
+                    soldDpassCustV[custodian_]),
                 dust) >=
-                totalPaidV[custodian_]
-            , "asm-too-much-withdrawn");
+                add(
+                    paidDpassCustV[custodian_],
+                    paidCdcCustV[custodian_])
+            , "asm-too-much-paid-to-custodian");
     }
 
     /*
@@ -859,18 +925,22 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) internal {
         require(custodians[custodian_], "asm-not-a-custodian");
         bytes32 domain = domains[custodian_];
+        uint newV = add(totalDpassCustV[custodian_], positiveV_);
 
-        totalDpassCustV[custodian_] = sub(
-            add(
-                totalDpassCustV[custodian_],
-                positiveV_),
-            negativeV_);
+        totalDpassCustV[custodian_] = 
+            sub(
+                newV,
+                min(
+                    negativeV_,
+                    newV));
+
+        newV = add(totalDpassV[domain], positiveV_);
 
         totalDpassV[domain] = sub(
-            add(
-                totalDpassV[domain],
-                positiveV_),
-            negativeV_);
+            newV,
+            min(
+                negativeV_,
+                newV));
 
         emit LogDpassValue(totalDpassCustV[custodian_], totalDpassV[domain], custodian_, domain);
     }
@@ -881,18 +951,19 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) internal {
         require(custodians[custodian_], "asm-not-a-custodian");
         bytes32 domain = domains[custodian_];
-
+        uint newV = add(totalDcdcCustV[custodian_], positiveV_);
         totalDcdcCustV[custodian_] = sub(
-            add(
-                totalDcdcCustV[custodian_],
-                positiveV_),
-            negativeV_);
+            newV,
+            min(
+                negativeV_,
+                newV));
+        newV = add(totalDcdcV[domain], positiveV_);
 
         totalDcdcV[domain] = sub(
-            add(
-                totalDcdcV[domain],
-                positiveV_),
-            negativeV_);
+            newV,
+            min(
+                negativeV_,
+                newV));
 
         emit LogDcdcTotalCustodianValue(totalDcdcCustV[custodian_], totalDcdcV[domain], custodian_, domain);
     }
