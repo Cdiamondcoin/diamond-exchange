@@ -18,22 +18,21 @@ export ETH_PASSWORD=~/.eth-pwd
 export custodian=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export eth=0x00000000000000000000000000000000000000ee
 
-# Deployed contrcts
-export dpass=0x18a7a95d17f2e7208982922a814d49661f23a073
+# Deployed contracts
+export dpass=0x0011f0e3efe621501f3adb4b9360d82e2cee07ea
 
-export dpt=0xe52649ed992f24ee90c3db78cc43a3bcc998e207
-export cdc=0xa117bfbbfcb77043588ec47fe72baa4759a024f6
-export ethPriceFeed=0x573585bd725a3b62ce5fd46240ca2233ff06face
-export dptPriceFeed=0xb07250e4a3838fc1cc78e65027d0a10b43e11ff3
-export cdcPriceFeed=0x8456c68f86b17e837355b16134130bb99c9f457a
-export liq=0x8173937ecc0c11a8262bbaa8b92eea3a83b9c257
-export wal=0x255fbb467368b48e814785d9947d47b55c37f1a3
-export burner=0xef80bcfd7b21447d5ffefcfa8a9ae6fa60419868
-export dcdc=0xf13f5580b26d11951d6e1f4b6af5f3c2e2ebc497
-export guard=0x295128cdeb76633bb2dd6538b97d25d86c0d9719
-export dex=0x5cb0f6255b0eb2e6140c65287ea98a7bb741ffb0
-export asm=0x16f6afb964acf12697bdbf1fedf3987e457b3f83
-export red=
+export dpt=0xfc1fb94f35502d34f25900944d83f66d50cf2b09
+export cdc=0x890ef5336c31d8c9b0617437115d2f377e3f4a90
+export ethPriceFeed=0x83015ecfce1746868fcb19d6c7257eac058e9035
+export dptPriceFeed=0x741ba74c908658a6e38e20ff4bb2194c6c57863c
+export cdcPriceFeed=0x61836d124e94d5cf727a018d364cb8fca2b89192
+export liq=0xfaaf956f8bedf6fb79f3689f6dadad2383790dce
+export wal=0x0d61f39eeeeb264f5040df9f4e88c4ca4136e80a
+export burner=0x145f9ed990268629eead8528ef1c423fb1096541
+export dcdc=0x4ae37c12a5dfa9779343bd306af59bb9ea252c6a
+export guard=0x7b992593c0af6be6277374c16175c443825d51db
+export dex=0x9033432ec48f4106fe6128139f944068b02a36d3
+export asm=0x34cf21a14af99801e4f45f7fff7709f19295b32d
 
 
 # address to bytes32
@@ -215,7 +214,7 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb varFee) $(etb 0.03) $e
 # percentage value telling how much of total fee goes to profit of DPT owners
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 0.1) $empty
 # if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
-seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb takeProfitOnlyInDpt) $false $empty
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb takeProfitOnlyInDpt) $true $empty
 
 # user can buy dpass
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc721) $(atb $dpass) $true
@@ -262,6 +261,19 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb setApproveForA
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb custodians) $(atb $custodian) $true $domain
 # set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
 seth send $asm "setCapCustV(address,uint)" $custodian $uAny
+
+
+# set price feed (same as for exchange)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $dcdc) $(atb $cdcPriceFeed) $domain
+# enable to use rate that is not coming from feed
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $dcdc) $true $domain
+# set precision of token to 18
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $dcdc) $b18 $domain
+# tell asm that dcdc is indeed a dcdc token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dcdcs) $(atb $dcdc) $true $domain
+# set rate for token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $dcdc) $(etb 70) $domain
+
 
 #----------------------------------------setup-redeemer------------------------------------------------------------
 
