@@ -569,24 +569,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 
     /*
-    * @dev Custodians can find out how much token they can withdraw.
-    */
-    function withdrawV(address custodian_) public view returns(uint) {
-        require(custodians[custodian_], "asm-not-a-custodian");
-        uint custodianCdcV_ = _getCustodianCdcV(domains[custodian_], custodian_);
-
-        uint totalSoldV_ = add(
-            custodianCdcV_,
-            dpassSoldCustV[custodian_]);
-
-        if (add(totalSoldV_, dust) > totalPaidV[custodian_]) {
-            return sub(totalSoldV_, totalPaidV[custodian_]);
-        } else {
-            return 0;
-        }
-    }
-
-    /*
     * @dev Withdraw tokens for selling dpass, and cdc. Custodians do not receive money directly from selling dpass, ot cdc, but
     * they must withdraw their tokens.
     */
