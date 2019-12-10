@@ -112,6 +112,7 @@ seth send $dpt "setAuthority(address)" $guard
 seth send $cdc "setAuthority(address)" $guard
 seth send $dcdc "setAuthority(address)" $guard
 seth send $dpass "setAuthority(address)" $guard
+seth send $red "setAuthority(address)" $guard
 
 # caller, toContract, permissions
 seth send $guard "permit(address,address,bytes32)" $asm $cdc $bAny
@@ -125,6 +126,11 @@ seth send $guard "permit(address,address,bytes32)" $red $asm $bAny
 seth send $guard "permit(address,address,bytes32)" $red $dex $bAny
 
 seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "getRate(address)")
+
+# any can buyTokensWithFee
+seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "buyTokensWithFee(address,uint256,address,uint256)")
+# any can redeem
+seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $red) $(sigTob "redeem(address,address,uint256,address,uint256,address)")
 
 # Permissions to custodian
 # seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRate(address)")
