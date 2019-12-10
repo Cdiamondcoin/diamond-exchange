@@ -1,6 +1,5 @@
 pragma solidity ^0.5.11;
 
-import "ds-math/math.sol";
 import "ds-auth/auth.sol";
 import "ds-token/token.sol";
 import "ds-stop/stop.sol";
@@ -85,14 +84,9 @@ contract DiamondExchangeEvents {
     event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1);
 
     event LogTransferEth(address src, address dst, uint256 val);
-    // TODO: remove all following LogTest()
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
 }
 
-contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
+contract DiamondExchange is DSAuth, DiamondExchangeEvents {
     TrustedDSToken public cdc;                              // CDC token contract
     address public dpt;                                     // DPT token contract
 
@@ -425,7 +419,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         address feeToken_,
         uint256 feeAmt_,
         address payable custodian_
-    ) public payable stoppable nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
+    ) public payable auth nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
 
         require(redeemFeeToken[feeToken_] || feeToken_ == dpt, "dex-token-not-to-pay-redeem-fee");
         
@@ -459,7 +453,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint256 sellAmtOrId_,
         address buyToken_,
         uint256 buyAmtOrId_
-    ) public payable stoppable nonReentrant kycCheck {
+    ) public payable auth nonReentrant kycCheck {
         uint buyV_;
         uint sellV_;
         uint feeV_;
