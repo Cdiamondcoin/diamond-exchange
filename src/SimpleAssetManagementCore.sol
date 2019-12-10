@@ -8,7 +8,7 @@ pragma solidity ^0.5.11;
     mapping(address => bool) public custodians;             // returns true for custodians
     mapping(address => uint)                                // total base currency value of custodians collaterals
         public totalDpassCustV;
-    mapping(address => uint) private rate;                  // current rate of a token in base currency
+    mapping(address => uint) private rates;                 // current rate of a token in base currency
     mapping(address => uint) public cdcV;                   // base currency value of cdc token
     mapping(address => uint) public dcdcV;                  // base currency value of dcdc token
     mapping(address => uint) public totalDcdcCustV;         // total value of all dcdcs at custodian
@@ -19,7 +19,7 @@ pragma solidity ^0.5.11;
     mapping(address => bool) public dpasses;                // returns true for dpass tokens allowed in this contract
     mapping(address => bool) public dcdcs;                  // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
     mapping(address => bool) public cdcs;                   // returns true for cdc tokens allowed in this contract
-    mapping(address => uint) private decimals;              // stores decimals for each ERC20 token
+    mapping(address => uint) private decimal;               // stores decimals for each ERC20 token
     mapping(address => bool) public decimalsSet;            // stores decimals for each ERC20 token
     mapping(address => address) public priceFeed;           // price feed address for token
     mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
@@ -77,9 +77,13 @@ pragma solidity ^0.5.11;
     function setTotalDpassCustV(address custodian_, uint set) public aut {
         totalDpassCustV[custodian_] = set;
     }
+    
+    function rate(address token_) public view aut returns(uint) {
+        return rates[token_];
+    }
 
     function setRate(address token_, uint set) public aut {
-        rate[token_] = set;
+        rates[token_] = set;
     }
 
     function setCdcV(address cdc_, uint set) public aut {
@@ -114,8 +118,12 @@ pragma solidity ^0.5.11;
         cdcs[cdc_] = set;
     }
 
+    function decimals(address token_) public view returns(uint) {
+        return decimal[token_];
+    }
+
     function setDecimals(address token_, uint set) public aut {
-        decimals[token_] = set;
+        decimal[token_] = set;
     }
 
     function setDecimalsSet(address token_, bool set) public aut {

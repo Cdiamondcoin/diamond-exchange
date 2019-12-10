@@ -53,6 +53,12 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
             asm = SimpleAssetManagement(address(uint160(addr(value_))));
 
+        } else if (what_ == "asc") {
+
+            require(addr(value_) != address(0x0), "red-zero-red-address");
+
+            dex = DiamondExchange(address(uint160(addr(value_))));
+
         } else if (what_ == "dex") {
 
             require(addr(value_) != address(0x0), "red-zero-red-address");
@@ -93,8 +99,8 @@ contract Redeemer is DSAuth, DSStop, DSMath {
             address cdc_ = addr(value_);
             address dcdc_ = addr(value1_);
 
-            require(asm.cdcs(cdc_), "red-setup-cdc-in-asm-first");
-            require(asm.dcdcs(dcdc_), "red-setup-dcdc-in-asm-first");
+            require(asc.cdcs(cdc_), "red-setup-cdc-in-asm-first");
+            require(asc.dcdcs(dcdc_), "red-setup-dcdc-in-asm-first");
 
             dcdc[cdc_] = dcdc_;
         } else if (what_ == "dpt") {
@@ -155,12 +161,12 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
         require(feeToken_ != eth || feeAmt_ == msg.value, "red-pls-send-eth");
 
-        if( asm.dpasses(redeemToken_) ) {
+        if( asc.dpasses(redeemToken_) ) {
 
             Dpass(redeemToken_).redeem(redeemAmtOrId_);
             require(custodian_ == address(uint160(Dpass(redeemToken_).getCustodian(redeemAmtOrId_))), "red-wrong-custodian-provided");
 
-        } else if ( asm.cdcs(redeemToken_) ) {
+        } else if ( asc.cdcs(redeemToken_) ) {
 
             require(
                 DSToken(dcdc[redeemToken_])
@@ -193,8 +199,8 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         uint profitV_;
         uint redeemTokenV_;
 
-        if(asm.dpasses(redeemToken_)) {
-            redeemTokenV_ = asm.basePrice(redeemToken_, redeemAmtOrId_);
+        if(asc.dpasses(redeemToken_)) {
+            redeemTokenV_ = asc.basePrice(redeemToken_, redeemAmtOrId_);
         } else {
             redeemTokenV_ = dex.wmulV(
                 redeemAmtOrId_,

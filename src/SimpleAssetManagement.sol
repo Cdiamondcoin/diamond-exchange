@@ -129,7 +129,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             address token = addr(value_);
             uint decimal = uint256(value1_);
             require(token != address(0x0), "asm-wrong-address");
-            asc.decimals(token) = 10 ** decimal;
+            asc.setDecimals(token, 10 ** decimal);
             asc.setDecimalsSet(token, true);
         } else if (what_ == "manualRate") {
             address token = addr(value_);
@@ -145,7 +145,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             bytes32 domain = value2_;
             address newDcdc = addr(value_);
             bool enable = uint(value1_) > 0;
-            if(enable) asc.domains(newDcdc) = domain;
+            if(enable) asc.setDomains(newDcdc, domain);
             require(newDcdc != address(0), "asm-dcdc-address-zero");
             require(asc.priceFeed(newDcdc) != address(0), "asm-add-pricefeed-first");
             require(asc.decimalsSet(newDcdc),"asm-no-decimals-set-for-token");
@@ -155,7 +155,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             bytes32 domain = value2_;
             address newCdc = addr(value_);
             bool enable = uint(value1_) > 0;
-            if(enable) asc.domains(newCdc) = domain;
+            if(enable) asc.setDomains(newCdc, domain);
             require(asc.priceFeed(newCdc) != address(0), "asm-add-pricefeed-first");
             require(asc.decimalsSet(newCdc), "asm-add-decimals-first");
             require(newCdc != address(0), "asm-cdc-address-zero");
@@ -166,7 +166,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             bytes32 domain = value2_;
             address dpass = addr(value_);
             bool enable = uint(value1_) > 0;
-            if(enable) asc.domains(dpass) = domain;
+            if(enable) asc.setDomains(dpass, domain);
             require(dpass != address(0), "asm-dpass-address-zero");
             asc.setDpasses(dpass, enable);
         } else if (what_ == "approve") {                            // TODO: remove this for security reasons
@@ -186,7 +186,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         } else if (what_ == "dust") {
             dust = uint256(value_);
         } else if (what_ == "asc") {
-            asc = addr(value_);
+            asc = SimpleAssetManagementCore(addr(value_));
         } else {
             require(false, "asm-wrong-config-option");
         }
