@@ -1,5 +1,7 @@
 pragma solidity ^0.5.11;
 
+ contract SimpleAssetManagementCore {
+
     mapping(
         address => mapping(
             uint => uint)) public basePrice;                // the base price used for collateral valuation
@@ -55,14 +57,180 @@ pragma solidity ^0.5.11;
         uint nextAuditBefore;                               // proposed time of next audit. The audit should be at least at every 3 months.
     }
 
-    mapping(address => Audit) public audit;                 // containing the last audit reports for all custodians.
+    mapping(address => Audit) public audits;                 // containing the last audit reports for all custodians.
     uint32 public auditInterval = 1776000;                  // represents 3 months of audit interwal in which an audit is mandatory for custodian.
-    mapping(address =y bool) allowed;                       // contracts that are allowed to use us
+    mapping(address => bool) allowed;                       // contracts that are allowed to use us
 
     constructor(address owner) {
         allowed[owner] = true;
     }
     
-    mi
 
-    setBasePrice() 
+    function setBasePrice(address token_, uint tokenId_, uint set) public aut {
+        basePrice[token_][tokenId_] = set;
+    }
+
+    function setCustodians(address custodian_, bool set) public aut {
+        custodians[custodian_] = set;
+    }
+
+    function setTotalDpassCustV(address custodian_, uint set) public aut {
+        totalDpassCustV[custodian_] = set;
+    }
+
+    function setRate(address token_, uint set) public aut {
+        rate[token_] = set;
+    }
+
+    function setCdcV(address cdc_, uint set) public aut {
+        cdcV[cdc_] = set;
+    }
+
+    function setDcdcV(address dcdc_, uint set) public aut {
+        dcdcV[dcdc_] = set;
+    }
+
+    function setTotalDcdcCustV(address custodian_, uint set) public aut {
+        totalDcdcCustV[custodian_] = set;
+    }
+
+    function setDcdcCustV(address dcdc_, address custodian_, uint set) public aut {
+        dcdcCustV[dcdc_][custodian_] = set;
+    }
+
+    function setPayTokens(address payToken_, bool set) public aut {
+        payTokens[payToken_] = set;
+    }
+
+    function setDpasses(address dpass_, bool set) public aut {
+        dpasses[dpass_] = set;
+    }
+
+    function setDcdcs(address dcdc_, bool set) public aut {
+        dcdcs[dcdc_] = set;
+    }
+
+    function setCdcs(address cdc_, bool set) public aut {
+        cdcs[cdc_] = set;
+    }
+
+    function setDecimals(address token_, uint set) public aut {
+        decimals[token_] = set;
+    }
+
+    function setDecimalsSet(address token_, bool set) public aut {
+        decimalsSet[token_] = set;
+    }
+
+    function setPriceFeed(address token_, address set) public aut {
+        priceFeed[token_] = set;
+    }
+
+    function setTokenPurchaseRate(address token_, uint set) public aut {
+        tokenPurchaseRate[token_] = set;
+    }
+
+    // ... price of token at which we send it to custodian
+    function setPaidDpassCustV(address custodian_, uint set) public aut {
+        paidDpassCustV[custodian_] = set;
+    }
+
+    function setPaidCdcCustV(address custodian_, uint set) public aut {
+        paidCdcCustV[custodian_] = set;
+    }
+
+    function setSoldDpassCustV(address custodian_, uint set) public aut {
+        soldDpassCustV[custodian_] = set;
+    }
+
+    function setManualRate(address token_, bool set) public aut {
+        manualRate[token_] = set;
+    }
+
+    function setDomains(address tokenOrActor_, bytes32 set) public aut {
+        domains[tokenOrActor_] = set;
+    }
+
+    function setTotalDpassV(bytes32 domain_, uint set) public aut {
+        totalDpassV[domain_] = set;
+    }
+
+    function setTotalDcdcV(bytes32 domain_, uint set) public aut {
+        totalDcdcV[domain_] = set;
+    }
+
+    function setTotalCdcV(bytes32 domain_, uint set) public aut {
+        totalCdcV[domain_] = set;
+    }
+
+    function setTotalSoldDpassV(bytes32 domain_, uint set) public aut {
+        totalSoldDpassV[domain_] = set;
+    }
+
+    function setTotalSoldCdcV(bytes32 domain_, uint set) public aut {
+        totalSoldCdcV[domain_] = set;
+    }
+
+    function setTotalPaidDpassV(bytes32 domain_, uint set) public aut {
+        totalPaidDpassV[domain_] = set;
+    }
+
+    function setTotalPaidCdcV(bytes32 domain_, uint set) public aut {
+        totalPaidCdcV[domain_] = set;
+    }
+
+    function setOverCollRatio(bytes32 domain_, uint set) public aut {
+        overCollRatio[domain_] = set;
+    }
+
+    function setOverCollRemoveRatio(bytes32 domain_, uint set) public aut {
+        overCollRemoveRatio[domain_] = set;
+    }
+
+    function setCapCustV(address custodian_, uint set) public aut {
+        capCustV[custodian_] = set;
+    }
+
+    function setAllowed(address owner_, bool set) public aut {
+		allowed[owner_] = set;
+    }
+
+    function setAudit(
+        address custodian_,        
+        address auditor,
+        uint256 status,
+        bytes32 descriptionHash,
+        bytes32 descriptionUrl,
+        uint nextAuditBefore
+    ) public aut {
+        audits[custodian_] = Audit({
+            auditor: auditor,
+            status: status,
+            descriptionHash: descriptionHash,
+            descriptionUrl: descriptionUrl,
+            nextAuditBefore: nextAuditBefore
+        });
+    }
+
+    function audit(address custodian_) public returns 
+    (
+        address auditor,
+        uint256 status,
+        bytes32 descriptionHash,
+        bytes32 descriptionUrl,
+        uint nextAuditBefore
+    ){
+        Audit storage audit_ = audits[custodian_];
+        auditor = audit_.auditor;
+        status = audit_.status;
+        descriptionHash = audit_.descriptionHash;
+        descriptionUrl = audit_.descriptionUrl;
+    }
+
+//-----------------------------------------------
+
+    modifier aut {
+        require(allowed[msg.sender], "asc-not-authorized");
+        _;
+    } 
+}
