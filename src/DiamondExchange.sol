@@ -3,10 +3,9 @@ pragma solidity ^0.5.11;
 import "ds-auth/auth.sol";
 import "ds-token/token.sol";
 import "ds-stop/stop.sol";
-import "ds-note/note.sol";
 import "./Liquidity.sol";
 import "dpass/Dpass.sol";
-import "./Redeemer.sol";
+
 /**
 * @dev Contract to get ETH/USD price
 */
@@ -41,6 +40,18 @@ contract TrustedFeeCalculator {
     }
 }
 
+contract TrustedRedeemer {
+
+function redeem(
+    address sender,
+    address redeemToken_,
+    uint256 redeemAmtOrId_,
+    address feeToken_,
+    uint256 feeAmt_,
+    address payable custodian_
+) public payable returns (uint256);
+
+}
 
 contract TrustedAsm {
     function notifyTransferFrom(address token, address src, address dst, uint256 id721) external;
@@ -86,7 +97,7 @@ contract DiamondExchangeEvents {
     event LogTransferEth(address src, address dst, uint256 val);
 }
 
-contract DiamondExchange is DSAuth, DiamondExchangeEvents {
+contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     TrustedDSToken public cdc;                              // CDC token contract
     address public dpt;                                     // DPT token contract
 
@@ -402,7 +413,7 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
             redeemer = address(uint160(addr(value_)));
 
         } else {
-
+            value1_;
             require(false, "dex-no-such-option");
         }
 
@@ -419,7 +430,7 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
         address feeToken_,
         uint256 feeAmt_,
         address payable custodian_
-    ) public payable auth nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
+    ) public payable stoppable nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
 
         require(redeemFeeToken[feeToken_] || feeToken_ == dpt, "dex-token-not-to-pay-redeem-fee");
         
@@ -441,7 +452,7 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
         
         _sendToken(feeToken_, msg.sender, redeemer, feeAmt_);
 
-        return Redeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
+        return TrustedRedeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
     }
 
     /**
@@ -453,7 +464,7 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
         uint256 sellAmtOrId_,
         address buyToken_,
         uint256 buyAmtOrId_
-    ) public payable auth nonReentrant kycCheck {
+    ) public payable stoppable nonReentrant kycCheck {
         uint buyV_;
         uint sellV_;
         uint feeV_;
@@ -836,59 +847,6 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
         kyc[user_] = allowed_;
     }
 
-    /*
-    * @dev Returns true if seller accepts token as payment
-    */
-    function sellerAcceptsToken(address token_, address seller_)
-    public view returns (bool) {
-
-        return (canSellErc20[token_] ||
-                canSellErc721[token_]) &&
-                !denyToken[token_][seller_];
-    }
-
-
-    /*
-    * @dev Returns true if token is handled by Asset Management
-    *
-    * When a token is an erc20 token and handled by asm it implies that
-    * asm will mint and burn the token upon request.
-    *
-    * When a token is an erc721 token and handled by asm it implies that
-    * token is used for collateral for CDC token.
-    */
-    function isHandledByAsm(address token_) public view returns (bool) {
-        return handledByAsm[token_];
-    }
-
-    /**
-    * @dev Collect all available info about a diamond
-    * Returns diamond data with following arguments
-    *
-    * ownerCustodian_[0]    = owner
-    * ownerCustodian_[1]    = custodian
-    * attrs_[0]             = issuer
-    * attrs_[1]             = report
-    * attrs_[2]             = state eg.: "valid" "invalid" "sale"
-    * attrs_[3]             = cccc ( cut, clarity, color, carat)
-    * attrs_[4]             = attributeHash
-    * attrs_[5]             = currentHashingAlgorithm
-    * carat_                = weight in carats
-    * priceV_               = current effective sale price in base currency
-    */
-    function getDiamondInfo(address token_, uint256 tokenId_)
-    public view returns(
-        address[2] memory ownerCustodian_,
-        bytes32[6] memory attrs_,
-        uint24 carat_,
-        uint priceV_
-    ) {
-        require(canBuyErc721[token_] || canSellErc721[token_], "dex-token-not-a-dpass-token");
-        (ownerCustodian_, attrs_, carat_) = Dpass(token_).getDiamondInfo(tokenId_);
-        priceV_ = getPrice(token_, tokenId_);
-    }
-
-
     /**
     * @dev Get sell price of dpass token
     */
@@ -1038,26 +996,12 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
             return fca.getCosts(user, sellToken_, sellId_, buyToken_, buyAmtOrId_);
         }
     }
+
     /**
     * @dev Get exchange rate in base currency
     */
     function getLocalRate(address token_) public view auth returns(uint256) {
         return rate[token_];
-    }
-
-    /**
-    * @dev Get manual rate. If manual rate for token is set to true then if rate
-    * feed returns invalid data, still a manually set rate can be used.
-    */
-    function getManualRate(address token_) public view returns(bool) {
-        return manualRate[token_];
-    }
-
-    /**
-    * @dev Get price feed address for token.
-    */
-    function getPriceFeed(address token_) public view returns(TrustedFeedLikeDex) {
-        return priceFeed[token_];
     }
 
     /**
@@ -1073,21 +1017,6 @@ contract DiamondExchange is DSAuth, DiamondExchangeEvents {
             return canSellErc20[token_] || canSellErc721[token_];
         }
     }
-
-    /**
-    * @dev Return true if the decimals for token has been set by contract owner.
-    */
-    function getDecimalsSet(address token_) public view returns(bool) {
-        return decimalsSet[token_];
-    }
-
-    /**
-    * @dev Get the custodian of ERC20 token.
-    */
-    function getCustodian20(address token_) public view returns(address) {
-        return custodian20[token_];
-    }
-
 
     /**
     * @dev Convert address to bytes32

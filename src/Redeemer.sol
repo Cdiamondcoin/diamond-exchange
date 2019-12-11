@@ -27,9 +27,9 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     address public dpt;                                     // dpt token address
     SimpleAssetManagement public asm;                       // asset management contract
     DiamondExchange public dex;
-    address payable public liq;                                     // liquidity providing contract address
-    bool public liqBuysDpt;                              // true if liquidity contract buys dpt on the fly, false otherwise
-    address payable public burner;                                  // burner contract to take dpt owners' profit
+    address payable public liq;                             // liquidity providing contract address
+    bool public liqBuysDpt;                                 // true if liquidity contract buys dpt on the fly, false otherwise
+    address payable public burner;                          // burner contract to take dpt owners' profit
     address payable wal;                                    // wallet to receive the operational costs
     uint public profitRate;                                 // profit that is sent from fees to dpt owners
     bool locked;                                            // variable to avoid reentrancy attacks against this contract

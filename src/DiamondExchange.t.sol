@@ -277,30 +277,30 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testSetManualDptRateDex() public {
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));
-        assertTrue(DiamondExchange(exchange).getManualRate(dpt));
+        assertTrue(DiamondExchange(exchange).manualRate(dpt));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(false));
-        assertTrue(!DiamondExchange(exchange).getManualRate(dpt));
+        assertTrue(!DiamondExchange(exchange).manualRate(dpt));
     }
 
     function testSetManualCdcRateDex() public {
         DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(true));
-        assertTrue(DiamondExchange(exchange).getManualRate(cdc));
+        assertTrue(DiamondExchange(exchange).manualRate(cdc));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(false));
-        assertTrue(!DiamondExchange(exchange).getManualRate(cdc));
+        assertTrue(!DiamondExchange(exchange).manualRate(cdc));
     }
 
     function testSetManualEthRateDex() public {
         DiamondExchange(exchange).setConfig(b("manualRate"), b(address(0xee)), b(true));
-        assertTrue(DiamondExchange(exchange).getManualRate(address(0xee)));
+        assertTrue(DiamondExchange(exchange).manualRate(address(0xee)));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(address(0xee)), b(false));
-        assertTrue(!DiamondExchange(exchange).getManualRate(address(0xee)));
+        assertTrue(!DiamondExchange(exchange).manualRate(address(0xee)));
     }
 
     function testSetManualDaiRateDex() public {
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));
-        assertTrue(DiamondExchange(exchange).getManualRate(dai));
+        assertTrue(DiamondExchange(exchange).manualRate(dai));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(false));
-        assertTrue(!DiamondExchange(exchange).getManualRate(dai));
+        assertTrue(!DiamondExchange(exchange).manualRate(dai));
     }
 
     function testFailNonOwnerSetManualDptRateDex() public {
@@ -2152,38 +2152,6 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
 
-    function testGetDiamondInfoDex() public {
-        address[2] memory ownerCustodian;
-        bytes32[6] memory attrs;
-        uint24 carat;
-        uint price;
-        (ownerCustodian, attrs, carat, price) = DiamondExchange(exchange).getDiamondInfo(dpass, dpassId[user]);
-
-        assertEq(ownerCustodian[0], user);
-        assertEq(ownerCustodian[1], seller);
-        assertEq(attrs[0], "gia");
-        assertEq(attrs[1], "2141438167");
-        assertEq(attrs[2], "sale");
-        assertEq(attrs[3], "BR,IF,F,0.01");
-        assertEq(attrs[4], bytes32(uint(0xc0a5d062e13f99c8f70d19dc7993c2f34020a7031c17f29ce2550315879006d7)));
-        assertEq(attrs[5], "20191101");
-        assertEq(carat, uint(0.2 * 100));
-        assertEq(price, dpassOwnerPrice[user]);
-
-        (ownerCustodian, attrs, carat, price) = DiamondExchange(exchange).getDiamondInfo(dpass, dpassId[seller]);
-
-        assertEq(ownerCustodian[0], asm);
-        assertEq(ownerCustodian[1], seller);
-        assertEq(attrs[0], "gia");
-        assertEq(attrs[1], "2141438168");
-        assertEq(attrs[2], "sale");
-        assertEq(attrs[3], "BR,VVS1,F,3.00");
-        assertEq(attrs[4], bytes32(uint(0xac5c1daab5131326b23d7f3a4b79bba9f236d227338c5b0fb17494defc319886)));
-        assertEq(attrs[5], "20191101");
-        assertEq(carat, uint(3.1 * 100));
-        assertEq(price, dpassOwnerPrice[asm]);
-    }
-
     function testGetBuyPriceAndSetBuyPriceDex() public {
         uint buyPrice = 43 ether;
         uint otherBuyPrice = 47 ether;
@@ -2772,19 +2740,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         testForFixCdcBuyUserDpassUserHasNoDptDex();
     }
 
-    function testSellerAcceptsToken() public {
-        DiamondExchange(exchange).setDenyToken(cdc, true);
-        assertTrue(
-            !DiamondExchange(exchange).sellerAcceptsToken(cdc, address(this)));
-        DiamondExchange(exchange).setDenyToken(cdc, false);
-        assertTrue(
-            DiamondExchange(exchange).sellerAcceptsToken(cdc, address(this)));
-    }
-
     function testIsHandledByAsm() public {
-        assertTrue(DiamondExchange(exchange).isHandledByAsm(cdc));
+        assertTrue(DiamondExchange(exchange).handledByAsm(cdc));
         DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(false));
-        assertTrue(!DiamondExchange(exchange).isHandledByAsm(cdc));
+        assertTrue(!DiamondExchange(exchange).handledByAsm(cdc));
     }
 
     function testSetPriceFeedDex() public {
@@ -2793,21 +2752,21 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
         assertEqLog(
             "set-pricefeed-is-returned",
-            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(DiamondExchange(exchange).priceFeed(token)),
             address(feed[token]));
 
         token = dai;
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
         assertEqLog(
             "set-pricefeed-is-returned",
-            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(DiamondExchange(exchange).priceFeed(token)),
             address(feed[token]));
 
         token = cdc;
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(token), b(address(feed[token])));
         assertEqLog(
             "set-pricefeed-is-returned",
-            address(DiamondExchange(exchange).getPriceFeed(token)),
+            address(DiamondExchange(exchange).priceFeed(token)),
             address(feed[token]));
     }
 
@@ -2823,23 +2782,23 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     }
 
     function testGetDecimalsSetDex() public {
-        assertTrue(DiamondExchange(exchange).getDecimalsSet(cdc));
+        assertTrue(DiamondExchange(exchange).decimalsSet(cdc));
         address token1 = address(new DSToken("TEST"));
-        assertTrue(!DiamondExchange(exchange).getDecimalsSet(token1));
+        assertTrue(!DiamondExchange(exchange).decimalsSet(token1));
         DiamondExchange(exchange).setConfig("decimals",b(token1), b(18));
-        assertTrue(DiamondExchange(exchange).getDecimalsSet(token1));
+        assertTrue(DiamondExchange(exchange).decimalsSet(token1));
     }
 
     function testGetCustodian20() public {
         assertEqLog(
             "default custodian is asm",
-            DiamondExchange(exchange).getCustodian20(cdc),
+            DiamondExchange(exchange).custodian20(cdc),
             custodian20[cdc]
         );
         address token1 = address(new DSToken("TEST"));
         assertEqLog(
             "any token custodian is unset",
-            DiamondExchange(exchange).getCustodian20(token1),
+            DiamondExchange(exchange).custodian20(token1),
             address(0)
         );
     }
@@ -3383,7 +3342,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
                 dpassOwnerPrice[origSellerSellToken];
 
         buyT = erc20[buyToken] ?                                                        // total amount of token available to buy (or tokenid)
-            DiamondExchange(exchange).isHandledByAsm(buyToken) ?
+            DiamondExchange(exchange).handledByAsm(buyToken) ?
                 min(buyAmtOrId, SimpleAssetManagement(asm).getAmtForSale(buyToken)) :
                 min(
                     buyAmtOrId,
@@ -3464,7 +3423,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             emit LogTest(user.balance);
 
         if(erc20[buyToken]) {
-            origBuyer = DiamondExchange(exchange).isHandledByAsm(buyToken) ? asm : custodian20[buyToken];
+            origBuyer = DiamondExchange(exchange).handledByAsm(buyToken) ? asm : custodian20[buyToken];
         } else {
             origBuyer = Dpass(buyToken).ownerOf(buyAmtOrId);
         }
@@ -3612,7 +3571,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         // tokens bought by user must decrease custodian account
         if (erc20[buyToken]) {
 
-            if(DiamondExchange(exchange).isHandledByAsm(buyToken) ) {
+            if(DiamondExchange(exchange).handledByAsm(buyToken) ) {
                 actual = DSToken(buyToken).balanceOf(asm);
                 expected = balance[asm][buyToken];
 
