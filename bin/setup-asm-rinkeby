@@ -126,11 +126,6 @@ seth send $guard "permit(address,address,bytes32)" $red $dex $bAny
 
 seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "getRate(address)")
 
-# any can buyTokensWithFee
-seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "buyTokensWithFee(address,uint256,address,uint256)")
-# any can redeem
-seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $red) $(sigTob "redeem(address,address,uint256,address,uint256,address)")
-
 # Permissions to custodian
 # seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRate(address)")
 seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRateNewest(address)")
@@ -143,7 +138,6 @@ seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "wit
 seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "setStateDpass(address,uint256,bytes8)")
 
 seth send $guard "permit(address,address,bytes32)" $custodian $dpass $(sigTob "linkOldToNewToken(uint256,uint256)")
-
 
 
 #----------------------------------------setup-dex------------------------------------------------------------
