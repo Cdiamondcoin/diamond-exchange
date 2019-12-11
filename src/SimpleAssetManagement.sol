@@ -52,18 +52,20 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     mapping(address => bool) public dpasses;                // returns true for dpass tokens allowed in this contract
     mapping(address => bool) public dcdcs;                  // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
     mapping(address => bool) public cdcs;                   // returns true for cdc tokens allowed in this contract
-    mapping(address => uint) private decimals;              // stores decimals for each ERC20 token
+    mapping(address => uint) public decimals;               // stores decimals for each ERC20 token eg: 1000000000000000000 denotes 18 decimal precision 
     mapping(address => bool) public decimalsSet;            // stores decimals for each ERC20 token
     mapping(address => address) public priceFeed;           // price feed address for token
     mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
     mapping(address => uint) public totalPaidV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
-    mapping(address => uint) public dpassSoldCustV;         // totoal amount of all dpass tokens that have been sold by custodian
+    mapping(address => uint) public dpassSoldCustV;         // total amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => uint) public capCustV;               // maximum value of dpass and dcdc tokens a custodian is allowed to mint
+    mapping(address => uint) public cdcPurchaseV;           // purchase value of a cdc token in purchase price in base currency
     uint public totalDpassV;                                // total value of dpass collaterals in base currency
     uint public totalDcdcV;                                 // total value of dcdc collaterals in base currency
     uint public totalCdcV;                                  // total value of cdc tokens issued in base currency
+    uint public totalCdcPurchaseV;                          // total value of cdc tokens in purchase price in base currency
     uint public overCollRatio;                              // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
     uint public overCollRemoveRatio;                        // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
 
@@ -146,8 +148,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             overCollRemoveRatio = uint(value_);
             require(overCollRemoveRatio >= 1 ether, "asm-must-be-gt-1-ether");
             require(overCollRemoveRatio <= overCollRatio, "asm-must-be-lt-overcollratio");
-
-            _requireSystemRemoveCollaterized(); // TODO: check if this should hold or sthg else
+            _requireSystemRemoveCollaterized();
         } else if (what_ == "priceFeed") {
             require(addr(value1_) != address(address(0x0)), "asm-wrong-pricefeed-address");
             require(addr(value_) != address(address(0x0)), "asm-wrong-token-address");
@@ -176,12 +177,20 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             require(decimalsSet[newDcdc],"asm-no-decimals-set-for-token");
             dcdcs[newDcdc] = enable;
             _updateTotalDcdcV(newDcdc);
+        } else if (what_ == "cdcPurchaseV") {
+            address cdc_ = addr(value_);
+            uint addAmt_ = uint(value1_);
+            uint subAmt_ = uint(value2_);
+            _updateCdcPurchaseV(cdc_, addAmt_, subAmt_);
         } else if (what_ == "cdcs") {
             address newCdc = addr(value_);
             bool enable = uint(value1_) > 0;
             require(priceFeed[newCdc] != address(0), "asm-add-pricefeed-first");
             require(decimalsSet[newCdc], "asm-add-decimals-first");
             require(newCdc != address(0), "asm-cdc-address-zero");
+            require(
+                DSToken(newCdc).totalSupply() == 0 || cdcPurchaseV[newCdc] > 0,
+                "asm-setconfig-cdcpurchasev-first");
             cdcs[newCdc] = enable;
             _updateCdcV(newCdc);
             _requireSystemCollaterized();
@@ -190,14 +199,14 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             bool enable = uint(value1_) > 0;
             require(dpass != address(0), "asm-dpass-address-zero");
             dpasses[dpass] = enable;
-        } else if (what_ == "approve") {                            // TODO: remove this for security reasons
+        } else if (what_ == "approve") {                            // TODO: remove this once we operate as dao
             address token = addr(value_);
             address dst = addr(value1_);
             uint value = uint(value2_);
             require(decimalsSet[token],"asm-no-decimals-set-for-token");
             require(dst != address(0), "asm-dst-zero-address");
             DSToken(token).approve(dst, value);
-        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this for security reasons
+        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this once we ork as dao
             address token = addr(value_);
             address dst = addr(value1_);
             bool enable = uint(value2_) > 0;
@@ -231,18 +240,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
      */
     function getRate(address token_) public view auth returns (uint) {
         return rate[token_];
-    }
-
-    /**
-    * @dev Retrieve the decimals of a token. As we can store only uint values, the decimals defne how many of the lower digits are part of the fraction part.
-    */
-    function getDecimals(address token_) public view returns (uint8 dec) {
-        require(cdcs[token_] || payTokens[token_] || dcdcs[token_], "asm-token-not-listed");
-        require(decimalsSet[token_], "asm-token-with-unset-decimals");
-        while(dec <= 77 && decimals[token_] % uint(10) ** uint(dec) == 0){
-            dec++;
-        }
-        dec--;
     }
 
     /*
@@ -343,11 +340,11 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             dpasses[token_] || cdcs[token_] || payTokens[token_],
             "asm-invalid-token");
 
-            require(
+        require(
             !dpasses[token_] || Dpass(token_).getState(amtOrId_) == "sale",
             "asm-ntf-token-state-not-sale");
 
-        if(dpasses[token_] && src_ == address(this)) {                     // custodian sells dpass to user
+        if(dpasses[token_] && src_ == address(this)) {                      // custodian sells dpass to user
             custodian = Dpass(token_).getCustodian(amtOrId_);
 
             _updateCollateralDpass(
@@ -363,7 +360,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
 
             _requireSystemCollaterized();
 
-        } else if (dst_ == address(this) && !dpasses[token_]) {             // user sells ERC20 token_ to sellers
+        } else if (dst_ == address(this) && !dpasses[token_]) {             // user sells ERC20 token_ to custodians
             require(payTokens[token_], "asm-we-dont-accept-this-token");
 
             if (cdcs[token_]) {
@@ -401,7 +398,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
 
         } else if (dpasses[token_]) {                                        // user sells erc721 token_ to other users
 
-            // require(payTokens[token_], "asm-token-not-accepted");        // TODO: test user wants to steal others approved tokens
 
         }  else {
             require(false, "asm-unsupported-tx");
@@ -426,6 +422,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).mint(dst_, amt_);
         _updateCdcV(token_);
+        _updateCdcPurchaseV(token_, amt_, 0);
         _requireSystemCollaterized();
     }
 
@@ -458,7 +455,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(dcdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(src_, amt_);
         _updateDcdcV(token_, src_);
-
         _requireSystemRemoveCollaterized();
         _requirePaidLessThanSold(src_, custodianCdcV);
     }
@@ -576,13 +572,20 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     */
     function getAmtForSale(address token_) external view returns(uint256) {
         require(cdcs[token_], "asm-token-is-not-cdc");
+
+        uint totalCdcAllowedV_ =
+            wdiv(
+                add(
+                    totalDpassV,
+                    totalDcdcV),
+                overCollRatio);
+
+        if (totalCdcAllowedV_ < add(totalCdcV, dust))
+            return 0;
+
         return wdivT(
             sub(
-                wdiv(
-                    add(
-                        totalDpassV,
-                        totalDcdcV),
-                    overCollRatio),
+                totalCdcAllowedV_,
                 totalCdcV),
             _getNewRate(token_),
             token_);
@@ -626,9 +629,10 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     */
     function _setBasePrice(address token_, uint256 tokenId_, uint256 price_) internal {
         bytes32 state_;
+        address custodian_;
         require(dpasses[token_], "asm-invalid-token-address");
         state_ = Dpass(token_).getState(tokenId_);
-        address custodian_ = Dpass(token_).getCustodian(tokenId_);
+        custodian_ = Dpass(token_).getCustodian(tokenId_);
         require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
 
         if(Dpass(token_).ownerOf(tokenId_) == address(this) &&
@@ -653,6 +657,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(amt_);
         _updateCdcV(token_);
+        _updateCdcPurchaseV(token_, 0, amt_);
     }
 
     /**
@@ -661,6 +666,50 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _updateRate(address token_) internal returns (uint256 rate_) {
         require((rate_ = _getNewRate(token_)) > 0, "asm-updateRate-rate-gt-zero");
         rate[token_] = rate_;
+    }
+
+    /*
+    * @dev updates totalCdcPurchaseV and cdcPurchaseV when addAmt_ is added, or when subAmt_ is removed from cdc_.
+    */
+    function _updateCdcPurchaseV(address cdc_, uint256 addAmt_, uint256 subAmt_) internal {
+        uint currSupply_;
+        uint prevPurchaseV_;
+
+        if(addAmt_ > 0) {
+
+            uint currentAddV_ = wmulV(addAmt_, _updateRate(cdc_), cdc_);
+            cdcPurchaseV[cdc_] = add(cdcPurchaseV[cdc_], currentAddV_);
+            totalCdcPurchaseV = add(totalCdcPurchaseV, currentAddV_);
+
+        } else if (subAmt_ > 0) {
+
+            currSupply_ = DSToken(cdc_).totalSupply();
+            prevPurchaseV_ = cdcPurchaseV[cdc_];
+
+            cdcPurchaseV[cdc_] = currSupply_ > dust ?
+                wmul(
+                    prevPurchaseV_,
+                    wdiv(
+                        currSupply_,
+                        add(
+                            currSupply_,
+                            subAmt_)
+                        )):
+                0;
+
+            totalCdcPurchaseV = sub(
+                totalCdcPurchaseV,
+                min(
+                    sub(
+                        prevPurchaseV_,
+                        min(
+                            cdcPurchaseV[cdc_], 
+                            prevPurchaseV_)),
+                    totalCdcPurchaseV));
+        } else {
+            require(false, "asm-add-or-sub-amount-must-be-0");
+        }
+
     }
 
     /*
@@ -735,20 +784,16 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @dev Get the total value share of custodian from the total cdc minted.
     */
     function _getCustodianCdcV(address custodian_) internal view returns(uint) {
+        uint totalDpassAndDcdcV_ = add(totalDpassV, totalDcdcV);
         return wmul(
-            totalCdcV,
-            add(
-                totalDpassV,
-                totalDcdcV) 
-            > 0 ?
-            wdiv(
-                add(
-                    totalDpassCustV[custodian_],
-                    totalDcdcCustV[custodian_]),
-                add(
-                    totalDpassV,
-                    totalDcdcV)):
-            1 ether);
+            totalCdcPurchaseV,
+            totalDpassAndDcdcV_ > 0 ?
+                wdiv(
+                    add(
+                        totalDpassCustV[custodian_],
+                        totalDcdcCustV[custodian_]),
+                    totalDpassAndDcdcV_):
+                1 ether);
     }
 
     /**
@@ -793,9 +838,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(
             add(
                 add(
-                    add(
-                        totalDpassCustV[custodian_],
-                        totalDcdcCustV[custodian_]),
+                    custodianCdcV_,
                     dpassSoldCustV[custodian_]),
                 dust) >=
                 totalPaidV[custodian_]
@@ -879,5 +922,4 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     }
 }
 
-// TODO: be able to ban custodian sale
 // TODO: check price multiplier for base price!! implement it to multiply basePrice and to be able to change the prices with only one tx.

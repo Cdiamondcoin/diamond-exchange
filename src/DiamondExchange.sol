@@ -776,7 +776,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             payTo_ = handledByAsm[buyToken_] ?
                 address(uint160(address(asm))):
-                custodian20[buyToken_];                                 // we pay not to custodian but to asm
+                custodian20[buyToken_];                                 // we do not pay directly to custodian but through asm
 
             _sendToken(buyToken_, payTo_, msg.sender, buyT_);           // send buyToken_ from custodian to user
         }
