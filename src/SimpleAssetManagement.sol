@@ -23,6 +23,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     event LogTransferEth(address src, address dst, uint256 amount);
     event LogBasePrice(address sender_, address token_, uint256 tokenId_, uint256 price_);
     event LogCdcValue(uint256 totalCdcV, uint256 cdcValue, address token);
+    event LogCdcPurchaseValue(uint256 totalCdcPurchaseV, uint256 cdcPurchaseValue, address token);
     event LogDcdcValue(uint256 totalDcdcV, uint256 ddcValue, address token);
     event LogDcdcCustodianValue(uint256 totalDcdcCustV, uint256 dcdcCustV, address dcdc, address custodian);
     event LogDcdcTotalCustodianValue(uint256 totalDcdcCustV, uint256 totalDcdcV, address custodian);
@@ -710,6 +711,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             require(false, "asm-add-or-sub-amount-must-be-0");
         }
 
+        emit LogCdcPurchaseValue(totalCdcPurchaseV, cdcPurchaseV[cdc_], cdc_);
     }
 
     /*
