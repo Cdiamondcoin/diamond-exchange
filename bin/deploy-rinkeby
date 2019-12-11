@@ -16,7 +16,8 @@ export ETH_RPC_URL=https://rinkeby.infura.io/v3/47706a887c1245319e35b5e507c7f097
 export ETH_KEYSTORE="$(pwd)"
 
 # export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize --optimize-runs 1"}
-export SOLC_FLAGS="--optimize --optimize-runs 1"
+# export SOLC_FLAGS="--optimize --optimize-runs 1"
+export SOLC_FLAGS="--optimize"
 # export ETH_GAS=${ETH_GAS:-"8000000"}
 # https://ethstats.net/ 9965875
 # https://www.rinkeby.io/#stats 7006834
