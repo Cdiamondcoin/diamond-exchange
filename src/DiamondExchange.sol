@@ -419,7 +419,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         emit LogConfigChange(what_, value_, value1_);
     }
-    
+
     /**
     * @dev Redeem token and pay fee for redeem.
     */
@@ -433,7 +433,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     ) public payable stoppable nonReentrant returns(uint redeemId) { // kyc check will thake place on redeem contract.
 
         require(redeemFeeToken[feeToken_] || feeToken_ == dpt, "dex-token-not-to-pay-redeem-fee");
-        
+
         if(canBuyErc721[redeemToken_] || canSellErc721[redeemToken_]) {
 
             Dpass(redeemToken_)                                // transfer token to redeemer
@@ -449,7 +449,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         } else {
             require(false, "dex-token-can-not-be-redeemed");
         }
-        
+
         _sendToken(feeToken_, msg.sender, redeemer, feeAmt_);
 
         return TrustedRedeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
@@ -470,7 +470,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint feeV_;
         uint sellT_;
         uint buyT_;
-        
+
         require(!denyToken[sellToken_][buyToken_], "dex-cant-use-this-token-to-buy");
 
         _updateRates(sellToken_, buyToken_);    // update currency rates
@@ -897,12 +897,12 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
         address buyToken_,                                                      // the token user wants to buy
         uint256 buyAmtOrId_                                                     // the amount user wants to buy
-    ) public view 
+    ) public view
     returns (
         uint256 sellAmtOrId_,                                                   // the calculated amount of tokens needed to be solc to get buyToken_
         uint256 feeDpt_,                                                        // the fee paid in DPT if user has DPT ...
                                                                                 // ... (if you dont want to calculate with user DPT set user address to 0x0
-        uint256 feeV_,                                                          // total fee to be paid in base currency 
+        uint256 feeV_,                                                          // total fee to be paid in base currency
         uint256 feeSellT_                                                       // fee to be paid in sellTokens (this amount will be subtracted as fee from user)
     ) {
         uint buyV_;
@@ -1168,9 +1168,11 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             feeTakenV_ :
             wmul(feeTakenV_, profitRate);
 
-        profitV_ = profitPaidV_ < totalProfitV_ ?                   // profit value still to be paid in base currency
-            sub(totalProfitV_, profitPaidV_) :
-            0;
+        profitV_ = sub(                                             // profit value still to be paid in base currency
+            totalProfitV_,
+            min(
+                profitPaidV_,
+                totalProfitV_));
 
         profitDpt_ = wdivT(profitV_, rate[dpt], dpt);               // profit in DPT still to be paid
 

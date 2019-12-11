@@ -398,7 +398,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             Dpass(token_).setState("valid", amtOrId_);
 
         } else if (dpasses[token_]) {                                        // user sells erc721 token_ to other users
-
+            // nothing to check
 
         }  else {
             require(false, "asm-unsupported-tx");
@@ -449,15 +449,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @param amt_ uint amount to be burnt.
     */
     function burnDcdc(address token_, address src_, uint256 amt_) public nonReentrant auth {
-        uint custodianCdcV = _getCustodianCdcV(src_);
-
         require(custodians[msg.sender], "asm-not-a-custodian");
         require(!custodians[msg.sender] || src_ == msg.sender, "asm-can-not-burn-from-src");
         require(dcdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(src_, amt_);
         _updateDcdcV(token_, src_);
         _requireSystemRemoveCollaterized();
-        _requirePaidLessThanSold(src_, custodianCdcV);
+        _requirePaidLessThanSold(src_, _getCustodianCdcV(src_));
     }
 
     /**
@@ -559,9 +557,9 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(payTokens[token_], "asm-cant-withdraw-token");
         require(tokenPurchaseRate[token_] > 0, "asm-token-purchase-rate-invalid");
 
-        uint tokenV = wmulV(tokenPurchaseRate[token_], amt_, token_);
+        uint tokenPurchaseV = wmulV(tokenPurchaseRate[token_], amt_, token_);
 
-        totalPaidV[msg.sender] = add(totalPaidV[msg.sender], tokenV);
+        totalPaidV[msg.sender] = add(totalPaidV[msg.sender], tokenPurchaseV);
         _requirePaidLessThanSold(custodian, _getCustodianCdcV(custodian));
 
         sendToken(token_, address(this), msg.sender, amt_);
