@@ -20,7 +20,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     event LogRedeem(uint256 redeemId, address sender, address redeemToken_,uint256 redeemAmtOrId_, address feeToken_, uint256 feeAmt_, address payable custodian);
     address public eth = address(0xee);
     event LogTransferEth(address src, address dst, uint256 amount);
-
+    event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1);
     mapping(address => address) public dcdc;                 // dcdc[cdc] returns the dcdc token associated (having the same values) as cdc token
     uint256 public fixFee;                                  // Fixed part of fee charged by Cdiamondcoin from redeemToken_ in base currency
     uint256 public varFee;                                  // Variable part of fee charged by Cdiamondcoin from redeemToken_
@@ -134,7 +134,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         } else {
             require(false, "red-invalid-option");
         }
-
+        emit LogConfigChange(what_, value_, value1_);
     }
 
     /*

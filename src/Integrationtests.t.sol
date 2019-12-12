@@ -7,7 +7,7 @@ pragma solidity ^0.5.11;
 // TODO: invalid diamond who does what
 // TODO: simple setup scenario
 // TODO: custodian adds diamond wrong this is how we correnct ir
-// TODO: upgrade asm or exchange functionality
+// TODO: upgrade asm or dex functionality
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: test for each basic use-case to demonstrate usability
 
@@ -35,7 +35,7 @@ import "./Dcdc.sol";
 import "./FeeCalculator.sol";
 import "./Redeemer.sol";
 
-contract IntegrationsTest is DSTest {
+contract IntegrationsTest is DSTest, DSMath {
 
     event LogTest(uint256 what);
     event LogTest(bool what);
@@ -46,7 +46,9 @@ contract IntegrationsTest is DSTest {
     address burner;
     address payable wal;
     address payable asm;
-    address payable exchange;
+    address payable asmUpgrade;
+    address payable dex;
+    address payable dexUpgrade;
     address payable liq;
     address fca;
     address payable red;
@@ -56,6 +58,7 @@ contract IntegrationsTest is DSTest {
     address payable custodian;
     address payable custodian1;
     address payable custodian2;
+    address auditor;
 
     address dpt;
     address dai;
@@ -116,11 +119,62 @@ contract IntegrationsTest is DSTest {
         _setupContracts();
     }
 
-    function test1MintCdcInt() public {             // use-case 1. Mint Cdc
+    function testUpgradeAsmInt() public {               // testing of upgrading of exchange contract (dex)
+        //------------------simulate-actions-prior-to-upgrade------------------------------
+        uint id1 = test1MintCdcInt();                   // mint dpass (and returns its id) and cdc tokens
+        uint id2 = test2MintDpassInt();                 // mint another dpass and returns tokens
+        test22MintDcdcInt();                            // mint some dcdc tokens too
+
+        //------------------upgrade-starts-HERE--------------------------------------------
+        SimpleAssetManagement(asm).stop();              // stop some update functiona THIS DOES NOT STOP CUSTODIANS NOR AUTÓDITORS NOR ASSET MANAGERS!!!!
+        DiamondExchange(dex).stop();                    // stop exchange
+
+        asmUpgrade = address(uint160(                   // deploy new asset managemet contract
+            address(new SimpleAssetManagement())));
+
+        _disableEveryoneUsingCurrentAsm();              // make sure no one has access to current asm while upgrade
+        _upgradeAsmGuard();                             // setup guard first
+        _configAsmForAsmUpgrade(id1, id2);              // configure exchange
+        _configDexForAsmUpgrade();                      // config asm to handle upgraded exchange
+        _configRedForAsmUpgrade();                      // config asm to handle upgraded exchange
+
+        DiamondExchange(dex).start();                   // enable trade and redeem functionality
+
+        //------------------upgrade-ends-HERE---------------------------------------------
+
+        //------------------test-succsessful-upgrade---------------------------------------
+
+        assertEqLog("dcdc-total-value", SimpleAssetManagement(asmUpgrade).totalDcdcV(), wmul(cdcUsdRate, 5 ether));
+        assertEqLog("cdc-total-value", SimpleAssetManagement(asmUpgrade).totalCdcV(), wmul(cdcUsdRate, 1 ether));
+        assertEqLog("dpass-total-value", SimpleAssetManagement(asmUpgrade).totalDpassV(), 2928.03 * 2 ether);
+        assertEqLog("dpass-total-value-cust", SimpleAssetManagement(asmUpgrade).totalDpassCustV(custodian), 2928.03 * 2 ether);
+        _configTest3CdcPurchaseAsmUpgradeInt();         // config test below to run with new dex
+        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
+    }
+
+    function testUpgradeDexInt() public {               // testing of upgrading of exchange contract (dex)
+        DiamondExchange(dex).stop();                    // make sure no one trades or redeems anything on dex
+        dexUpgrade = address(uint160(                   // deploy new exchange contract
+            address(new DiamondExchange())));
+
+        DiamondExchange(dexUpgrade).stop();             // disable trade and redeem functionality
+
+        _upgradeDexGuard();                             // setup guard first
+        _configDexForDexUpgrade();                            // configure exchange
+        _configAsmForDexUpgrade();                      // config asm to handle upgraded exchange
+        _configRedeemerForDexUpgrade();                 // setup redeemer for new dex
+
+        DiamondExchange(dexUpgrade).start();            // enable trade and redeem functionality
+
+        _configTest3CdcPurchaseInt();                   // config test below to run with new dex
+        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
+    }
+
+    function test1MintCdcInt() public returns (uint id) {             // use-case 1. Mint Cdc
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        TesterActor(custodian).doMintDpass(         // custodian must mint dpass first to create collateral for CDC
+        id = TesterActor(custodian).doMintDpass(    // custodian must mint dpass first to create collateral for CDC
             dpass,                                  // token to mint (system can handle any number of different dpass tokens)
             custodian,                              // custodian of diamond, custodians can only set themselves no others
             "GIA",                                  // the issuer of following ID, currently GIA" is the only supported
@@ -135,7 +189,7 @@ contract IntegrationsTest is DSTest {
                                         );
         SimpleAssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
-                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
+                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from dex to mint to user
         assertEqLog("cdc-minted-to-user", DSToken(cdc).balanceOf(user), 1 ether);
     }
 
@@ -143,19 +197,19 @@ contract IntegrationsTest is DSTest {
 
         SimpleAssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
-                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
+                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from dex to mint to user
     }
 
-    function test2MintDpassInt() public {              // use-case 2. Mint Dpass
+    function test2MintDpassInt() public returns(uint id) {              // use-case 2. Mint Dpass
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        uint id = TesterActor(custodian)
+        id = TesterActor(custodian)
             .doMintDpass(
             dpass,                                  // token to mint (system can handle any number of different dpass tokens)
             custodian,                              // custodian of diamond, custodians can only set themselves no others
             "GIA",                                  // the issuer of following ID, currently GIA" is the only supported
-            "2134567890",                           // GIA number (ID)
+            "2134567891",                           // GIA number (ID)
             "sale",                                 // if wants to have it for sale, if not then "valid"
             "BR,IF,D,5.00",                         // cut, clarity, color, weight range(start) of diamond
             511,                                    // carat is decimal 2 precision, so this diamond is 5.11 carats
@@ -167,6 +221,12 @@ contract IntegrationsTest is DSTest {
         assertEqLog("dpass-minted-to-asm",Dpass(dpass).ownerOf(id), asm);
 
     }
+ 
+    function test22MintDcdcInt() public {
+        TesterActor(custodian).doMintDcdc(dcdc, custodian, 5 ether);
+        assertEqLog("dcdc-is-at-custodian", DSToken(dcdc).balanceOf(custodian), 5 ether);
+        assertEqLog("dcdc-total-value", SimpleAssetManagement(asm).totalDcdcV(), wmul(cdcUsdRate, 5 ether));
+    }
 
     function test3CdcPurchaseInt() public {
 
@@ -175,7 +235,7 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user, daiPaid);       // send 10 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));         // user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));         // user must approve dex in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
@@ -184,7 +244,7 @@ contract IntegrationsTest is DSTest {
             dpass,
             custodian,
             "GIA",
-            "2134567890",
+            "2134567893",
             "sale",
             "BR,IF,D,5.00",
             511,
@@ -201,8 +261,8 @@ contract IntegrationsTest is DSTest {
             uint(-1)
         );
 
-        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
-        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("fixFee", DiamondExchange(dex).fixFee(), 18);
+        logUint("varFee", DiamondExchange(dex).varFee(), 18);
         logUint("user-cdc-balance", DSToken(cdc).balanceOf(user), 18);
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
         logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
@@ -219,12 +279,12 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));    // user must approve dex in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
-            "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
+        DiamondExchange(dex).setConfig(        // before any token can be sold on dex, we must tell ...
+            "canBuyErc721",                         // ... dex that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
 
@@ -250,8 +310,8 @@ contract IntegrationsTest is DSTest {
             id
         );
 
-        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
-        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("fixFee", DiamondExchange(dex).fixFee(), 18);
+        logUint("varFee", DiamondExchange(dex).varFee(), 18);
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
         logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
         logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
@@ -268,12 +328,12 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));    // user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));    // user must approve dex in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        DiamondExchange(exchange).setConfig(        // before any token can be sold on exchange, we must tell ...
-            "canBuyErc721",                         // ... exchange that users are allowed to buy it. ...
+        DiamondExchange(dex).setConfig(        // before any token can be sold on dex, we must tell ...
+            "canBuyErc721",                         // ... dex that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
 
@@ -304,13 +364,13 @@ contract IntegrationsTest is DSTest {
         TesterActor(user).doBuyTokensWithFee(       // THIS WILL FAIL!! Because if the only dpass is sold, there would be nothing ...
                                                     // ... to back the value of CDC sold in previous step.
             dai,
-            daiPaid,                                                    // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
+            daiPaid,                                // note that diamond costs less than user wants to pay, so only the price is subtracted from the user not the total value
             dpass,
             id
-        );                                          // error Revert ("exchange-sell-amount-exceeds-allowance")
+        );                                          // error Revert ("dex-sell-amount-exceeds-allowance")
 
-        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
-        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("fixFee", DiamondExchange(dex).fixFee(), 18);
+        logUint("varFee", DiamondExchange(dex).varFee(), 18);
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
         logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
         logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
@@ -327,10 +387,10 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user, daiPaid);                                       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));                                    // user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));                                         // user must approve dex in order to trade
 
         TesterActor(user)
-            .doApprove(cdc, exchange, uint(-1));                                    // user must approve exchange in order to trade
+            .doApprove(cdc, dex, uint(-1));                                         // user must approve dex in order to trade
 
         TesterActor(user).doBuyTokensWithFee(                                       // user buys cdc that he will redeem later
             dai, daiPaid - 500 ether, cdc, uint(-1));
@@ -369,11 +429,11 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user, daiPaid);                                       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, exchange, uint(-1));                                    // user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));                                         // user must approve dex in order to trade
 
         uint id = test4DpassPurchaseInt();                                          // first purchase dpass token
 
-        TesterActor(user).doApprove721(dpass, exchange, id);
+        TesterActor(user).doApprove721(dpass, dex, id);
 
         uint gas = gasleft();
         uint redeemId = TesterActor(user).doRedeem(                                 // redeem dpass
@@ -438,7 +498,7 @@ contract IntegrationsTest is DSTest {
         (,
          bytes32[6] memory attrs,
          ) = Dpass(dpass).getDiamondInfo(id);
-        
+
          assertEqLog("attribute-has-changed",                                       // hash did change
             attrs[4],
             0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
@@ -446,7 +506,7 @@ contract IntegrationsTest is DSTest {
         assertEqLog("hashing-algo-has-changed", attrs[5], "20200101");              // hashing algo did change
 
     }
-    
+
     function test8SellDpassToOtherUser() public {
         uint id = test4DpassPurchaseInt();                      // First user buys dpass token
         uint daiPaid = 4000 ether;
@@ -454,10 +514,10 @@ contract IntegrationsTest is DSTest {
         DSToken(dai).transfer(user1, daiPaid);                  // send 4000 DAI to the buyer user, so he can use it to buy CDC
 
         TesterActor(user1)
-            .doApprove(dai, exchange, uint(-1));                // buyer user must approve exchange in order to trade
+            .doApprove(dai, dex, uint(-1));                // buyer user must approve dex in order to trade
 
-        TesterActor(user).doApprove721(dpass, exchange, id);    // seller user must approve the exchange
-        TesterActor(user).doSetState(dpass, "sale", id);        // set state to "sale" is also needed in order to work on exchange
+        TesterActor(user).doApprove721(dpass, dex, id);    // seller user must approve the dex
+        TesterActor(user).doSetState(dpass, "sale", id);        // set state to "sale" is also needed in order to work on dex
         assertEqLog("user1-has-dai", DSToken(dai).balanceOf(user1), daiPaid);
         TesterActor(user1).doBuyTokensWithFee(
             dai,                                                // buyer user wants to pay with dai
@@ -471,8 +531,8 @@ contract IntegrationsTest is DSTest {
         assertEqLog("user-dpass-balance", Dpass(dpass).balanceOf(user), 0);
         assertEqLog("user1-dpass-balance", Dpass(dpass).balanceOf(user1), 1);
 
-        logUint("fixFee", DiamondExchange(exchange).fixFee(), 18);
-        logUint("varFee", DiamondExchange(exchange).varFee(), 18);
+        logUint("fixFee", DiamondExchange(dex).fixFee(), 18);
+        logUint("varFee", DiamondExchange(dex).varFee(), 18);
         logUint("user-dai-balance", DSToken(dai).balanceOf(user), 18);
         logUint("asm-dai-balance", DSToken(dai).balanceOf(asm), 18);
         logUint("wallet-dai-balance", DSToken(dai).balanceOf(wal), 18);
@@ -483,15 +543,245 @@ contract IntegrationsTest is DSTest {
     }
 
     function test9CurrencyExchangesWork() public {
-       // TODO: start from here 
+       // TODO: start from here
     }
 //---------------------------end-of-tests-------------------------------------------------------------------
+
+    function _disableEveryoneUsingCurrentAsm() internal {
+        // if something was permitted with ANY, it must be forbidden with ANY, and if it was with bytes4(keccak()) then with bytes4(keccak(), if you try to forbid permitted bytes4(keccak()) with ANY it will not work!!!!!!!
+
+        // DO NOT DISABLE YOUSELF!!!!
+
+        guard.forbid(dex, asm, ANY);
+        guard.forbid(red, asm, ANY);
+
+        guard.forbid(custodian, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.forbid(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.forbid(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("getRateNewest(address)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("getRate(address)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.forbid(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+
+        guard.forbid(auditor, asm, bytes4(keccak256("setAudit(address,uint256,bytes32,bytes32,uint32)")));
+    }
+
+    function _upgradeAsmGuard() internal {
+        SimpleAssetManagement(asmUpgrade).setAuthority(guard);
+        guard.permit(address(this), asmUpgrade, ANY);
+        guard.permit(asmUpgrade, cdc, ANY);
+        guard.permit(asmUpgrade, cdc1, ANY);
+        guard.permit(asmUpgrade, cdc2, ANY);
+        guard.permit(asmUpgrade, dcdc, ANY);
+        guard.permit(asmUpgrade, dcdc1, ANY);
+        guard.permit(asmUpgrade, dcdc2, ANY);
+        guard.permit(asmUpgrade, dpass, ANY);
+        guard.permit(asmUpgrade, dpass1, ANY);
+        guard.permit(asmUpgrade, dpass2, ANY);
+        guard.permit(dex, asmUpgrade, ANY);
+        guard.permit(red, asmUpgrade, ANY);
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
+
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian, asmUpgrade, bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("withdraw(address,uint256)")));
+
+        guard.permit(custodian1, asmUpgrade, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian2, asmUpgrade, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
+        guard.permit(auditor, asmUpgrade, bytes4(keccak256("setAudit(address,uint256,bytes32,bytes32,uint32)")));
+    }
+
+    function _configAsmForAsmUpgrade(uint256 id1, uint256 id2) internal {
+
+       //-------------setup-asmUpgrade------------------------------------------------------------
+        SimpleAssetManagement(asmUpgrade).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for dex)
+        SimpleAssetManagement(asmUpgrade).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        SimpleAssetManagement(asmUpgrade).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
+        SimpleAssetManagement(asmUpgrade).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
+
+
+
+        //----LINE-BELOW-IS-IMPORTANT!!!!!!!!!----------------------------------------------------
+        SimpleAssetManagement(asmUpgrade).setConfig(
+            "cdcPurchaseV",                                                                                // set the total value of all cdc in the system in PURCHASE TIME PRICE
+            b(cdc),                                                                                        // the cdc token address  (if we have more than one cdc token this process must be done for all 
+            b(SimpleAssetManagement(asm).cdcPurchaseV(cdc)),                                               // get the purchase price form the old contract
+            b(uint(0))                                                                                     // at upgrade this should be always zero.
+        ); 
+
+
+        SimpleAssetManagement(asmUpgrade).setConfig("cdcs", b(cdc), b(true), "diamonds");                  // tell asmUpgrade that cdc is indeed a cdc token
+        SimpleAssetManagement(asmUpgrade).setConfig("rate", b(cdc), b(cdcUsdRate), "diamonds");            // set rate for token
+        SimpleAssetManagement(asmUpgrade).setConfig("priceFeed", b(eth), b(address(ethFeed)), "diamonds"); // set pricefeed for eth
+        SimpleAssetManagement(asmUpgrade).setConfig("payTokens", b(eth), b(true), "diamonds");             // enable eth to pay with
+        SimpleAssetManagement(asmUpgrade).setConfig("manualRate", b(eth), b(true), "diamonds");            // enable to set rate of eth manually if feed is dowh (as is current situations)
+        SimpleAssetManagement(asmUpgrade).setConfig("decimals", b(eth), b(18), "diamonds");                // set precision for eth token
+        SimpleAssetManagement(asmUpgrade).setConfig("rate", b(eth), b(ethUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
+        SimpleAssetManagement(asmUpgrade).setConfig("priceFeed", b(dai), b(address(daiFeed)), "diamonds"); // set pricefeed for dai
+        SimpleAssetManagement(asmUpgrade).setConfig("payTokens", b(dai), b(true), "diamonds");             // enable dai to pay with
+        SimpleAssetManagement(asmUpgrade).setConfig("manualRate", b(dai), b(true), "diamonds");            // enable to set rate of dai manually if feed is dowh (as is current situations)
+        SimpleAssetManagement(asmUpgrade).setConfig("decimals", b(dai), b(18), "diamonds");                // set precision for dai token
+        SimpleAssetManagement(asmUpgrade).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
+        SimpleAssetManagement(asmUpgrade).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asmUpgrade to be handled by dex
+        SimpleAssetManagement(asmUpgrade).setConfig("setApproveForAll", b(dpass), b(dex), b(true));        // enable the dpass tokens of asmUpgrade to be handled by dex
+        SimpleAssetManagement(asmUpgrade).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
+        SimpleAssetManagement(asmUpgrade).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
+        SimpleAssetManagement(asmUpgrade).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asmUpgrade as for dex)
+        SimpleAssetManagement(asmUpgrade).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        SimpleAssetManagement(asmUpgrade).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18
+        SimpleAssetManagement(asmUpgrade).setConfig("dcdcs", b(dcdc), b(true), "diamonds");                 // tell asmUpgrade that dcdc is indeed a dcdc token
+        SimpleAssetManagement(asmUpgrade).setConfig("rate", b(dcdc), b(cdcUsdRate), "diamonds");            // set rate for token
+
+        //----------------------send-all-unsold-dpass-tokens-to-new-asm----------------------------------
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(address(this)), b(true));      // enable us to transfer unsold dpass tokens.
+        Dpass(dpass).transferFrom(asm, asmUpgrade, id1);                                                    // if there are more diamonds you send them all
+        Dpass(dpass).transferFrom(asm, asmUpgrade, id2);                                                    // if there are more diamonds you send them all
+        TesterActor(custodian).setAsm(asmUpgrade);                                                          // set custodian to handle upgraded asm
+        TesterActor(custodian).doSetBasePrice(                                                              // set base price on new asm, must be done for all dpass tokens
+            dpass, 
+            id1,
+            SimpleAssetManagement(asm).basePrice(dpass, id1));                                              // get base price (optionally) from old asm
+        TesterActor(custodian).doSetBasePrice(                                                              // set base price on new asm, must be done for all dpass tokens
+            dpass, 
+            id2,
+            SimpleAssetManagement(asm).basePrice(dpass, id2));                                              // get base price (optionally) from old asm
+        //----------------------set-info-of-dcdc-tokens-at-upgraded-asm----------------------------------
+        SimpleAssetManagement(asmUpgrade).setDcdcV(dcdc, custodian);                                        // update dcdc value for all custodians
+        //----------------------setting-overCollRatio-MUST COME AFTER ADDING ALL DPASS, and DCDC contract otherwise system reverts with "asm-system-undercollaterized" 
+        SimpleAssetManagement(asmUpgrade).setConfig("overCollRatio", b(uint(1.1 ether)), "", "diamonds");   // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+        SimpleAssetManagement(asmUpgrade).setConfig("overCollRemoveRatio", b(uint(1.05 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+    }
+
+    function _configDexForAsmUpgrade() internal {
+        DiamondExchange(dex).setConfig("asm", b(asmUpgrade), b(""));                                       // set asset management contract
+    }
+
+    function _configRedForAsmUpgrade() internal {
+        Redeemer(red).setConfig("asm", b(asmUpgrade), "", "");                                              // tell redeemer the address of asset management
+    }
+
+    function _configTest3CdcPurchaseAsmUpgradeInt() internal {
+        asm = asmUpgrade;                               // now asm points to the upgraded exchanges address(in order to run next test)
+        TesterActor(user).setAsm(asm);                  // test user uses new asm
+        TesterActor(custodian).setAsm(asm);             // custodian uses new asm
+    }
+
+
+    function _configTest3CdcPurchaseInt() internal {
+        dex = dexUpgrade;                               // now dex points to the upgraded exchanges address(in order to run next test)
+        TesterActor(user).setDex(dex);                  // test user uses new dex
+        TesterActor(custodian).setDex(dex);             // custodian uses new dex
+    }
+
+    function _upgradeDexGuard() internal {
+        DiamondExchange(dexUpgrade).setAuthority(guard);
+        guard.permit(dexUpgrade, asm, ANY);
+        guard.permit(dexUpgrade, liq, ANY);
+    }
+
+    function _configDexForDexUpgrade() internal {
+        Liquidity(liq).approve(dpt, dexUpgrade, uint(-1));
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(cdc), b(true));           // user can sell cdc tokens
+        DiamondExchange(dexUpgrade).setConfig("canBuyErc20", b(cdc), b(true));            // user can buy cdc tokens
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("priceFeed", b(cdc), b(address(cdcFeed)));  // priceFeed address is set
+        DiamondExchange(dexUpgrade).setConfig("handledByAsm", b(cdc), b(true));           // make sure that cdc is minted by asset management
+        DiamondExchange(dexUpgrade).setConfig(b("rate"), b(cdc), b(uint(cdcUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(cdc), b(true));          // allow using manually set prices on cdc token
+
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(eth), b(true));           // user can sell eth tokens
+        // DiamondExchange(dexUpgrade).setConfig("canBuyErc20", b(eth), b(true));         // user CAN NOT BUY ETH ON THIS EXCHANAGE
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("priceFeed", b(eth), b(address(ethFeed)));  // priceFeed address is set
+        // DiamondExchange(dexUpgrade).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
+        DiamondExchange(dexUpgrade).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
+        DiamondExchange(dexUpgrade).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
+
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
+        DiamondExchange(dexUpgrade).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
+        DiamondExchange(dexUpgrade).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
+
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
+        DiamondExchange(dexUpgrade).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
+        DiamondExchange(dexUpgrade).setConfig("redeemFeeToken", b(dpt), b(true));         // set dpt as a token with which redeem fee can be paid
+
+        DiamondExchange(dexUpgrade).setConfig("dpt", b(dpt), "");                         // tell exhcange which one is the DPT token
+        DiamondExchange(dexUpgrade).setConfig("liq", b(liq), "");                         // set liquidity contract
+        DiamondExchange(dexUpgrade).setConfig("burner", b(burner), b(""));                // set burner contract to burn profit of dpt owners
+        DiamondExchange(dexUpgrade).setConfig("asm", b(asm), b(""));                      // set asset management contract
+        DiamondExchange(dexUpgrade).setConfig("wal", b(wal), b(""));                      // set wallet to store cost part of fee received from users
+
+        DiamondExchange(dexUpgrade).setConfig("fixFee", b(uint(0 ether)), b(""));         // fixed part of fee that is independent of purchase value
+        DiamondExchange(dexUpgrade).setConfig("varFee", b(uint(0.03 ether)), b(""));      // percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
+        DiamondExchange(dexUpgrade).setConfig("profitRate", b(uint(0.1 ether)), b(""));   // percentage value telling how much of total fee goes to profit of DPT owners
+        DiamondExchange(dexUpgrade).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
+        DiamondExchange(dexUpgrade).setConfig("redeemer", b(red), b(""));                 // set wallet to store cost part of fee received from users
+    }
+
+    function _configAsmForDexUpgrade() internal {
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(dexUpgrade), b(true));        // enable the dpass tokens of asm to be handled by dexUpgrade
+    }
+
+    function _configRedeemerForDexUpgrade() internal {
+        Redeemer(red).setConfig("dex", b(dexUpgrade), "", "");                             // tell redeemer the address of dexUpgrade
+        Redeemer(red).setConfig(
+            "profitRate",
+            b(DiamondExchange(dexUpgrade).profitRate()), "", "");                          // tell redeemer the profitRate (should be same as we set in dexUpgrade), the rate of profit belonging to dpt owners
+    }
+
     function logUint(bytes32 what, uint256 num, uint256 dec) public {
         emit LogUintIpartUintFpart( what, num / 10 ** dec, num % 10 ** dec);
     }
 
     function _prepareDai() public {
-       daiUsdRate = 1 ether;
+        daiUsdRate = 1 ether;
 
         daiFeed = new Medianizer();                    // create medianizer that calculates single price from multiple price sources
 
@@ -613,51 +903,58 @@ contract IntegrationsTest is DSTest {
 
         ethFeed.poke();
         //--------------------oracles-update-price-data--------------------------------end
+//--------------setup-liq------------------------------------------------------------
 
-        DiamondExchange(exchange).setConfig("canSellErc20", b(cdc), b(true));           // user can sell cdc tokens
-        DiamondExchange(exchange).setConfig("canBuyErc20", b(cdc), b(true));            // user can buy cdc tokens
-        DiamondExchange(exchange).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
-        DiamondExchange(exchange).setConfig("priceFeed", b(cdc), b(address(cdcFeed)));  // priceFeed address is set
-        DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(true));           // make sure that cdc is minted by asset management
-        DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(uint(cdcUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
-        DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(true));          // allow using manually set prices on cdc token
+        DSToken(dpt).transfer(liq, INITIAL_BALANCE);
+        Liquidity(liq).approve(dpt, dex, uint(-1));
+        Liquidity(liq).approve(dpt, red, uint(-1));
 
-        DiamondExchange(exchange).setConfig("canSellErc20", b(eth), b(true));           // user can sell eth tokens
-        // DiamondExchange(exchange).setConfig("canBuyErc20", b(eth), b(true));         // user CAN NOT BUY ETH ON THIS EXCHANAGE
-        DiamondExchange(exchange).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
-        DiamondExchange(exchange).setConfig("priceFeed", b(eth), b(address(ethFeed)));  // priceFeed address is set
-        // DiamondExchange(exchange).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
-        DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
-        DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
+//--------------setup-dex------------------------------------------------------------
 
-        DiamondExchange(exchange).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
-        DiamondExchange(exchange).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
-        DiamondExchange(exchange).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
-        DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
-        DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
+        DiamondExchange(dex).setConfig("canSellErc20", b(cdc), b(true));           // user can sell cdc tokens
+        DiamondExchange(dex).setConfig("canBuyErc20", b(cdc), b(true));            // user can buy cdc tokens
+        DiamondExchange(dex).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
+        DiamondExchange(dex).setConfig("priceFeed", b(cdc), b(address(cdcFeed)));  // priceFeed address is set
+        DiamondExchange(dex).setConfig("handledByAsm", b(cdc), b(true));           // make sure that cdc is minted by asset management
+        DiamondExchange(dex).setConfig(b("rate"), b(cdc), b(uint(cdcUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dex).setConfig(b("manualRate"), b(cdc), b(true));          // allow using manually set prices on cdc token
 
-        DiamondExchange(exchange).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
-        DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
-        DiamondExchange(exchange).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
-        DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
-        DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
-        DiamondExchange(exchange).setConfig("redeemFeeToken", b(dpt), b(true));         // set dpt as a token with which redeem fee can be paid
+        DiamondExchange(dex).setConfig("canSellErc20", b(eth), b(true));           // user can sell eth tokens
+        // DiamondExchange(dex).setConfig("canBuyErc20", b(eth), b(true));         // user CAN NOT BUY ETH ON THIS EXCHANAGE
+        DiamondExchange(dex).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
+        DiamondExchange(dex).setConfig("priceFeed", b(eth), b(address(ethFeed)));  // priceFeed address is set
+        // DiamondExchange(dex).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
+        DiamondExchange(dex).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dex).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
+        DiamondExchange(dex).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
 
-        DiamondExchange(exchange).setConfig("dpt", b(dpt), "");                         // tell exhcange which one is the DPT token
-        DiamondExchange(exchange).setConfig("liq", b(liq), "");                         // set liquidity contract
-        DiamondExchange(exchange).setConfig("burner", b(burner), b(""));                // set burner contract to burn profit of dpt owners
-        DiamondExchange(exchange).setConfig("asm", b(asm), b(""));                      // set asset management contract
-        DiamondExchange(exchange).setConfig("wal", b(wal), b(""));                      // set wallet to store cost part of fee received from users
+        DiamondExchange(dex).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
+        DiamondExchange(dex).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
+        DiamondExchange(dex).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
+        DiamondExchange(dex).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dex).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
+        DiamondExchange(dex).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
 
-        DiamondExchange(exchange).setConfig("fixFee", b(uint(0 ether)), b(""));         // fixed part of fee that is independent of purchase value
-        DiamondExchange(exchange).setConfig("varFee", b(uint(0.03 ether)), b(""));      // percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
-        DiamondExchange(exchange).setConfig("profitRate", b(uint(0.1 ether)), b(""));   // percentage value telling how much of total fee goes to profit of DPT owners
-        DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
+        DiamondExchange(dex).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
+        DiamondExchange(dex).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
+        DiamondExchange(dex).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
+        DiamondExchange(dex).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
+        DiamondExchange(dex).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
+        DiamondExchange(dex).setConfig("redeemFeeToken", b(dpt), b(true));         // set dpt as a token with which redeem fee can be paid
+
+        DiamondExchange(dex).setConfig("dpt", b(dpt), "");                         // tell exhcange which one is the DPT token
+        DiamondExchange(dex).setConfig("liq", b(liq), "");                         // set liquidity contract
+        DiamondExchange(dex).setConfig("burner", b(burner), b(""));                // set burner contract to burn profit of dpt owners
+        DiamondExchange(dex).setConfig("asm", b(asm), b(""));                      // set asset management contract
+        DiamondExchange(dex).setConfig("wal", b(wal), b(""));                      // set wallet to store cost part of fee received from users
+
+        DiamondExchange(dex).setConfig("fixFee", b(uint(0 ether)), b(""));         // fixed part of fee that is independent of purchase value
+        DiamondExchange(dex).setConfig("varFee", b(uint(0.03 ether)), b(""));      // percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
+        DiamondExchange(dex).setConfig("profitRate", b(uint(0.1 ether)), b(""));   // percentage value telling how much of total fee goes to profit of DPT owners
+        DiamondExchange(dex).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
        //-------------setup-asm------------------------------------------------------------
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for exchange)
+        SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for dex)
         SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
         SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
         SimpleAssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
@@ -677,12 +974,13 @@ contract IntegrationsTest is DSTest {
         SimpleAssetManagement(asm).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
 
         SimpleAssetManagement(asm).setConfig("overCollRatio", b(uint(1.1 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
-        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by exchange
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));        // enable the dpass tokens of asm to be handled by exchange
+        SimpleAssetManagement(asm).setConfig("overCollRemoveRatio", b(uint(1.05 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by dex
+        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(dex), b(true));        // enable the dpass tokens of asm to be handled by dex
         SimpleAssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
         SimpleAssetManagement(asm).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asm as for exchange)
+        SimpleAssetManagement(asm).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asm as for dex)
         SimpleAssetManagement(asm).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
         SimpleAssetManagement(asm).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18
         SimpleAssetManagement(asm).setConfig("dcdcs", b(dcdc), b(true), "diamonds");                 // tell asm that dcdc is indeed a dcdc token
@@ -691,7 +989,7 @@ contract IntegrationsTest is DSTest {
 
 //--------------setup-redeemer-------------------------------------------------------
         Redeemer(red).setConfig("asm", b(asm), "", "");                             // tell redeemer the address of asset management
-        Redeemer(red).setConfig("dex", b(exchange), "", "");                             // tell redeemer the address of exchange
+        Redeemer(red).setConfig("dex", b(dex), "", "");                             // tell redeemer the address of dex
         Redeemer(red).setConfig("burner", b(burner), "", "");                       // tell redeemer the address of burner
         Redeemer(red).setConfig("wal", b(wal), "", "");                             // tell redeemer the address of burner
         Redeemer(red).setConfig("fixFee", b(uint(0 ether)), "", "");                      // tell redeemer the fixed fee in base currency that is taken from total redeem fee is 0
@@ -700,14 +998,15 @@ contract IntegrationsTest is DSTest {
 
         Redeemer(red).setConfig(
             "profitRate",
-            b(DiamondExchange(exchange).profitRate()), "", "");                          // tell redeemer the profitRate (should be same as we set in exchange), the rate of profit belonging to dpt owners
+            b(DiamondExchange(dex).profitRate()), "", "");                          // tell redeemer the profitRate (should be same as we set in dex), the rate of profit belonging to dpt owners
 
         Redeemer(red).setConfig("dcdcOfCdc", b(cdc), b(dcdc), "");                  // do a match between cdc and matching dcdc token
         Redeemer(red).setConfig("dpt", b(dpt), "", "");                             // set dpt token address for redeemer
         Redeemer(red).setConfig("liq", b(liq), "", "");                             // set liquidity contract address for redeemer
         Redeemer(red).setConfig("liqBuysDpt", b(false), "", "");                    // set if liquidity contract should buy dpt on the fly for sending as fee
         // Redeemer(red).setConfig("dust", b(uint(1000)), "", "");                  // it is optional to set dust, its default value is 1000
-        DiamondExchange(exchange).setConfig("redeemer", b(red), b(""));             // set wallet to store cost part of fee received from users
+        DiamondExchange(dex).setConfig("redeemer", b(red), b(""));                  // set wallet to store cost part of fee received from users
+
     }
 
     function _createTokens() internal {
@@ -770,24 +1069,21 @@ contract IntegrationsTest is DSTest {
 
         ourGas = gasleft();
         emit LogTest("cerate DiamondExchange");
-        exchange = address(uint160(address(new DiamondExchange())));
+        dex = address(uint160(address(new DiamondExchange())));
         emit LogTest(ourGas - gasleft());
         red = address(uint160(address(new Redeemer())));
 
         liq = address(uint160(address(new Liquidity())));                           // DPT liquidity pprovider contract
-        DSToken(dpt).transfer(liq, INITIAL_BALANCE);
-        Liquidity(liq).approve(dpt, exchange, uint(-1));
-        Liquidity(liq).approve(dpt, red, uint(-1));
-
         fca = address(uint160(address(new FeeCalculator())));                       // fee calculation contract
     }
 
     function _createActors() internal {
-        user = address(new TesterActor(address(exchange), address(asm)));
-        user1 = address(new TesterActor(address(exchange), address(asm)));
-        custodian = address(new TesterActor(address(exchange), address(asm)));
-        custodian1 = address(new TesterActor(address(exchange), address(asm)));
-        custodian2 = address(new TesterActor(address(exchange), address(asm)));
+        user = address(new TesterActor(address(dex), address(asm)));
+        user1 = address(new TesterActor(address(dex), address(asm)));
+        custodian = address(new TesterActor(address(dex), address(asm)));
+        custodian1 = address(new TesterActor(address(dex), address(asm)));
+        custodian2 = address(new TesterActor(address(dex), address(asm)));
+        auditor = address(new TesterActor(address(dex), address(asm)));
     }
 
     function _setupGuard() internal {
@@ -795,7 +1091,7 @@ contract IntegrationsTest is DSTest {
         Burner(burner).setAuthority(guard);
         Wallet(wal).setAuthority(guard);
         SimpleAssetManagement(asm).setAuthority(guard);
-        DiamondExchange(exchange).setAuthority(guard);
+        DiamondExchange(dex).setAuthority(guard);
         Liquidity(liq).setAuthority(guard);
         FeeCalculator(fca).setAuthority(guard);
         DSToken(dpt).setAuthority(guard);
@@ -823,49 +1119,55 @@ contract IntegrationsTest is DSTest {
         guard.permit(address(asm), dpass, ANY);
         guard.permit(address(asm), dpass1, ANY);
         guard.permit(address(asm), dpass2, ANY);
-        guard.permit(exchange, asm, ANY);
-        guard.permit(exchange, liq, ANY);
+        guard.permit(dex, asm, ANY);
+        guard.permit(dex, liq, ANY);
         guard.permit(red, liq, ANY);
         guard.permit(red, asm, ANY);
-        guard.permit(red, exchange, ANY);
+        guard.permit(red, dex, ANY);
 
-        guard.permit(custodian, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian, asm, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian, asm, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("mint(address,address,uint256)")));
 
-        guard.permit(custodian, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian, asm, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
         guard.permit(custodian, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
 
-        guard.permit(custodian1, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("mint(address,address,uint256)")));
 
-        guard.permit(custodian1, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian1, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian1, asm, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
         guard.permit(custodian1, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian1, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian1, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
 
-        guard.permit(custodian2, address(asm), bytes4(keccak256("getRateNewest(address)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("getRate(address)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("burn(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mint(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("burnDcdc(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("mintDcdc(address,address,uint256)")));
-        guard.permit(custodian2, address(asm), bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("getRateNewest(address)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("getRate(address)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("burn(address,address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("mint(address,address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("burnDcdc(address,address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("mintDpass(address,address,bytes32,bytes32,bytes32,bytes32,uint24,bytes32,bytes8,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("mintDcdc(address,address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("withdraw(address,uint256)")));
+        guard.permit(custodian2, asm, bytes4(keccak256("setBasePrice(address,uint256,uint256)")));
         guard.permit(custodian2, dpass, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian2, dpass1, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
         guard.permit(custodian2, dpass2, bytes4(keccak256("linkOldToNewToken(uint256,uint256)")));
+
+//----------------setup-auditor---------------------------------------------------------------------
+        guard.permit(auditor, asm, bytes4(keccak256("setAudit(address,uint256,bytes32,bytes32,uint32)")));
     }
 
     function b(bytes32 a) public pure returns(bytes32) {
@@ -983,6 +1285,22 @@ contract TrustedSASMTester is Wallet {
         asm.setConfig(what_, value_, value1_, value2_);
     }
 
+    function doSetAudit(
+        address custodian_,
+        uint256 status_,
+        bytes32 descriptionHash_,
+        bytes32 descriptionUrl_,
+        uint32 auditInterval_
+    ) public {
+        asm.setAudit(
+            custodian_,
+            status_,
+            descriptionHash_,
+            descriptionUrl_,
+            auditInterval_
+        );
+    }
+
     function doSetBasePrice(address token, uint256 tokenId, uint256 price) public {
         asm.setBasePrice(token, tokenId, price);
     }
@@ -1079,6 +1397,10 @@ contract TrustedSASMTester is Wallet {
         Dpass(token_).setState(newState_, tokenId_);
     }
 
+    function setAsm(address payable asm_) public {
+        asm = SimpleAssetManagement(asm_);
+    }
+
     function () external payable {
     }
 }
@@ -1092,12 +1414,12 @@ contract DiamondExchangeTester is Wallet, DSTest {
     event LogTest(address what);
     event LogTest(bytes32 what);
 
-    DiamondExchange public exchange;
+    address payable public dex;
 
 
     constructor(address payable exchange_) public {
-        require(exchange_ != address(0), "CET: exchange 0x0 invalid");
-        exchange = DiamondExchange(exchange_);
+        require(exchange_ != address(0), "CET: dex 0x0 invalid");
+        dex = exchange_;
     }
 
     function () external payable {
@@ -1132,11 +1454,11 @@ contract DiamondExchangeTester is Wallet, DSTest {
     }
 
     function doSetBuyPrice(address token, uint256 tokenId, uint256 price) public {
-        DiamondExchange(exchange).setBuyPrice(token, tokenId, price);
+        DiamondExchange(dex).setBuyPrice(token, tokenId, price);
     }
 
     function doGetBuyPrice(address token, uint256 tokenId) public view returns(uint256) {
-        return DiamondExchange(exchange).getBuyPrice(token, tokenId);
+        return DiamondExchange(dex).getBuyPrice(token, tokenId);
     }
 
     function doBuyTokensWithFee(
@@ -1147,14 +1469,14 @@ contract DiamondExchangeTester is Wallet, DSTest {
     ) public payable logs_gas {
         if (sellToken == address(0xee)) {
 
-            DiamondExchange(exchange)
+            DiamondExchange(dex)
             .buyTokensWithFee
             .value(sellAmtOrId == uint(-1) ? address(this).balance : sellAmtOrId > address(this).balance ? address(this).balance : sellAmtOrId)
             (sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
         } else {
 
-            DiamondExchange(exchange).buyTokensWithFee(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+            DiamondExchange(dex).buyTokensWithFee(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
         }
     }
 
@@ -1167,7 +1489,7 @@ contract DiamondExchangeTester is Wallet, DSTest {
     ) public payable returns (uint) {
         if (feeToken_ == address(0xee)) {
 
-            return  DiamondExchange(exchange)
+            return  DiamondExchange(dex)
                 .redeem
                 .value(feeAmt_ == uint(-1) ? address(this).balance : feeAmt_ > address(this).balance ? address(this).balance : feeAmt_)
 
@@ -1177,7 +1499,7 @@ contract DiamondExchangeTester is Wallet, DSTest {
                 feeAmt_,
                 custodian_);
         } else {
-            return  DiamondExchange(exchange).redeem(
+            return  DiamondExchange(dex).redeem(
                 redeemToken_,
                 redeemAmtOrId_,
                 feeToken_,
@@ -1196,11 +1518,11 @@ contract DiamondExchangeTester is Wallet, DSTest {
     function doSetConfig(bytes32 what, uint256 value_, bool value1_) public { doSetConfig(what, b32(value_), b32(value1_)); }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_) public {
-        DiamondExchange(exchange).setConfig(what_, value_, value1_);
+        DiamondExchange(dex).setConfig(what_, value_, value1_);
     }
 
     function doGetDecimals(address token_) public view returns(uint8) {
-        return DiamondExchange(exchange).getDecimals(token_);
+        return DiamondExchange(dex).getDecimals(token_);
     }
 
     /**
@@ -1245,15 +1567,20 @@ contract DiamondExchangeTester is Wallet, DSTest {
         address buyToken_,
         uint256 buyAmtOrId_
     ) public view returns (uint256) {
-        return DiamondExchange(exchange).calculateFee(sender_, value_, sellToken_, sellAmtOrId_, buyToken_, buyAmtOrId_);
+        return DiamondExchange(dex).calculateFee(sender_, value_, sellToken_, sellAmtOrId_, buyToken_, buyAmtOrId_);
     }
 
     function doGetRate(address token_) public view returns (uint rate_) {
-        return DiamondExchange(exchange).getRate(token_);
+        return DiamondExchange(dex).getRate(token_);
     }
 
     function doGetLocalRate(address token_) public view returns (uint rate_) {
-        return DiamondExchange(exchange).getRate(token_);
+        return DiamondExchange(dex).getRate(token_);
+    }
+
+    function setDex(address payable dex_) public {
+        require(dex_ != address(0), "test-setdex-dex-zero");
+        dex = dex_;
     }
 }
 

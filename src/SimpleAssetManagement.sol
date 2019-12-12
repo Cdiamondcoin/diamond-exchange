@@ -499,7 +499,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             currentHashingAlgorithm_);
 
         _setBasePrice(token_, id_, price_);
-        _requireCapCustV(custodian_);
     }
 
     /*
