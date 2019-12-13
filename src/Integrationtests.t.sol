@@ -1,12 +1,11 @@
 pragma solidity ^0.5.11;
 
-// TODO: asm move to other asm test!!!!! PRIORITY
 // TODO: show how to introduce new buy token (denyToken, feeds, etc)
 // TODO: user sells diamonds
 // TODO: setup scenario
 // TODO: invalid diamond who does what
 // TODO: simple setup scenario
-// TODO: custodian adds diamond wrong this is how we correnct ir
+// TODO: custodian adds diamond wrong this is how we correnct it
 // TODO: upgrade asm or dex functionality
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: test for each basic use-case to demonstrate usability
@@ -15,7 +14,7 @@ pragma solidity ^0.5.11;
 
 // TODO: user puts his dpass for sale.
 // TODO: oracle update CDC price must set cdc values as well
-// DODO: lazy custodian looses money because prices went up and has less cdc from sale
+// TODO: lazy custodian looses money because prices went up and has less cdc from sale
 
 import "ds-test/test.sol";
 import "ds-auth/auth.sol";
@@ -119,57 +118,6 @@ contract IntegrationsTest is DSTest, DSMath {
         _setupContracts();
     }
 
-    function testUpgradeAsmInt() public {               // testing of upgrading of exchange contract (dex)
-        //------------------simulate-actions-prior-to-upgrade------------------------------
-        uint id1 = test1MintCdcInt();                   // mint dpass (and returns its id) and cdc tokens
-        uint id2 = test2MintDpassInt();                 // mint another dpass and returns tokens
-        test22MintDcdcInt();                            // mint some dcdc tokens too
-
-        //------------------upgrade-starts-HERE--------------------------------------------
-        SimpleAssetManagement(asm).stop();              // stop some update functiona THIS DOES NOT STOP CUSTODIANS NOR AUTÓDITORS NOR ASSET MANAGERS!!!!
-        DiamondExchange(dex).stop();                    // stop exchange
-
-        asmUpgrade = address(uint160(                   // deploy new asset managemet contract
-            address(new SimpleAssetManagement())));
-
-        _disableEveryoneUsingCurrentAsm();              // make sure no one has access to current asm while upgrade
-        _upgradeAsmGuard();                             // setup guard first
-        _configAsmForAsmUpgrade(id1, id2);              // configure exchange
-        _configDexForAsmUpgrade();                      // config asm to handle upgraded exchange
-        _configRedForAsmUpgrade();                      // config asm to handle upgraded exchange
-
-        DiamondExchange(dex).start();                   // enable trade and redeem functionality
-
-        //------------------upgrade-ends-HERE---------------------------------------------
-
-        //------------------test-succsessful-upgrade---------------------------------------
-
-        assertEqLog("dcdc-total-value", SimpleAssetManagement(asmUpgrade).totalDcdcV(), wmul(cdcUsdRate, 5 ether));
-        assertEqLog("cdc-total-value", SimpleAssetManagement(asmUpgrade).totalCdcV(), wmul(cdcUsdRate, 1 ether));
-        assertEqLog("dpass-total-value", SimpleAssetManagement(asmUpgrade).totalDpassV(), 2928.03 * 2 ether);
-        assertEqLog("dpass-total-value-cust", SimpleAssetManagement(asmUpgrade).totalDpassCustV(custodian), 2928.03 * 2 ether);
-        _configTest3CdcPurchaseAsmUpgradeInt();         // config test below to run with new dex
-        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
-    }
-
-    function testUpgradeDexInt() public {               // testing of upgrading of exchange contract (dex)
-        DiamondExchange(dex).stop();                    // make sure no one trades or redeems anything on dex
-        dexUpgrade = address(uint160(                   // deploy new exchange contract
-            address(new DiamondExchange())));
-
-        DiamondExchange(dexUpgrade).stop();             // disable trade and redeem functionality
-
-        _upgradeDexGuard();                             // setup guard first
-        _configDexForDexUpgrade();                            // configure exchange
-        _configAsmForDexUpgrade();                      // config asm to handle upgraded exchange
-        _configRedeemerForDexUpgrade();                 // setup redeemer for new dex
-
-        DiamondExchange(dexUpgrade).start();            // enable trade and redeem functionality
-
-        _configTest3CdcPurchaseInt();                   // config test below to run with new dex
-        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
-    }
-
     function test1MintCdcInt() public returns (uint id) {             // use-case 1. Mint Cdc
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
@@ -239,7 +187,7 @@ contract IntegrationsTest is DSTest, DSMath {
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        uint id = TesterActor(custodian)            // **Mint some dpass diamond so that we can print cdc
+        TesterActor(custodian)            // **Mint some dpass diamond so that we can print cdc
             .doMintDpass(
             dpass,
             custodian,
@@ -544,6 +492,57 @@ contract IntegrationsTest is DSTest, DSMath {
 
     function test9CurrencyExchangesWork() public {
        // TODO: start from here
+    }
+
+    function testUpgradeAsmInt() public {               // testing of upgrading of exchange contract (dex)
+        //------------------simulate-actions-prior-to-upgrade------------------------------
+        uint id1 = test1MintCdcInt();                   // mint dpass (and returns its id) and cdc tokens
+        uint id2 = test2MintDpassInt();                 // mint another dpass and returns tokens
+        test22MintDcdcInt();                            // mint some dcdc tokens too
+
+        //------------------upgrade-starts-HERE--------------------------------------------
+        SimpleAssetManagement(asm).stop();              // stop some update functiona THIS DOES NOT STOP CUSTODIANS NOR AUTÓDITORS NOR ASSET MANAGERS!!!!
+        DiamondExchange(dex).stop();                    // stop exchange
+
+        asmUpgrade = address(uint160(                   // deploy new asset managemet contract
+            address(new SimpleAssetManagement())));
+
+        _disableEveryoneUsingCurrentAsm();              // make sure no one has access to current asm while upgrade
+        _upgradeAsmGuard();                             // setup guard first
+        _configAsmForAsmUpgrade(id1, id2);              // configure exchange
+        _configDexForAsmUpgrade();                      // config asm to handle upgraded exchange
+        _configRedForAsmUpgrade();                      // config asm to handle upgraded exchange
+
+        DiamondExchange(dex).start();                   // enable trade and redeem functionality
+
+        //------------------upgrade-ends-HERE---------------------------------------------
+
+        //------------------test-succsessful-upgrade---------------------------------------
+
+        assertEqLog("dcdc-total-value", SimpleAssetManagement(asmUpgrade).totalDcdcV(), wmul(cdcUsdRate, 5 ether));
+        assertEqLog("cdc-total-value", SimpleAssetManagement(asmUpgrade).totalCdcV(), wmul(cdcUsdRate, 1 ether));
+        assertEqLog("dpass-total-value", SimpleAssetManagement(asmUpgrade).totalDpassV(), 2928.03 * 2 ether);
+        assertEqLog("dpass-total-value-cust", SimpleAssetManagement(asmUpgrade).totalDpassCustV(custodian), 2928.03 * 2 ether);
+        _configTest3CdcPurchaseAsmUpgradeInt();         // config test below to run with new dex
+        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
+    }
+
+    function testUpgradeDexInt() public {               // testing of upgrading of exchange contract (dex)
+        DiamondExchange(dex).stop();                    // make sure no one trades or redeems anything on dex
+        dexUpgrade = address(uint160(                   // deploy new exchange contract
+            address(new DiamondExchange())));
+
+        DiamondExchange(dexUpgrade).stop();             // disable trade and redeem functionality
+
+        _upgradeDexGuard();                             // setup guard first
+        _configDexForDexUpgrade();                            // configure exchange
+        _configAsmForDexUpgrade();                      // config asm to handle upgraded exchange
+        _configRedeemerForDexUpgrade();                 // setup redeemer for new dex
+
+        DiamondExchange(dexUpgrade).start();            // enable trade and redeem functionality
+
+        _configTest3CdcPurchaseInt();                   // config test below to run with new dex
+        test3CdcPurchaseInt();                          // let's check if we can exchange some tokens with upgraded exchange
     }
 //---------------------------end-of-tests-------------------------------------------------------------------
 

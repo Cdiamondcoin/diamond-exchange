@@ -3,6 +3,7 @@ pragma solidity ^0.5.11;
 import "./DiamondExchange.sol";
 import "dpass/Dpass.sol";
 import "ds-auth/auth.sol";
+import "./Redeemer.sol";
 
 contract TrustedAsmExt {
     function getAmtForSale(address token) external view returns(uint256);
@@ -38,6 +39,7 @@ contract DiamondExchangeExtension is DSAuth {
     uint public dust = 1000;
     TrustedAsmExt public asm;
     DiamondExchange public dex;
+    Redeemer public red;
     TrustedFeeCalculatorExt public fca;
 
     uint private buyV;
@@ -79,11 +81,18 @@ contract DiamondExchangeExtension is DSAuth {
 
             dex = DiamondExchange(address(uint160(addr(value_))));
 
+        } else if (what_ == "red") {
+
+            require(addr(value_) != address(0x0), "dee-wrong-address");
+
+            red = Redeemer(address(uint160(addr(value_))));
+
         } else if (what_ == "dust") {
 
             dust = uint256(value_);
 
         } else {
+            value1_; // disable warning of unused variable
             require(false, "dee-no-such-option");
         }
     }
@@ -143,12 +152,12 @@ contract DiamondExchangeExtension is DSAuth {
         uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
         address buyToken_,                                                      // the token user wants to buy
         uint256 buyAmtOrId_                                                     // the amount user wants to buy
-    ) public view 
+    ) public view
     returns (
         uint256 sellAmtOrId_,                                                   // the calculated amount of tokens needed to be solc to get buyToken_
         uint256 feeDpt_,                                                        // the fee paid in DPT if user has DPT ...
                                                                                 // ... (if you dont want to calculate with user DPT set user address to 0x0
-        uint256 feeV_,                                                          // total fee to be paid in base currency 
+        uint256 feeV_,                                                          // total fee to be paid in base currency
         uint256 feeSellT_                                                       // fee to be paid in sellTokens (this amount will be subtracted as fee from user)
     ) {
         uint buyV_;
@@ -184,7 +193,7 @@ contract DiamondExchangeExtension is DSAuth {
                             DSToken(buyToken_).balanceOf(
                                 dex.custodian20(buyToken_)),
                             DSToken(buyToken_).allowance(
-                                dex.custodian20(buyToken_), address(this)));
+                                dex.custodian20(buyToken_), address(dex)));
 
                 buyV_ = min(buyV_, buyAmtOrId_);
 
@@ -238,5 +247,14 @@ contract DiamondExchangeExtension is DSAuth {
 
             return fca.getCosts(user, sellToken_, sellId_, buyToken_, buyAmtOrId_);
         }
+    }
+
+    // TODO: test
+    function getRedeemCosts(
+        address redeemToken_,
+        uint256 redeemAmtOrId_,
+        address feeToken_
+    ) public view returns(uint) {
+        return red.getRedeemCosts(redeemToken_, redeemAmtOrId_, feeToken_);
     }
 }

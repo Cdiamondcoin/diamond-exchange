@@ -20,7 +20,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     event LogRedeem(uint256 redeemId, address sender, address redeemToken_,uint256 redeemAmtOrId_, address feeToken_, uint256 feeAmt_, address payable custodian);
     address public eth = address(0xee);
     event LogTransferEth(address src, address dst, uint256 amount);
-    event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1);
+    event LogConfigChange(bytes32 what, bytes32 value, bytes32 value1, bytes32 value2);
     mapping(address => address) public dcdc;                 // dcdc[cdc] returns the dcdc token associated (having the same values) as cdc token
     uint256 public fixFee;                                  // Fixed part of fee charged by Cdiamondcoin from redeemToken_ in base currency
     uint256 public varFee;                                  // Variable part of fee charged by Cdiamondcoin from redeemToken_
@@ -134,7 +134,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         } else {
             require(false, "red-invalid-option");
         }
-        emit LogConfigChange(what_, value_, value1_);
+        emit LogConfigChange(what_, value_, value1_, value2_);
     }
 
     /*
@@ -191,28 +191,9 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
     function _sendFeeToCdiamondCoin(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_, uint256 feeAmt_) internal returns (uint feeToCustodianT_){
         uint profitV_;
-        uint redeemTokenV_;
+        uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
 
-        if(asm.dpasses(redeemToken_)) {
-            redeemTokenV_ = asm.basePrice(redeemToken_, redeemAmtOrId_);
-        } else {
-            redeemTokenV_ = dex.wmulV(
-                redeemAmtOrId_,
-                dex.getLocalRate(redeemToken_),
-                redeemToken_);
-        }
-
-        uint feeT_ = add(
-            dex.wdivT(
-                fixFee,
-                dex.getLocalRate(feeToken_),
-                feeToken_),
-            dex.wdivT(
-                wmul(
-                    varFee, 
-                    redeemTokenV_),
-                dex.getLocalRate(feeToken_),
-                feeToken_));
+        uint feeT_ = _getFeeT(feeToken_, redeemTokenV_);
 
         uint profitT_ = wmul(profitRate, feeT_);
 
@@ -238,6 +219,36 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
         require(add(feeAmt_,dust) >= feeT_, "red-not-enough-fee-sent");
         feeToCustodianT_ = sub(feeAmt_, feeT_);
+    }
+    
+    function getRedeemCosts(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_) public view returns(uint feeT_) {
+        uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
+        feeT_ = _getFeeT(feeToken_, redeemTokenV_);
+    }
+
+    function _calcRedeemTokenV(address redeemToken_, uint256 redeemAmtOrId_) internal view returns(uint redeemTokenV_) {
+        if(asm.dpasses(redeemToken_)) {
+            redeemTokenV_ = asm.basePrice(redeemToken_, redeemAmtOrId_);
+        } else {
+            redeemTokenV_ = dex.wmulV(
+                redeemAmtOrId_,
+                dex.getLocalRate(redeemToken_),
+                redeemToken_);
+        }
+    }
+
+    function _getFeeT(address feeToken_, uint256 redeemTokenV_) internal view returns (uint) {
+        return add(
+            dex.wdivT(
+                fixFee,
+                dex.getLocalRate(feeToken_),
+                feeToken_),
+            dex.wdivT(
+                wmul(
+                    varFee, 
+                    redeemTokenV_),
+                dex.getLocalRate(feeToken_),
+                feeToken_));
     }
 
     /**

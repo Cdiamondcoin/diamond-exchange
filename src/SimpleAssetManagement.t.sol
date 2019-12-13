@@ -460,6 +460,51 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.basePrice(dpass, id_), price_);
     }
 
+    function testSetBasePriceInvalidAsm() public {
+        uint price_ = 100 ether;
+        uint capCustV_ = 100.1 ether;
+        require( capCustV_ >= price_, "test-customer-cap-gt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "invalid", cccc_, 1, b(0xef), "20191107");
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, price_);
+        assertEq(asm.basePrice(dpass, id_), price_);
+        assertEq(asm.totalDpassCustV(custodian1), uint(0));
+        assertEq(asm.totalDpassV(), uint(0));
+    }
+
+    function testSetBasePriceRemovedAsm() public {
+        uint price_ = 100 ether;
+        uint capCustV_ = 100.1 ether;
+        require( capCustV_ >= price_, "test-customer-cap-gt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "removed", cccc_, 1, b(0xef), "20191107");
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, price_);
+        assertEq(asm.basePrice(dpass, id_), price_);
+        assertEq(asm.totalDpassCustV(custodian1), uint(0));
+        assertEq(asm.totalDpassV(), uint(0));
+    }
+
+    function testSetBasePriceRedeemedAsm() public {
+        uint price_ = 100 ether;
+        uint capCustV_ = 100.1 ether;
+        require( capCustV_ >= price_, "test-customer-cap-gt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "redeemed", cccc_, 1, b(0xef), "20191107");
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, price_);
+        assertEq(asm.basePrice(dpass, id_), price_);
+        assertEq(asm.totalDpassCustV(custodian1), uint(0));
+        assertEq(asm.totalDpassV(), uint(0));
+    }
+
     function testFailSetBasePriceCapCustVReachedAsm() public {
         // error Revert ("asm-custodian-reached-maximum-coll-value")
         uint price_ = 100 ether;
@@ -471,6 +516,20 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
         asm.setCapCustV(custodian1, capCustV_);
         asm.setBasePrice(dpass, id_, price_);
+    }
+
+    function testSetBasePriceLowerCapCustVReachedAsm() public {
+        // error Revert ("asm-custodian-reached-maximum-coll-value")
+        uint price_ = 100 ether;
+        uint capCustV_ = 80 ether;
+        require( capCustV_ <= price_, "test-customer-cap-lt-price");
+        uint id_;
+        bytes20 cccc_ = "BR,IF,F,0.01";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian1, "GIA", "11211211", "valid", cccc_, 1, b(0xef), "20191107");
+        asm.setBasePrice(dpass, id_, price_);
+        asm.setCapCustV(custodian1, capCustV_);
+        asm.setBasePrice(dpass, id_, capCustV_);
     }
 
     function testStoppedMintStillWorksAsm() public {

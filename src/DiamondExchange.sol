@@ -221,7 +221,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(user_ != address(0x0), "dex-wrong-address");
 
             kyc[user_] = uint(value1_) > 0;
-        } else if (what_ == "allowTokenPair") {         // TODO: test
+        } else if (what_ == "allowTokenPair") {
 
             address sellToken_ = addr(value_);
             address buyToken_ = addr(value1_);
@@ -232,7 +232,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
                 "dex-buytoken-not-listed");
 
             denyToken[sellToken_][buyToken_] = false;
-        } else if (what_ == "denyTokenPair") {          // TODO: test
+        } else if (what_ == "denyTokenPair") {
 
             address sellToken_ = addr(value_);
             address buyToken_ = addr(value1_);

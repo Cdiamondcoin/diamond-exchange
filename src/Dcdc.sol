@@ -44,4 +44,3 @@ contract Dcdc is DSToken {
         super.burn(guy, wad);
     }
 }
-// TODO: add tests

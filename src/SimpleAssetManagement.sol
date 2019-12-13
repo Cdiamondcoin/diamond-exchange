@@ -634,7 +634,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(!custodians[msg.sender] || msg.sender == custodian_, "asm-not-authorized");
 
         if(Dpass(token_).ownerOf(tokenId_) == address(this) &&
-          (state_ == "valid" || state_ == "sale")) {                                        // TODO: test
+          (state_ == "valid" || state_ == "sale")) {
             _updateCollateralDpass(price_, basePrice[token_][tokenId_], custodian_);
             if(price_ >= basePrice[token_][tokenId_])
                 _requireCapCustV(custodian_);
