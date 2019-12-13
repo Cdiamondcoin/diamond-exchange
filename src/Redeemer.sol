@@ -5,8 +5,8 @@ import "ds-auth/auth.sol";
 import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "ds-note/note.sol";
-import "./SimpleAssetManagement.sol";
-import "./SimpleAssetManagementCore.sol";
+import "./AssetManagement.sol";
+import "./AssetManagementCore.sol";
 import "./DiamondExchange.sol";
 import "dpass/Dpass.sol";
 import "./Liquidity.sol";
@@ -26,8 +26,8 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     uint256 public fixFee;                                  // Fixed part of fee charged by Cdiamondcoin from redeemToken_ in base currency
     uint256 public varFee;                                  // Variable part of fee charged by Cdiamondcoin from redeemToken_
     address public dpt;                                     // dpt token address
-    SimpleAssetManagement public asm;                       // asset management contract
-    SimpleAssetManagementCore public asc;                   // asset management contract
+    AssetManagement public asm;                       // asset management contract
+    AssetManagementCore public asc;                   // asset management contract
     DiamondExchange public dex;
     address payable public liq;                             // liquidity providing contract address
     bool public liqBuysDpt;                                 // true if liquidity contract buys dpt on the fly, false otherwise
@@ -53,13 +53,13 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
             require(addr(value_) != address(0x0), "red-zero-asm-address");
 
-            asm = SimpleAssetManagement(address(uint160(addr(value_))));
+            asm = AssetManagement(address(uint160(addr(value_))));
 
         } else if (what_ == "asc") {
 
             require(addr(value_) != address(0x0), "red-zero-asc-address");
 
-            asc = SimpleAssetManagementCore(address(uint160(addr(value_))));
+            asc = AssetManagementCore(address(uint160(addr(value_))));
 
         } else if (what_ == "dex") {
 

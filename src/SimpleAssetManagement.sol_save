@@ -6,11 +6,11 @@ import "ds-token/token.sol";
 import "ds-guard/guard.sol";
 import "cdc-token/Cdc.sol";
 import "dpass/Dpass.sol";
-import "./SimpleAssetManagement.sol";
+import "./AssetManagement.sol";
 import "./Wallet.sol";
 import "./Dcdc.sol";
 
-contract SimpleAssetManagementTest is DSTest, DSMath {
+contract AssetManagementTest is DSTest, DSMath {
     // TODO: remove all following LogTest()
     event LogUintIpartUintFpart(bytes32 key, uint val, uint val1);
     event LogTest(uint256 what);
@@ -54,7 +54,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     mapping(address => bool) dustSet;
     mapping(address => uint) cap;                           // custodian max collateral capacity
 
-    SimpleAssetManagement public asm;                       // SimpleAssetManagement()
+    AssetManagement public asm;                       // AssetManagement()
     bool showActualExpected;
     uint price1;
     uint overCollRemoveRatio;
@@ -1774,8 +1774,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function _createActors() internal {
         
         uint ourGas = gasleft();
-        asm = new SimpleAssetManagement();
-        emit LogTest("cerate SimpleAssetManagement");
+        asm = new AssetManagement();
+        emit LogTest("cerate AssetManagement");
         emit LogTest(ourGas - gasleft());
 
         guard = new DSGuard();
@@ -2016,7 +2016,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
 }
-//----------------------end-of-SimpleAssetManagementTest-----------------------------------------
+//----------------------end-of-AssetManagementTest-----------------------------------------
 
 contract TestFeedLike {
     bytes32 public rate;
@@ -2079,10 +2079,10 @@ contract TrustedDpassTester {
 }
 
 contract TrustedSASMTester is Wallet {
-    SimpleAssetManagement asm;
+    AssetManagement asm;
 
     constructor(address payable asm_) public {
-        asm = SimpleAssetManagement(asm_);
+        asm = AssetManagement(asm_);
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {

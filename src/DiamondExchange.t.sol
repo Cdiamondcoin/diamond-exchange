@@ -10,7 +10,8 @@ import "dpass/Dpass.sol";
 import "./DiamondExchange.sol";
 import "./Burner.sol";
 import "./Wallet.sol";
-import "./SimpleAssetManagement.sol";
+import "./AssetManagement.sol";
+import "./AssetManagementCore.sol";
 
 contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     event LogUintIpartUintFpart(bytes32 key, uint val, uint val1);
@@ -33,7 +34,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     address payable public liq;                                             // DiamondExchangeTester()
     address payable public wal;                                             // DptTester()
-    address payable public asm;                                             // SimpleAssetManagement()
+    address payable public asm;                                             // AssetManagement()
+    address payable public asc;                                             // AssetManagementCore()
     address payable public user;                                            // DiamondExchangeTester()
     address payable public seller;                                          // DiamondExchangeTester()
 
@@ -684,9 +686,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testFailForFixDaiBuyAllCdcUserHasEnoughDptZeroTokenForSaleDex() public {
         // error Revert ("dex-0-token-is-for-sale")
 
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(address(this)), b(true));
+        AssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(address(this)), b(true));
         Dpass(dpass).transferFrom(asm, user,  dpassId[seller]);  // send the single collateral token away so that 0 CDC can be created.
-        SimpleAssetManagement(asm).notifyTransferFrom(dpass, asm, user, dpassId[seller]);
+        AssetManagement(asm).notifyTransferFrom(dpass, asm, user, dpassId[seller]);
 
         userDpt = 123 ether;
         sendToken(dpt, user, userDpt);
@@ -2269,7 +2271,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testFailGetPriceBothBasePriceAndSetBuyPriceZeroDex() public {
         // error Revert ("dex-zero-price-not-allowed")
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], 0 ether);
+        AssetManagement(asm).setBasePrice(dpass, dpassId[user], 0 ether);
         DiamondExchange(exchange).getPrice(dpass, dpassId[user]);
     }
 
@@ -2282,7 +2284,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testFailSellDpassForFixCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2298,7 +2300,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testSellDpassForLimitedCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2314,7 +2316,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function testSellDpassForUnlimitedCdcUserHasNoDptTakeProfitOnlyInDptDex() public {
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2331,7 +2333,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testFailSellDpassForFixCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2349,7 +2351,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForLimitedCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2366,7 +2368,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForUnlimitedCdcUserHasDptNotEnoughTakeProfitOnlyInDptDex() public {
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2383,7 +2385,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testFailSellDpassForFixCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2400,7 +2402,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForLimitedCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2417,7 +2419,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForUnlimitedCdcUserHasDptEnoughTakeProfitOnlyInDptDex() public {
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2436,7 +2438,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2453,7 +2455,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForLimitedCdcUserHasNoDptFullFeeInDptDex() public {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2470,7 +2472,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testSellDpassForUnlimitedCdcUserHasNoDptFullFeeInDptDex() public {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 0 ether;
@@ -2488,7 +2490,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2507,7 +2509,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2525,7 +2527,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 1.812 ether;
@@ -2543,7 +2545,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
         // error Revert ("dex-not-enough-tokens-to-buy")
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2561,7 +2563,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2579,7 +2581,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b(false)), b(""));
 
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2598,9 +2600,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DSToken(dai).transfer(asm, INITIAL_BALANCE);
         balance[asm][dai] = DSToken(dai).balanceOf(asm);
         DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(dai), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
+        AssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2619,9 +2621,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DSToken(dai).transfer(asm, INITIAL_BALANCE);
         balance[asm][dai] = DSToken(dai).balanceOf(asm);
         DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(dai), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
+        AssetManagement(asm).setConfig("approve", b(dai), b(exchange), b(uint(-1)));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(b(true)));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
+        AssetManagement(asm).setConfig("payTokens",b(dpass),b(true),"");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
         userDpt = 123 ether;
@@ -2648,10 +2650,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchangeTester(user)                                                 // address(this) is the seller the seller
             .transferFrom721(dpass, user, address(this), dpassId[user]);
         dpassOwnerPrice[address(this)] = 61 ether;
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
+        AssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
         Dpass(dpass).approve(exchange, dpassId[user]);
 
-        SimpleAssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
+        AssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -2667,10 +2669,10 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchangeTester(user)
             .transferFrom721(dpass, user, address(this), dpassId[user]);
         dpassOwnerPrice[address(this)] = 61 ether;
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
+        AssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[address(this)]);
         Dpass(dpass).approve(exchange, dpassId[user]);
 
-        SimpleAssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
+        AssetManagement(asm).setConfig("payTokens", b(dpass), b(true), "");
 
         userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
@@ -2993,7 +2995,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
     }
- 
+
     function testFailGetCostsUserZeroDex() public view{
         // error Revert ("dex-user-address-zero")
         (uint sellAmt_, uint feeDpt_, uint256 feeV_, uint256 feeSellT_) = DiamondExchange(exchange).getCosts(address(0), cdc, 0, dpass, dpassId[seller]);
@@ -3289,7 +3291,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     function testGetCostsSellDpassBuyFixCdcTakeAllCostsInDptDptNotEnoughDex() public {
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(false)), b(""));
         DiamondExchange(exchange).setConfig(b("canSellErc721"), b(dpass), b(true));
-        SimpleAssetManagement(asm).setConfig("payTokens",b(dpass), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens",b(dpass), b(true), "diamonds");
         DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[user]);
 
 
@@ -3338,12 +3340,12 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             "20191101"
         );
 
-        SimpleAssetManagement(asm).setBasePrice(dpass, id_, price_);
+        AssetManagement(asm).setBasePrice(dpass, id_, price_);
     }
 
     function sendSomeCdcToUser() public {
         createDiamond(500000 ether);
-        SimpleAssetManagement(asm).mint(cdc, user, wdiv(
+        AssetManagement(asm).mint(cdc, user, wdiv(
             add(
                 wdiv(
                     dpassOwnerPrice[asm],
@@ -3355,8 +3357,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function sendSomeCdcToUser(uint256 amt) public {
         createDiamond(500000 ether);
-        require(amt <= SimpleAssetManagement(asm).getAmtForSale(cdc), "test-can-not-mint-that-much");
-        SimpleAssetManagement(asm).mint(cdc, user, amt);
+        require(amt <= AssetManagement(asm).getAmtForSale(cdc), "test-can-not-mint-that-much");
+        AssetManagement(asm).mint(cdc, user, amt);
         balance[user][cdc] = DSToken(cdc).balanceOf(user);
     }
 
@@ -3364,10 +3366,11 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         return token == eth ? holder.balance :  DSToken(token).balanceOf(holder);
     }
 
+    uint origUserBalanceT;
+    uint buyT;
+    uint buyV;
+
     function doExchange(address sellToken, uint256 sellAmtOrId, address buyToken, uint256 buyAmtOrId) public {
-        uint origUserBalanceT;
-        uint buyT;
-        uint buyV;
         bool _takeProfitOnlyInDpt = DiamondExchange(exchange).takeProfitOnlyInDpt();
         uint fixFee_;
         uint varFee_;
@@ -3384,7 +3387,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         buyT = erc20[buyToken] ?                                                        // total amount of token available to buy (or tokenid)
             DiamondExchange(exchange).isHandledByAsm(buyToken) ?
-                min(buyAmtOrId, SimpleAssetManagement(asm).getAmtForSale(buyToken)) :
+                min(buyAmtOrId, AssetManagement(asm).getAmtForSale(buyToken)) :
                 min(
                     buyAmtOrId,
                     balanceOf(buyToken, custodian20[buyToken])) :
@@ -3469,6 +3472,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             origBuyer = Dpass(buyToken).ownerOf(buyAmtOrId);
         }
 
+        uint gas = gasleft();
         DiamondExchangeTester(user).doBuyTokensWithFee(
             sellToken,
             sellAmtOrId,
@@ -3476,6 +3480,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             buyAmtOrId
         );
 
+        emit LogTest(gas - gasleft());
         userDptV = wmulV(userDpt, usdRate[dpt], dpt);
 
         balanceUserIncreaseT = erc20[buyToken] ?
@@ -3837,13 +3842,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         erc20[eng] = true;
         erc20[eth] = true;
     }
-    
+
     function _mintInitialSupply() internal {
         DSToken(dpt).mint(SUPPLY);
         DSToken(dai).mint(SUPPLY);
         DSToken(eng).mint(SUPPLY);
     }
-    
+
     function _setUsdRates() internal {
         usdRate[dpt] = 5 ether;
         usdRate[cdc] = 7 ether;
@@ -3865,7 +3870,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         decimalsSet[dai] = true;
         decimalsSet[eng] = true;
     }
-   
+
     function _setDust() internal {
         dust[dpt] = 10000;
         dust[cdc] = 10000;
@@ -3882,7 +3887,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         dustSet[dpass] = true;
 
     }
-    
+
     function _setFeeds() internal {
         feed[eth] = address(new TestFeedLike(usdRate[eth], true));
         feed[dpt] = address(new TestFeedLike(usdRate[dpt], true));
@@ -3890,12 +3895,13 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         feed[dai] = address(new TestFeedLike(usdRate[dai], true));
         feed[eng] = address(new TestFeedLike(usdRate[eng], true));
     }
-    
+
     function _createContracts() internal {
         burner = address(uint160(address(new Burner(DSToken(dpt))))); // Burner()
         wal = address(uint160(address(new DptTester(DSToken(dai))))); // DptTester()
-        asm = address(uint160(address(new SimpleAssetManagement())));
-        
+        asm = address(uint160(address(new AssetManagement())));
+        asc = address(uint160(address(new AssetManagementCore(address(this)))));
+
         uint ourGas = gasleft();
         emit LogTest("cerate DiamondExchange");
         exchange = address(uint160(address(new DiamondExchange())));
@@ -3907,12 +3913,15 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
         fca = address(uint160(address(new TestFeeCalculator())));
     }
-    
+
     function _setupGuard() internal {
         guard = new DSGuard();
-        SimpleAssetManagement(asm).setAuthority(guard);
+        AssetManagement(asm).setAuthority(guard);
         DSToken(cdc).setAuthority(guard);
         Dpass(dpass).setAuthority(guard);
+
+        AssetManagementCore(asc).setAllowed(address(asm), true);
+
         guard.permit(address(this), address(asm), ANY);
         guard.permit(address(asm), cdc, ANY);
         guard.permit(address(asm), dpass, ANY);
@@ -3921,7 +3930,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchangeTester(liq).setAuthority(guard);
         guard.permit(exchange, liq, ANY);
         DiamondExchangeTester(liq).setOwner(exchange);
-    } 
+    }
 
     function _setupCustodian20() internal {
         custodian20[dpt] = asm;
@@ -3932,43 +3941,43 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     }
 
     function _setConfigAsm() internal {
-    
-        SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(dai), b(feed[dai]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(dpt), b(feed[dpt]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(eng), b(feed[eng]), "diamonds");
+        AssetManagement(asm).setConfig("asc", b(address(asc)), "", "diamonds");
+        AssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
+        AssetManagement(asm).setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
+        AssetManagement(asm).setConfig("priceFeed", b(dai), b(feed[dai]), "diamonds");
+        AssetManagement(asm).setConfig("priceFeed", b(eth), b(feed[eth]), "diamonds");
+        AssetManagement(asm).setConfig("priceFeed", b(dpt), b(feed[dpt]), "diamonds");
+        AssetManagement(asm).setConfig("priceFeed", b(eng), b(feed[eng]), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("manualRate", b(dai), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("manualRate", b(dpt), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("manualRate", b(eng), b(true), "diamonds");
+        AssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");
+        AssetManagement(asm).setConfig("manualRate", b(dai), b(true), "diamonds");
+        AssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");
+        AssetManagement(asm).setConfig("manualRate", b(dpt), b(true), "diamonds");
+        AssetManagement(asm).setConfig("manualRate", b(eng), b(true), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(decimals[cdc]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("decimals", b(eth), b(decimals[eth]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("decimals", b(eng), b(decimals[eng]), "diamonds");
+        AssetManagement(asm).setConfig("decimals", b(cdc), b(decimals[cdc]), "diamonds");
+        AssetManagement(asm).setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
+        AssetManagement(asm).setConfig("decimals", b(eth), b(decimals[eth]), "diamonds");
+        AssetManagement(asm).setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
+        AssetManagement(asm).setConfig("decimals", b(eng), b(decimals[eng]), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("payTokens", b(dai), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("payTokens", b(dpt), b(true), "diamonds");
-        SimpleAssetManagement(asm).setConfig("payTokens", b(eng), b(true), "diamonds");
+        AssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");
+        AssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens", b(dai), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens", b(dpt), b(true), "diamonds");
+        AssetManagement(asm).setConfig("payTokens", b(eng), b(true), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("rate", b(cdc), b(usdRate[cdc]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("rate", b(dai), b(usdRate[dai]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("rate", b(eth), b(usdRate[eth]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("rate", b(dpt), b(usdRate[dpt]), "diamonds");
-        SimpleAssetManagement(asm).setConfig("rate", b(eng), b(usdRate[eng]), "diamonds");
+        AssetManagement(asm).setConfig("rate", b(cdc), b(usdRate[cdc]), "diamonds");
+        AssetManagement(asm).setConfig("rate", b(dai), b(usdRate[dai]), "diamonds");
+        AssetManagement(asm).setConfig("rate", b(eth), b(usdRate[eth]), "diamonds");
+        AssetManagement(asm).setConfig("rate", b(dpt), b(usdRate[dpt]), "diamonds");
+        AssetManagement(asm).setConfig("rate", b(eng), b(usdRate[eng]), "diamonds");
 
-        SimpleAssetManagement(asm).setConfig("custodians", b(seller), b(true), "diamonds");
-        SimpleAssetManagement(asm).setCapCustV(seller, 1000000 ether);
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
+        AssetManagement(asm).setConfig("custodians", b(seller), b(true), "diamonds");
+        AssetManagement(asm).setCapCustV(seller, 1000000 ether);
+        AssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
     }
 
     function _setConfigExchange() internal {
@@ -4041,18 +4050,18 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     }
 
     function _createActors() internal {
-    
+
         user = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
         seller = address(uint160(address(new DiamondExchangeTester(exchange, dpt, cdc, dai))));
     }
-    
+
     function _approveContracts()  internal {
         Cdc(cdc).approve(exchange, uint(-1));
         DSToken(dpt).approve(exchange, uint(-1));
         DSToken(dai).approve(exchange, uint(-1));
         DSToken(eng).approve(exchange, uint(-1));
     }
-    
+
     function _mintDpasses() internal {
         // Prepare dpass tokens
         dpassOwnerPrice[user] = 53 ether;
@@ -4068,7 +4077,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             bytes32(uint(0xc0a5d062e13f99c8f70d19dc7993c2f34020a7031c17f29ce2550315879006d7)), // bytes32 _attributesHash
             "20191101"
         );
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[user]);
+        AssetManagement(asm).setBasePrice(dpass, dpassId[user], dpassOwnerPrice[user]);
 
         dpassOwnerPrice[asm] = 137 ether;
         Dpass(dpass).setCccc("BR,VVS1,F,3.00", true);
@@ -4084,9 +4093,9 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
             "20191101"
         );
 
-        SimpleAssetManagement(asm).setBasePrice(dpass, dpassId[seller], dpassOwnerPrice[asm]);
+        AssetManagement(asm).setBasePrice(dpass, dpassId[seller], dpassOwnerPrice[asm]);
     }
-    
+
     function _transferToUserAndApproveExchange() internal {
         user.transfer(INITIAL_BALANCE);
         DSToken(dai).transfer(user, INITIAL_BALANCE);
@@ -4096,8 +4105,8 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchangeTester(user).doApprove(cdc, exchange, uint(-1));
         DiamondExchangeTester(user).doApprove(dai, exchange, uint(-1));
 
-    } 
-    
+    }
+
     function _storeInitialBalances() internal {
         balance[address(this)][eth] = address(this).balance;
         balance[user][eth] = user.balance;
@@ -4117,7 +4126,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         balance[custodian20[dpt]][dpt] = DSToken(dpt).balanceOf(custodian20[dpt]);
         balance[custodian20[dai]][dai] = DSToken(dai).balanceOf(custodian20[dai]);
 
-    } 
+    }
 
     function _logContractAddresses() internal {
         emit log_named_address("exchange", exchange);
@@ -4130,7 +4139,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         emit log_named_address("liq", liq);
         emit log_named_address("burner", burner);
         emit log_named_address("this", address(this));
-    } 
+    }
 
 }
 //------------------end-of-DiamondExchangeTest------------------------------------
@@ -4259,11 +4268,11 @@ contract DiamondExchangeTester is Wallet, DSTest {
     function doTransferFrom721(address token, address from, address to, uint amount) public {
         Dpass(token).transferFrom(from, to, amount);
     }
- 
+
     function doSetState(address token, uint256 tokenId, bytes8 state) public {
         Dpass(token).setState(state, tokenId);
     }
- 
+
     function doSetBuyPrice(address token, uint256 tokenId, uint256 price) public {
         DiamondExchange(exchange).setBuyPrice(token, tokenId, price);
     }

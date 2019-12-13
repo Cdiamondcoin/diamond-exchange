@@ -29,8 +29,8 @@ import "medianizer/medianizer.sol";
 import "./DiamondExchange.sol";
 import "./Burner.sol";
 import "./Wallet.sol";
-import "./SimpleAssetManagement.sol";
-import "./SimpleAssetManagementCore.sol";
+import "./AssetManagement.sol";
+import "./AssetManagementCore.sol";
 import "./Liquidity.sol";
 import "./Dcdc.sol";
 import "./FeeCalculator.sol";
@@ -135,7 +135,7 @@ contract IntegrationsTest is DSTest {
             "20191107",
             2928.03 ether                           // the price is 2928.03 USD for the diamond (not per carat!!!!)
                                         );
-        SimpleAssetManagement(asm)
+        AssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
                                                     // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
         assertEqLog("cdc-minted-to-user", DSToken(cdc).balanceOf(user), 1 ether);
@@ -143,7 +143,7 @@ contract IntegrationsTest is DSTest {
 
     function testFail1MintCdcInt() public {         // use-case 1. Mint CDC - failure if tehere is no collateral
 
-        SimpleAssetManagement(asm)
+        AssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
                                                     // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from exchange to mint to user
     }
@@ -660,37 +660,37 @@ contract IntegrationsTest is DSTest {
        //-------------setup-asm------------------------------------------------------------
 
         
-        SimpleAssetManagement(asm).setConfig("asc", b(address(asc)), "", "diamods"); // set price feed (sam as for exchange)
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for exchange)
-        SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
-        SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
-        SimpleAssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
-        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                  // tell asm that cdc is indeed a cdc token
-        SimpleAssetManagement(asm).setConfig("rate", b(cdc), b(cdcUsdRate), "diamonds");            // set rate for token
+        AssetManagement(asm).setConfig("asc", b(address(asc)), "", "diamods"); // set price feed (sam as for exchange)
+        AssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for exchange)
+        AssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        AssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
+        AssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
+        AssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                  // tell asm that cdc is indeed a cdc token
+        AssetManagement(asm).setConfig("rate", b(cdc), b(cdcUsdRate), "diamonds");            // set rate for token
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(eth), b(address(ethFeed)), "diamonds"); // set pricefeed for eth
-        SimpleAssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");             // enable eth to pay with
-        SimpleAssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");            // enable to set rate of eth manually if feed is dowh (as is current situations)
-        SimpleAssetManagement(asm).setConfig("decimals", b(eth), b(18), "diamonds");                // set precision for eth token
-        SimpleAssetManagement(asm).setConfig("rate", b(eth), b(ethUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
+        AssetManagement(asm).setConfig("priceFeed", b(eth), b(address(ethFeed)), "diamonds"); // set pricefeed for eth
+        AssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");             // enable eth to pay with
+        AssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");            // enable to set rate of eth manually if feed is dowh (as is current situations)
+        AssetManagement(asm).setConfig("decimals", b(eth), b(18), "diamonds");                // set precision for eth token
+        AssetManagement(asm).setConfig("rate", b(eth), b(ethUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(dai), b(address(daiFeed)), "diamonds"); // set pricefeed for dai
-        SimpleAssetManagement(asm).setConfig("payTokens", b(dai), b(true), "diamonds");             // enable dai to pay with
-        SimpleAssetManagement(asm).setConfig("manualRate", b(dai), b(true), "diamonds");            // enable to set rate of dai manually if feed is dowh (as is current situations)
-        SimpleAssetManagement(asm).setConfig("decimals", b(dai), b(18), "diamonds");                // set precision for dai token
-        SimpleAssetManagement(asm).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
+        AssetManagement(asm).setConfig("priceFeed", b(dai), b(address(daiFeed)), "diamonds"); // set pricefeed for dai
+        AssetManagement(asm).setConfig("payTokens", b(dai), b(true), "diamonds");             // enable dai to pay with
+        AssetManagement(asm).setConfig("manualRate", b(dai), b(true), "diamonds");            // enable to set rate of dai manually if feed is dowh (as is current situations)
+        AssetManagement(asm).setConfig("decimals", b(dai), b(18), "diamonds");                // set precision for dai token
+        AssetManagement(asm).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
 
-        SimpleAssetManagement(asm).setConfig("overCollRatio", b(uint(1.1 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
-        SimpleAssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by exchange
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));        // enable the dpass tokens of asm to be handled by exchange
-        SimpleAssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
-        SimpleAssetManagement(asm).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
+        AssetManagement(asm).setConfig("overCollRatio", b(uint(1.1 ether)), "", "diamonds");  // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+        AssetManagement(asm).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asm to be handled by exchange
+        AssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));        // enable the dpass tokens of asm to be handled by exchange
+        AssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
+        AssetManagement(asm).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asm as for exchange)
-        SimpleAssetManagement(asm).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
-        SimpleAssetManagement(asm).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18
-        SimpleAssetManagement(asm).setConfig("dcdcs", b(dcdc), b(true), "diamonds");                 // tell asm that dcdc is indeed a dcdc token
-        SimpleAssetManagement(asm).setConfig("rate", b(dcdc), b(cdcUsdRate), "diamonds");            // set rate for token
+        AssetManagement(asm).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asm as for exchange)
+        AssetManagement(asm).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        AssetManagement(asm).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18
+        AssetManagement(asm).setConfig("dcdcs", b(dcdc), b(true), "diamonds");                 // tell asm that dcdc is indeed a dcdc token
+        AssetManagement(asm).setConfig("rate", b(dcdc), b(cdcUsdRate), "diamonds");            // set rate for token
 
 
 //--------------setup-redeemer-------------------------------------------------------
@@ -768,10 +768,10 @@ contract IntegrationsTest is DSTest {
         burner = address(uint160(address(new Burner(DSToken(dpt))))); // Burner()   // burner contract
         wal = address(uint160(address(new Wallet()))); // DptTester()               // wallet contract
         uint ourGas = gasleft();
-        asm = address(uint160(address(new SimpleAssetManagement())));               // asset management contract
+        asm = address(uint160(address(new AssetManagement())));               // asset management contract
         asc = address(uint160(address(
-            new SimpleAssetManagementCore(address(this)))));                        // asset management contract
-        emit LogTest("cerate SimpleAssetManagement");
+            new AssetManagementCore(address(this)))));                        // asset management contract
+        emit LogTest("cerate AssetManagement");
         emit LogTest(ourGas - gasleft());
 
         ourGas = gasleft();
@@ -800,11 +800,11 @@ contract IntegrationsTest is DSTest {
         guard = new DSGuard();
         Burner(burner).setAuthority(guard);
         Wallet(wal).setAuthority(guard);
-        SimpleAssetManagement(asm).setAuthority(guard);
+        AssetManagement(asm).setAuthority(guard);
         DiamondExchange(exchange).setAuthority(guard);
         Liquidity(liq).setAuthority(guard);
         FeeCalculator(fca).setAuthority(guard);
-        SimpleAssetManagementCore(asc).setAllowed(address(asm), true);
+        AssetManagementCore(asc).setAllowed(address(asm), true);
         DSToken(dpt).setAuthority(guard);
         DSToken(dai).setAuthority(guard);
         DSToken(eng).setAuthority(guard);
@@ -980,12 +980,12 @@ contract IntegrationsTest is DSTest {
 }
 //----------------end-of-IntegrationsTest--------------------------------------------
 contract TrustedSASMTester is Wallet {
-    SimpleAssetManagement asm;
-    SimpleAssetManagementCore asc;
+    AssetManagement asm;
+    AssetManagementCore asc;
 
     constructor(address payable asm_, address payable asc_) public {
-        asm = SimpleAssetManagement(asm_);
-        asc = SimpleAssetManagementCore(asc_);
+        asm = AssetManagement(asm_);
+        asc = AssetManagementCore(asc_);
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {

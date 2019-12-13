@@ -27,7 +27,7 @@ import "price-feed/price-feed.sol";
 import "./DiamondExchange.sol";
 import "./Burner.sol";
 import "./Wallet.sol";
-import "./SimpleAssetManagement.sol";
+import "./AssetManagement.sol";
 import "./Liquidity.sol";
 
 contract IntegrationsTest {
@@ -146,30 +146,30 @@ contract IntegrationsTest {
 
         //-------------setup-asm------------------------------------------------------------
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(cdcFeed), "diamonds");          // set price feed (sam as for exchange)
-        SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
-        SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
-        SimpleAssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
-        SimpleAssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                  // tell asm that cdc is indeed a cdc token
-        SimpleAssetManagement(asm).setConfig("rate", b(cdc), b(cdcUsdRate), "diamonds");            // set rate for token
+        AssetManagement(asm).setConfig("priceFeed", b(cdc), b(cdcFeed), "diamonds");          // set price feed (sam as for exchange)
+        AssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
+        AssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18
+        AssetManagement(asm).setConfig("payTokens", b(cdc), b(true), "diamonds");             // allow cdc to be used as means of payment for services
+        AssetManagement(asm).setConfig("cdcs", b(cdc), b(true), "diamonds");                  // tell asm that cdc is indeed a cdc token
+        AssetManagement(asm).setConfig("rate", b(cdc), b(cdcUsdRate), "diamonds");            // set rate for token
 
-        SimpleAssetManagement(asm).setConfig("priceFeed", b(eth), b(ethFeed), "diamonds");          // set pricefeed for eth
-        SimpleAssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");             // enable eth to pay with
-        SimpleAssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");            // enable to set rate of eth manually if feed is dowh (as is current situations)
-        SimpleAssetManagement(asm).setConfig("decimals", b(eth), b(18), "diamonds");                // set precision for eth token
-        SimpleAssetManagement(asm).setConfig("rate", b(eth), b(ethUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
+        AssetManagement(asm).setConfig("priceFeed", b(eth), b(ethFeed), "diamonds");          // set pricefeed for eth
+        AssetManagement(asm).setConfig("payTokens", b(eth), b(true), "diamonds");             // enable eth to pay with
+        AssetManagement(asm).setConfig("manualRate", b(eth), b(true), "diamonds");            // enable to set rate of eth manually if feed is dowh (as is current situations)
+        AssetManagement(asm).setConfig("decimals", b(eth), b(18), "diamonds");                // set precision for eth token
+        AssetManagement(asm).setConfig("rate", b(eth), b(ethUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
 
-        SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");        // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
-        SimpleAssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));   // enable the dpass tokens of asm to be handled by dex
-        SimpleAssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
+        AssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");        // make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+        AssetManagement(asm).setConfig("setApproveForAll", b(dpass), b(exchange), b(true));   // enable the dpass tokens of asm to be handled by dex
+        AssetManagement(asm).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
     } 
 
     function _createContracts() internal {
         burner = address(uint160(address(new Burner(DSToken(dpt))))); // Burner()   // burner contract
         wal = address(uint160(address(new Wallet()))); // DptTester()               // wallet contract
         uint ourGas = gasleft();
-        asm = address(uint160(address(new SimpleAssetManagement())));               // asset management contract
-        emit LogTest("cerate SimpleAssetManagement");
+        asm = address(uint160(address(new AssetManagement())));               // asset management contract
+        emit LogTest("cerate AssetManagement");
         emit LogTest(ourGas - gasleft());
 
         ourGas = gasleft();
@@ -214,12 +214,12 @@ contract IntegrationsTest {
 
     function _setupGuard() internal {
         guard = new DSGuard();
-        SimpleAssetManagement(burner).setAuthority(guard);
-        SimpleAssetManagement(wal).setAuthority(guard);
-        SimpleAssetManagement(asm).setAuthority(guard);
-        SimpleAssetManagement(exchange).setAuthority(guard);
-        SimpleAssetManagement(liq).setAuthority(guard);
-        SimpleAssetManagement(fca).setAuthority(guard);
+        AssetManagement(burner).setAuthority(guard);
+        AssetManagement(wal).setAuthority(guard);
+        AssetManagement(asm).setAuthority(guard);
+        AssetManagement(exchange).setAuthority(guard);
+        AssetManagement(liq).setAuthority(guard);
+        AssetManagement(fca).setAuthority(guard);
         DSToken(dpt).setAuthority(guard);
         DSToken(dai).setAuthority(guard);
         DSToken(eth).setAuthority(guard);
@@ -254,10 +254,10 @@ contract TesterActor is TrustedSASMTester, DiamondExchangeTester {
     ) public TrustedSASMTester(asm_) DiamondExchangeTester(exchange_) {}
 }
 contract TrustedSASMTester is Wallet {
-    SimpleAssetManagement asm;
+    AssetManagement asm;
 
     constructor(address payable asm_) public {
-        asm = SimpleAssetManagement(asm_);
+        asm = AssetManagement(asm_);
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {

@@ -6,7 +6,7 @@ import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "ds-note/note.sol";
 import "dpass/Dpass.sol";
-import "./SimpleAssetManagementCore.sol";
+import "./AssetManagementCore.sol";
 
 
 /**
@@ -17,7 +17,7 @@ contract TrustedFeedLike {
 }
 
 
-contract SimpleAssetManagement is DSAuth, DSStop {
+contract AssetManagement is DSAuth, DSStop {
 
     event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
@@ -36,24 +36,9 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     event LogTest(address what);
     event LogTest(bytes32 what);
 
-    uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
-    bool public locked;                                     // variable prevents to exploit by recursively calling funcions
-    address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
+    bool public locked;                               // variable prevents to exploit by recursively calling funcions
 
-    struct Audit {                                          // struct storing the results of an audit
-        address auditor;                                    // auditor who did the last audit
-        uint256 status;                                     // status of audit if 0, all is well, otherwise represents the value of ...
-                                                            // diamonds that there are problems with
-        bytes32 descriptionHash;                            // hash of the description file that describes the last audit in detail. ...
-                                                            // ... Auditors must have a detailed description of all the findings they had at ...
-                                                            // ... custodian, and are legally fully responsible for their documents.
-        bytes32 descriptionUrl;                             // url of the description file that details the results of the audit. File should be digitally signed. And the files total content should be hashed with keccak256() to make sure unmutability.
-        uint nextAuditBefore;                               // proposed time of next audit. The audit should be at least at every 3 months.
-    }
-
-    mapping(address => Audit) public audit;                 // containing the last audit reports for all custodians.
-    uint32 public auditInterval = 1776000;                  // represents 3 months of audit interwal in which an audit is mandatory for custodian.
-    SimpleAssetManagementCore asc;                          // core contract holding all values and getters for us
+    AssetManagementCore asc;                          // core contract holding all values and getters for us
     /**
      * @dev Modifier making sure the function can not be called in a recursive way in one transaction.
      */
@@ -184,9 +169,9 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             require(dst != address(0), "asm-dst-zero-address");
             Dpass(token).setApprovalForAll(dst, enable);
         } else if (what_ == "dust") {
-            dust = uint256(value_);
+            asc.setDust(uint256(value_));
         } else if (what_ == "asc") {
-            asc = SimpleAssetManagementCore(addr(value_));
+            asc = AssetManagementCore(addr(value_));
         } else {
             require(false, "asm-wrong-config-option");
         }
@@ -292,7 +277,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         require(asc.custodians(custodian_), "asm-audit-not-a-custodian");
         require(auditInterval_ != 0, "asm-audit-interval-zero");
 
-        minInterval_ = uint32(min(auditInterval_, auditInterval));
+        minInterval_ = uint32(min(auditInterval_, asc.auditInterval()));
 
         asc.setAudit(
             custodian_,
@@ -326,7 +311,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             asc.dpasses(token_) || asc.cdcs(token_) || asc.payTokens(token_),
             "asm-invalid-token");
 
-            require(
+        require(
             !asc.dpasses(token_) || Dpass(token_).getState(amtOrId_) == "sale",
             "asm-ntf-token-state-not-sale");
 
@@ -357,7 +342,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 _burn(token_, amtOrId_);
             } else {
                 balance = sub(
-                    token_ == eth ?
+                    token_ == asc.eth() ?
                         address(this).balance :
                         DSToken(token_).balanceOf(address(this)),
                     amtOrId_);                                              // this assumes that first tokens are sent, than ...
@@ -509,7 +494,6 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             currentHashingAlgorithm_);
 
         _setBasePrice(token_, id_, price_);
-        _requireCapCustV(custodian_);
     }
 
     /*
@@ -588,7 +572,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                     min(
                         custodianCdcV,
                         asc.paidCdcCustV(custodian))),
-                dust),
+                asc.dust()),
             "asm-too-much-to-withdraw");
         asc.setPaidCdcCustV(custodian, add(asc.paidCdcCustV(custodian), tokenV));
         asc.setTotalPaidCdcV(domain, add(asc.totalPaidCdcV(domain), tokenV));
@@ -674,7 +658,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         emit LogForceUpdateCollateralDcdc(msg.sender, positiveV_, negativeV_, custodian_);
     }
 
-
+    /**
+    * @dev Get base price_ for a diamond.
+    */
+    function basePrice(address token_, uint256 tokenId_) public returns  (uint) {
+        return asc.basePrice(token_, tokenId_); 
+    }
+ 
     /**
     * @dev Set base price_ for a diamond.
     */
@@ -823,7 +813,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 add(
                     asc.totalDpassV(domain_),
                     asc.totalDcdcV(domain_)),
-                dust) >=
+                asc.dust()) >=
             wmul(
                 asc.overCollRatio(domain_),
                 asc.totalCdcV(domain_))
@@ -842,7 +832,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 add(
                     asc.totalDpassV(domain_),
                     asc.totalDcdcV(domain_)),
-                dust) >=
+                asc.dust()) >=
             wmul(
                 asc.overCollRemoveRatio(domain_),
                 asc.totalCdcV(domain_))
@@ -861,7 +851,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                         asc.totalDpassCustV(custodian_),
                         asc.totalDcdcCustV(custodian_)),
                     asc.soldDpassCustV(custodian_)),
-                dust) >=
+                asc.dust()) >=
                 add(
                     asc.paidDpassCustV(custodian_),
                     asc.paidCdcCustV(custodian_))
@@ -876,7 +866,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     function _requireCapCustV(address custodian_) internal view {
         if(asc.capCustV(custodian_) != uint(-1))
         require(
-            add(asc.capCustV(custodian_), dust) >=
+            add(asc.capCustV(custodian_), asc.dust()) >=
                 add(
                     asc.totalDpassCustV(custodian_),
                     asc.totalDcdcCustV(custodian_)),
@@ -941,7 +931,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
         address payable dst,
         uint256 amount
     ) internal returns (bool){
-        if (token == eth && amount > 0) {
+        if (token == asc.eth() && amount > 0) {
             require(src == address(this), "wal-ether-transfer-invalid-src");
             dst.transfer(amount);
             emit LogTransferEth(src, dst, amount);

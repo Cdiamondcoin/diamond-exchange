@@ -1,6 +1,6 @@
 pragma solidity ^0.5.11;
 
- contract SimpleAssetManagementCore {
+ contract AssetManagementCore {
 
     mapping(
         address => mapping(
@@ -15,10 +15,10 @@ pragma solidity ^0.5.11;
     mapping(
         address => mapping(
             address => uint)) public dcdcCustV;             // dcdcCustV[dcdc][custodian] value of dcdc at custodian
-    mapping(address => bool) public payTokens;              // returns true for tokens allowed to make payment to custodians with
-    mapping(address => bool) public dpasses;                // returns true for dpass tokens allowed in this contract
-    mapping(address => bool) public dcdcs;                  // returns true for tokens representing cdc assets (without gia number) that are allowed in this contract
-    mapping(address => bool) public cdcs;                   // returns true for cdc tokens allowed in this contract
+    mapping(address => bool) public payTokens;              // returns true for tokens auth to make payment to custodians with
+    mapping(address => bool) public dpasses;                // returns true for dpass tokens auth in this contract
+    mapping(address => bool) public dcdcs;                  // returns true for tokens representing cdc assets (without gia number) that are auth in this contract
+    mapping(address => bool) public cdcs;                   // returns true for cdc tokens auth in this contract
     mapping(address => uint) private decimal;               // stores decimals for each ERC20 token
     mapping(address => bool) public decimalsSet;            // stores decimals for each ERC20 token
     mapping(address => address) public priceFeed;           // price feed address for token
@@ -32,7 +32,7 @@ pragma solidity ^0.5.11;
     mapping(bytes32 => uint) public totalDpassV;            // total value of dpass collaterals in base currency
     mapping(bytes32 => uint) public totalDcdcV;             // total value of dcdc collaterals in base currency
     mapping(bytes32 => uint) public totalCdcV;              // total value of cdc tokens issued in base currency
-    mapping(bytes32 => uint) public totalSoldDpassV;        // total value of cdc tokens issued in base currency
+    mapping(bytes32 => uint) public totalSoldDpassV;        // total value of sold cdc tokens issued in base currency
     mapping(bytes32 => uint) public totalSoldCdcV;          // total value of cdc tokens issued in base currency
     mapping(bytes32 => uint) public totalPaidDpassV;        // total value of cdc tokens issued in base currency
     mapping(bytes32 => uint) public totalPaidCdcV;          // total value of cdc tokens issued in base currency
@@ -40,7 +40,7 @@ pragma solidity ^0.5.11;
         public overCollRatio;                               // cdc can be minted as long as totalDpassV + totalDcdcV >= overCollRatio * totalCdcV
     mapping(bytes32 => uint)
         public overCollRemoveRatio;                         // dpass can be removed and dcdc burnt as long as totalDpassV + totalDcdcV >= overCollDpassRatio * totalCdcV
-    mapping(address => uint) public capCustV;               // maximum value of dpass and dcdc tokens a custodian is allowed to mint
+    mapping(address => uint) public capCustV;               // maximum value of dpass and dcdc tokens a custodian is auth to mint
 
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool public locked;                                     // variable prevents to exploit by recursively calling funcions
@@ -57,12 +57,12 @@ pragma solidity ^0.5.11;
         uint nextAuditBefore;                               // proposed time of next audit. The audit should be at least at every 3 months.
     }
 
-    mapping(address => Audit) public audits;                 // containing the last audit reports for all custodians.
+    mapping(address => Audit) public audits;                // containing the last audit reports for all custodians.
     uint32 public auditInterval = 1776000;                  // represents 3 months of audit interwal in which an audit is mandatory for custodian.
-    mapping(address => bool) allowed;                       // contracts that are allowed to use us
+    mapping(address => bool) auth;                          // contracts that are auth to use us
 
     constructor(address owner) public {
-        allowed[owner] = true;
+        auth[owner] = true;
     }
     
 
@@ -200,7 +200,11 @@ pragma solidity ^0.5.11;
     }
 
     function setAllowed(address owner_, bool set) public aut {
-		allowed[owner_] = set;
+        auth[owner_] = set;
+    }
+
+    function setDust(uint256 dust_) public aut {
+        dust = dust_;
     }
 
     function setAudit(
@@ -238,7 +242,7 @@ pragma solidity ^0.5.11;
 //-----------------------------------------------
 
     modifier aut {
-        require(allowed[msg.sender], "asc-not-authorized");
+        require(auth[msg.sender], "asc-not-authorized");
         _;
     } 
 }

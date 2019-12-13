@@ -927,7 +927,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint buyPrice_ = buyPrice[token_][owner_][tokenId_];
         require(canBuyErc721[token_], "dex-token-not-for-sale");
         if( buyPrice_ == 0 || buyPrice_ == uint(-1)) {
-            basePrice_ = asm.basePrice(token_, tokenId_);
+            basePrice_ = asc.basePrice(token_, tokenId_);
             require(basePrice_ != 0, "dex-zero-price-not-allowed");
             return basePrice_;
         } else {
