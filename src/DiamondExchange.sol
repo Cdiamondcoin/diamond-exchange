@@ -127,7 +127,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     address payable public liq;                             // contract providing DPT liquidity to pay for fee
     address payable public wal;                             // wallet address, where we keep all the tokens we received as fee
-    address payable public burner;                          // contract where accured fee of DPT is stored before being burned
+    address public burner;                          // contract where accured fee of DPT is stored before being burned
     TrustedAsm public asm;                                  // Asset Management contract
     uint256 public fixFee;                                  // Fixed part of fee charged for buying 18 decimals precision in base currency
     uint256 public varFee;                                  // Variable part of fee charged for buying 18 decimals precision in base currency
@@ -1184,7 +1184,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             "dex-not-enough-token-to-pay-fee");
 
         if (token_ == dpt) {
-            _sendToken(dpt, src_, burner, profitDpt_);
+            _sendToken(dpt, src_, address(uint160(address(burner))), profitDpt_);
 
             _sendToken(dpt, src_, wal, sub(feeT_, profitDpt_));
 
@@ -1196,7 +1196,10 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             } else {
 
-                _sendToken(dpt, liq, burner, profitDpt_);           // if liq contract stores DPT that can be sent to burner by us
+                _sendToken(dpt,                                     // if liq contract stores DPT that can be sent to burner by us
+                           liq, 
+                           address(uint160(address(burner))),
+                           profitDpt_);
             }
 
             _sendToken(token_, src_, wal, feeT_);                   // send user token_ to wallet
@@ -1234,18 +1237,19 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
                 profitDpt_ = min(wmul(feeDpt, profitRate), minDpt);
 
-                _sendToken(dpt, msg.sender, burner, profitDpt_);    // only profit is put to the burner
-
             } else {
 
                 profitDpt_ = wmul(minDpt, profitRate);
-
-                _sendToken(dpt, msg.sender, burner, profitDpt_);    // send profit to burner
 
                 costDpt_ = sub(minDpt, profitDpt_);
 
                 _sendToken(dpt, msg.sender, wal, costDpt_);         // send cost
             }
+
+            _sendToken(dpt,                                         // send profit to burner
+                       msg.sender,
+                       address(uint160(address(burner))),
+                       profitDpt_);
 
             feeTakenDpt_ = add(profitDpt_, costDpt_);               // total feeV_ taken in DPT
 

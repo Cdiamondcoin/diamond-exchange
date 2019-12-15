@@ -7,7 +7,7 @@ import "ds-token/token.sol";
 contract Liquidity is Wallet {
     bytes32 public symbol = "Liq";                          // set human readable name for contract
 
-    function burn(address dpt, address payable burner, uint256 burnValue) public auth {
-        transfer(dpt, burner, burnValue);
+    function burn(address dpt, address burner, uint256 burnValue) public auth {
+        transfer(dpt, address(uint160(address(burner))), burnValue);
     }
 }
