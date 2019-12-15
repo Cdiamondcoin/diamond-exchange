@@ -25,9 +25,6 @@
 [submodule "lib/cdc-token"]
 	path = lib/cdc-token
 	url = https://github.com/Cdiamondcoin/cdc-token.git
-[submodule "lib/dpass"]
-	path = lib/dpass
-	url = https://github.com/Cdiamondcoin/dpass
 [submodule "lib/medianizer"]
 	path = lib/medianizer
 	url = https://github.com/Cdiamondcoin/medianizer.git
