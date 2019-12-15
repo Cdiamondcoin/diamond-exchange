@@ -105,7 +105,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
         return TrustedErci721Wallet(token).getApproved(tokenId);
     }
 
-    function setApprovalForAll721(address token, address to, bool approved) public {
+    function setApprovalForAll721(address token, address to, bool approved) public auth {
         TrustedErci721Wallet(token).setApprovalForAll(to, approved);
     }
 
@@ -113,20 +113,20 @@ contract Wallet is DSAuth, DSStop, DSMath {
         return TrustedErci721Wallet(token).isApprovedForAll(owner, operator);
     }
 
-    function transferFrom721(address token, address from, address to, uint256 tokenId) public {
+    function transferFrom721(address token, address from, address to, uint256 tokenId) public auth {
         TrustedErci721Wallet(token).transferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom721(address token, address from, address to, uint256 tokenId) public {
+    function safeTransferFrom721(address token, address from, address to, uint256 tokenId) public auth {
         TrustedErci721Wallet(token).safeTransferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom721(address token, address from, address to, uint256 tokenId, bytes memory _data) public {
+    function safeTransferFrom721(address token, address from, address to, uint256 tokenId, bytes memory _data) public auth {
         TrustedErci721Wallet(token).safeTransferFrom(from, to, tokenId, _data);
     }
 
-    function transfer721(address token, address to, uint tokenId) public {
-        TrustedErci721Wallet(token).transferFrom(msg.sender, to, tokenId);
+    function transfer721(address token, address to, uint tokenId) public auth {
+        TrustedErci721Wallet(token).transferFrom(address(this), to, tokenId);
     }
 
     /**
