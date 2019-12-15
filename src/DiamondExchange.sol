@@ -138,6 +138,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     bool public takeProfitOnlyInDpt = true;                 // If true, it takes cost + profit in DPT, if false only profit in DPT
 
     uint256 public dust = 10000;                            // Numbers below this amount are considered 0. Can only be used ...
+    bytes32 public symbol = "Dex";                          // set human readable name for contract
                                                             // ... along with 18 decimal precisions numbers.
 
     bool liqBuysDpt;                                        // if true then liq contract is called directly to buy necessary dpt, otherwise we...

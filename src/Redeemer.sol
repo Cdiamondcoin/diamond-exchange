@@ -36,6 +36,8 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     uint redeemId;                                          // id of the redeem transaction user can refer to
     uint dust = 1000;                                       // dust value to handle round-off errors
 
+    bytes32 public symbol = "Red";                          // set human readable name for contract
+
     modifier nonReentrant {
         require(!locked, "dex-reentrancy-detected");
         locked = true;

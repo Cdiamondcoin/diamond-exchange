@@ -5,6 +5,7 @@ import "ds-math/math.sol";
 
 contract FeeCalculator is DSMath, DSAuth {
     uint public fee;
+    bytes32 public symbol = "Burner";                       // set human readable name for contract
 
     function calculateFee(
         address sender,
@@ -21,7 +22,7 @@ contract FeeCalculator is DSMath, DSAuth {
     * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees
     */
     function getCosts(
-        address user,                                                           // user for whom we want to check the costs for 
+        address user,                                                           // user for whom we want to check the costs for
         address sellToken_,
         uint256 sellId_,
         address buyToken_,
