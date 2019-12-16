@@ -351,13 +351,15 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         } else if (what_ == "decimals") {
 
-            require(addr(value_) != address(0x0), "dex-wrong-address");
+            address token_ = addr(value_);
+
+            require(token_ != address(0x0), "dex-wrong-address");
 
             uint decimal = uint256(value1_);
 
-            decimals[addr(value_)] = 10 ** decimal;
+            decimals[token_] = 10 ** decimal;
 
-            decimalsSet[addr(value_)] = true;
+            decimalsSet[token_] = true;
 
         } else if (what_ == "wal") {
 
@@ -377,11 +379,15 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             require(addr(value_) != address(0x0), "dex-wrong-address");
 
+            require(decimalsSet[addr(value_)], "dex-buytoken-decimals-not-set");
+
             canBuyErc20[addr(value_)] = uint(value1_) > 0;
 
         } else if (what_ == "canSellErc20") {
 
             require(addr(value_) != address(0x0), "dex-wrong-address");
+
+            require(decimalsSet[addr(value_)], "dex-selltoken-decimals-not-set");
 
             canSellErc20[addr(value_)] = uint(value1_) > 0;
 
@@ -403,9 +409,11 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         } else if (what_ == "dpt") {
 
-            require(addr(value_) != address(0x0), "dex-wrong-address");
-
             dpt = addr(value_);
+
+            require(dpt != address(0x0), "dex-wrong-address");
+
+            require(decimalsSet[dpt], "dex-dpt-decimals-not-set");
 
         } else if (what_ == "redeemer") {
 
@@ -1097,16 +1105,13 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     */
     function _updateRates(address sellToken_, address buyToken_) internal {
         if (canSellErc20[sellToken_]) {
-            require(decimalsSet[sellToken_], "dex-selltoken-decimals-not-set");
             _updateRate(sellToken_);
         }
 
         if (canBuyErc20[buyToken_]){
-            require(decimalsSet[buyToken_], "dex-buytoken-decimals-not-set");
             _updateRate(buyToken_);
         }
 
-        require(decimalsSet[dpt], "dex-dpt-decimals-not-set");
         _updateRate(dpt);
     }
 

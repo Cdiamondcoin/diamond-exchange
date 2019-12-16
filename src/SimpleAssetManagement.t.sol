@@ -11,7 +11,6 @@ import "./Wallet.sol";
 import "./Dcdc.sol";
 
 contract SimpleAssetManagementTest is DSTest, DSMath {
-    // TODO: remove all following LogTest()
     event LogUintIpartUintFpart(bytes32 key, uint val, uint val1);
     event LogTest(uint256 what);
     event LogTest(bool what);
@@ -75,6 +74,23 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     function testSetConfigRateAsm() public {
         asm.setConfig("rate", b(cdc), b(uint(10)), "diamonds");
         assertEq(asm.getRate(cdc), 10);
+    }
+
+    function testSetConfigTotalPaidCustVAsm() public {
+        uint totalPaidCustV_ = 10 ether;                                                    // custodian was paid 10 ether total
+        asm.setConfig("totalPaidCustV", b(custodian), b(totalPaidCustV_), "diamonds");
+        assertEq(asm.totalPaidCustV(custodian), totalPaidCustV_);
+    }
+
+    function testFailSetConfigTotalPaidCustVAsm() public {
+        uint totalPaidCustV_ = 10 ether;                                                    // custodian was paid 10 ether total
+        asm.setConfig("totalPaidCustV", b(custodian), b(totalPaidCustV_), "diamonds");
+        asm.setConfig("totalPaidCustV", b(custodian), b(totalPaidCustV_), "diamonds");      // this one fails, because we can only set it at first config time
+    }
+
+    function testFailSetConfigTotalPaidCustVNoCustodianAsm() public {
+        uint totalPaidCustV_ = 10 ether;                                                    // custodian was paid 10 ether total
+        asm.setConfig("totalPaidCustV", b(user), b(totalPaidCustV_), "diamonds");
     }
 
     function testSetRateAsm() public {
@@ -321,7 +337,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEqLog("cust1 setCapCustV() actually set", asm.capCustV(custodian1), 1.231265 ether);
         assertEqLog("cust2 setCapCustV() actually set", asm.capCustV(custodian2), 1.231266 ether);
     }
-    
+
     function testGetCdcValuesMintAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -776,6 +792,26 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.totalCdcV(), wmul(mintCdc, usdRate[cdc])); // does not update tokenPurchaseRate as token is burnt
     }
 
+    function testNotifyTransferFromDpassBuyPriceAsm() public {
+        uint price_ = 101 ether;
+        uint buyPrice_ = 90 ether;
+        uint id_;
+        bytes20 cccc_ = "BR,I3,D,10.00";
+        Dpass(dpass).setCccc(cccc_, true);
+        id_ = Dpass(dpass).mintDiamondTo(address(asm), custodian, "GIA", "3333333", "sale", cccc_, 1, b(0xef), "20191107");
+
+        asm.setBasePrice(dpass, id_, price_);
+        asm.setConfig("payTokens", b(dpass), b(true), "diamonds");
+        TrustedSASMTester(exchange).setBuyPrice(buyPrice_);
+        asm.setConfig("setApproveForAll", b(dpass), b(exchange), b(true));
+        TrustedSASMTester(exchange).doNotifyTransferFrom(dpass, address(asm), user, id_);
+        TrustedSASMTester(exchange).doSendDpassToken(dpass, address(asm), user, id_);
+
+        assertEqLog("dpassSolcDustV ok", asm.dpassSoldCustV(custodian), buyPrice_);
+        assertEqLog("totalDpassCustV ok", asm.totalDpassCustV(custodian), uint(0));
+        assertEqLog("totalDpassV", asm.totalDpassV(), uint(0));
+    }
+
     function testNotifyTransferFromDpassAsm() public {
         uint price_ = 101 ether;
         uint id_;
@@ -788,8 +824,8 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         TrustedSASMTester(user).doSendDpassToken(dpass, user, address(asm), id_);
         TrustedSASMTester(exchange).doNotifyTransferFrom(dpass, user, address(asm), id_);
 
-        assertEq(asm.totalDpassCustV(custodian), price_);
-        assertEq(asm.totalDpassV(), price_);
+        assertEqLog("totalDpassCustV ok", asm.totalDpassCustV(custodian), price_);
+        assertEqLog("totalDpassV", asm.totalDpassV(), price_);
     }
 
     function testFailNotifyTransferFromUserCustodianAsm() public {
@@ -1111,7 +1147,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint price_ = 100 ether;
         uint id_;
         bytes20 cccc_ = "BR,IF,F,0.01";
-        asm.setCapCustV(custodian1, price_); 
+        asm.setCapCustV(custodian1, price_);
         Dpass(dpass).setCccc(cccc_, true);
         id_ = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
         (
@@ -1141,7 +1177,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         require(capCustV_ < price_, "test-cap-lt-dpass-value");
         uint id_;
         bytes20 cccc_ = "BR,IF,F,0.01";
-        asm.setCapCustV(custodian1, capCustV_); 
+        asm.setCapCustV(custodian1, capCustV_);
         Dpass(dpass).setCccc(cccc_, true);
         id_ = TrustedSASMTester(custodian1).doMintDpass(dpass, custodian1, "GIa", "11211211", "sale", cccc_, 1, b(0xef), "20191107", price_);
 
@@ -1828,7 +1864,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function _createActors() internal {
-        
+
         uint ourGas = gasleft();
         asm = new SimpleAssetManagement();
         emit LogTest("cerate SimpleAssetManagement");
@@ -1836,7 +1872,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
         guard = new DSGuard();
         asm.setAuthority(guard);
-        
+
         user = address(new TrustedSASMTester(address(asm)));
         custodian = address(new TrustedSASMTester(address(asm)));
         custodian1 = address(new TrustedSASMTester(address(asm)));
@@ -2011,9 +2047,9 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function _setCustodianCap() internal {
-       cap[custodian] = uint(-1);           // we set infinite cap on custodian 
-       cap[custodian1] = uint(-1);           // we set infinite cap on custodian 
-       cap[custodian2] = uint(-1);           // we set infinite cap on custodian 
+       cap[custodian] = uint(-1);           // we set infinite cap on custodian
+       cap[custodian1] = uint(-1);           // we set infinite cap on custodian
+       cap[custodian2] = uint(-1);           // we set infinite cap on custodian
     }
 
     function _configAsm() internal {
@@ -2137,16 +2173,21 @@ contract TrustedDpassTester {
 
 contract TrustedSASMTester is Wallet {
     SimpleAssetManagement asm;
+    uint buyPriceV;
 
     constructor(address payable asm_) public {
         asm = SimpleAssetManagement(asm_);
     }
 
-    function buyPrice(address token_, address owner_, uint256 tokenId_) external pure returns (uint) {
+    function setBuyPrice(uint buyPriceV_) public {
+        buyPriceV = buyPriceV_;
+    }
+
+    function buyPrice(address token_, address owner_, uint256 tokenId_) external view returns (uint) {
         token_;
         owner_;
         tokenId_;
-        return 0;
+        return buyPriceV;
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {
@@ -2250,5 +2291,3 @@ contract TrustedSASMTester is Wallet {
     function () external payable {
     }
 }
-
-

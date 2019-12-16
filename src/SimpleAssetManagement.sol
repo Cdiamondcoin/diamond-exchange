@@ -19,6 +19,9 @@ contract TrustedDiamondExchangeAsm {
     function buyPrice(address token_, address owner_, uint256 tokenId_) external view returns (uint);
 }
 
+/**
+* @title Contract to handle diamond assets
+*/
 contract SimpleAssetManagement is DSAuth {
 
     event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
@@ -56,7 +59,7 @@ contract SimpleAssetManagement is DSAuth {
     mapping(address => address) public priceFeed;           // price feed address for token
     mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
-    mapping(address => uint) public totalPaidCustV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
+    mapping(address => uint) public totalPaidCustV;         // total amount that has been paid to custodian for dpasses and cdc in base currency
     mapping(address => uint) public dpassSoldCustV;         // total amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => uint) public capCustV;               // maximum value of dpass and dcdc tokens a custodian is allowed to mint
@@ -71,7 +74,7 @@ contract SimpleAssetManagement is DSAuth {
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool public locked;                                     // variable prevents to exploit by recursively calling funcions
     address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
-    bytes32 public name = "Asm";                          // set human readable name for contract
+    bytes32 public name = "Asm";                            // set human readable name for contract
     address public dex;                                     // address of exchange to get buyPrice from
 
     struct Audit {                                          // struct storing the results of an audit
@@ -208,7 +211,7 @@ contract SimpleAssetManagement is DSAuth {
             require(decimalsSet[token],"asm-no-decimals-set-for-token");
             require(dst != address(0), "asm-dst-zero-address");
             DSToken(token).approve(dst, value);
-        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this once we ork as dao
+        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this once operate as dao
             address token = addr(value_);
             address dst = addr(value1_);
             bool enable = uint(value2_) > 0;
@@ -221,7 +224,8 @@ contract SimpleAssetManagement is DSAuth {
             dex = addr(value_);
             require(dex != address(0), "asm-no-zero-dex-address-pls");
         } else if (what_ == "totalPaidCustV") {                         // only use during upgrade
-            address custodian_ = addr(value_);                          // TODO: test
+            address custodian_ = addr(value_);
+            require(custodians[custodian_], "asm-not-a-custodian");
             require(totalPaidCustV[custodian_] == 0,"asm-only-at-config-time");
             totalPaidCustV[custodian_] = uint(value1_);
         } else {
@@ -234,9 +238,10 @@ contract SimpleAssetManagement is DSAuth {
     /**
      * @dev Set rate (price in base currency) for token.
      */
-    function setRate(address token_, uint256 value_) public auth {  //TODO: change to nonReentrant after it does not use setConfig() anymore
+    function setRate(address token_, uint256 value_) public auth {
         setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
+
     /**
      * @dev Get newest rate in base currency from priceFeed for token.
      */
@@ -362,11 +367,11 @@ contract SimpleAssetManagement is DSAuth {
                 basePrice[token_][amtOrId_],
                 custodian);
 
-            buyPrice_ = TrustedDiamondExchangeAsm(dex).buyPrice(token_, address(this), amtOrId_); // TODO: test
+            buyPrice_ = TrustedDiamondExchangeAsm(dex).buyPrice(token_, address(this), amtOrId_);
 
             dpassSoldCustV[custodian] = add(
                 dpassSoldCustV[custodian],
-                buyPrice_ > 0 ?
+                buyPrice_ > 0 && buyPrice_ != uint(-1) ?
                     buyPrice_ :
                     basePrice[token_][amtOrId_]);
 
@@ -516,6 +521,9 @@ contract SimpleAssetManagement is DSAuth {
 
     /*
     * @dev Set state for dpass. Should be used primarily by custodians.
+    * @param token_ address the token we set the state of states are "valid" "sale" (required for selling) "invalid" redeemed
+    * @param tokenId_ uint id of dpass token
+    * @param state_ bytes8 the desired state
     */
     function setStateDpass(address token_, uint256 tokenId_, bytes8 state_) public nonReentrant auth {
         bytes32 prevState_;
@@ -562,6 +570,8 @@ contract SimpleAssetManagement is DSAuth {
     /*
     * @dev Withdraw tokens for selling dpass, and cdc. Custodians do not receive money directly from selling dpass, ot cdc, but
     * they must withdraw their tokens.
+    * @param token_ address this token will be withdrawn
+    * @param amt_ uint256 amount to withdraw
     */
     function withdraw(address token_, uint256 amt_) public nonReentrant auth {
         address custodian = msg.sender;
@@ -605,6 +615,9 @@ contract SimpleAssetManagement is DSAuth {
     /*
     * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
     *      token Value
+    * @param a_ uint256 number that will be multiplied with decimals considered
+    * @param b_ uint256 number that will be multiplied with decimals considered
+    * @param token_ address token whose decimals the result will have
     */
     function wmulV(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
         return wdiv(wmul(a_, b_), decimals[token_]);
@@ -612,6 +625,9 @@ contract SimpleAssetManagement is DSAuth {
 
     /*
     * @dev calculates division with decimals adjusted to match to tokens precision
+    * @param a_ uint256 number that will be numerator with decimals considered
+    * @param b_ uint256 number that will be denominator with decimals considered
+    * @param token_ address token whose decimals the result will have
     */
     function wdivT(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
         return wmul(wdiv(a_,b_), decimals[token_]);
@@ -619,6 +635,9 @@ contract SimpleAssetManagement is DSAuth {
 
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens at custodian.
+    * @param positiveV_ uint256 this value will be added to custodian's total dpass collateral value.
+    * @param negativeV_ uint256 this value will be subtracted from custodian's total dpass collateral value.
+    * @param custodian_ uint256 custodian for whom changes are made.
     */
     function setCollateralDpass(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDpass(positiveV_, negativeV_, custodian_);
@@ -628,6 +647,9 @@ contract SimpleAssetManagement is DSAuth {
 
     /*
     * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dcdc tokens of custodian.
+    * @param positiveV_ uint256 this value will be added to custodian's total dcdc collateral value.
+    * @param negativeV_ uint256 this value will be subtracted from custodian's total dcdc collateral value.
+    * @param custodian_ uint256 custodian for whom changes are made.
     */
     function setCollateralDcdc(uint positiveV_, uint negativeV_, address custodian_) public auth {
         _updateCollateralDcdc(positiveV_, negativeV_, custodian_);
@@ -933,5 +955,3 @@ contract SimpleAssetManagement is DSAuth {
         return true;
     }
 }
-
-// TODO: check price multiplier for base price!! implement it to multiply basePrice and to be able to change the prices with only one tx.
