@@ -145,7 +145,12 @@ contract DiamondExchangeExtension is DSAuth {
 
     /**
     * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees.
-    * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dex.dpt() fee,
+    * @param user_ address this is the address that will initiate buy transaction
+    * @param sellToken_ address token user wants to pay with 
+    * @param sellId_ uint256 if sellToken_ is dpass then this is the tokenId otherwise ignored
+    * @param buyToken_ address token user wants to buy
+    * @param buyAmtOrId_ uint256 amount or id of buyToken_
+    * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dpt fee,
     */
     function getCosts(
         address user_,                                                           // user for whom we want to check the costs for
