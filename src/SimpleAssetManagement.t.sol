@@ -160,7 +160,6 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
     function testSetDcdcStoppedAsm() public {
         address newDcdc = address(new DSToken("NEWTOKEN"));
-        asm.stop();
         asm.setConfig("decimals", b(address(newDcdc)), b(uint(18)), "diamonds");
         asm.setConfig("priceFeed", b(address(newDcdc)), b(feed[cdc]), "diamonds");
         asm.setConfig("dcdcs", b(address(newDcdc)), b(true), "diamonds");
@@ -396,7 +395,6 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         uint mintAmt = 10 ether;
         uint burnAmt = 5 ether;
         require(burnAmt <= mintAmt, "test-burnAmt-gt-mintAmt");
-        asm.stop();
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         TrustedSASMTester(custodian).doApprove(dcdc, address(asm),uint(-1));
         TrustedSASMTester(custodian).doBurnDcdc(dcdc, custodian, burnAmt);
@@ -407,7 +405,6 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
 
     function testGetDcdcValuesMintStoppedAsm() public {
         uint mintAmt = 1 ether;
-        asm.stop();
         TrustedSASMTester(custodian).doMintDcdc(dcdc, custodian, mintAmt);
         assertEq(asm.dcdcV(dcdc), wmul(usdRate[dcdc], mintAmt));
         assertEq(asm.dcdcV(dcdc1), 0 ether);
@@ -531,7 +528,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setCapCustV(custodian1, capCustV_);
         asm.setBasePrice(dpass, id_, capCustV_);
     }
-
+/*
     function testStoppedMintStillWorksAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -553,7 +550,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.cdcV(cdc1), 0 ether);
         assertEq(asm.cdcV(cdc2), 0 ether);
     }
-
+*/
     function testUpdateCdcValueAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -574,7 +571,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.cdcV(cdc1), 0 ether);
         assertEq(asm.cdcV(cdc2), 0 ether);
     }
-
+/*
     function testFailUpdateCdcValueAsm() public {
         uint price_ = 100 ether;
         uint id_;
@@ -592,7 +589,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.stop();
         asm.setCdcV(cdc);
     }
-
+*/
     function testUpdateTotalDcdcValueAsm() public {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
@@ -606,7 +603,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         assertEq(asm.totalDcdcV(), wmul(rate_, mintAmt));
 
     }
-
+/*
     function testFailUpdateTotalDcdcValueAsm() public {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
@@ -619,7 +616,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.stop();
         asm.setTotalDcdcV(dcdc);
     }
-
+*/
     function testUpdateDcdcValueAsm() public {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
@@ -632,7 +629,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.setDcdcV(dcdc, custodian);
         assertEq(asm.dcdcCustV(dcdc, custodian), wmul(rate_, mintAmt));
     }
-
+/*
     function testFailUpdateDcdcValueStoppedAsm() public {
         uint mintAmt = 11 ether;
         uint rate_ = 30 ether;
@@ -645,7 +642,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.stop();
         asm.setDcdcV(dcdc, custodian);
     }
-
+*/
     function testWmulVAsm() public {
         for(uint i = 77; i >= 1; i--) {
             asm.setConfig("decimals", b(cdc), b(i), "diamonds");
@@ -2020,6 +2017,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
     }
 
     function _configAsm() internal {
+        asm.setConfig("dex", b(exchange), "", "diamonds");
         asm.setConfig("decimals", b(dpt), b(decimals[dpt]), "diamonds");
         asm.setConfig("decimals", b(dai), b(decimals[dai]), "diamonds");
         asm.setConfig("decimals", b(eth), b(decimals[eth]), "diamonds");
@@ -2142,6 +2140,13 @@ contract TrustedSASMTester is Wallet {
 
     constructor(address payable asm_) public {
         asm = SimpleAssetManagement(asm_);
+    }
+
+    function buyPrice(address token_, address owner_, uint256 tokenId_) external pure returns (uint) {
+        token_;
+        owner_;
+        tokenId_;
+        return 0;
     }
 
     function doSetConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public {

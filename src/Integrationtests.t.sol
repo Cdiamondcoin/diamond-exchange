@@ -501,7 +501,6 @@ contract IntegrationsTest is DSTest, DSMath {
         test22MintDcdcInt();                            // mint some dcdc tokens too
 
         //------------------upgrade-starts-HERE--------------------------------------------
-        SimpleAssetManagement(asm).stop();              // stop some update functiona THIS DOES NOT STOP CUSTODIANS NOR AUTÓDITORS NOR ASSET MANAGERS!!!!
         DiamondExchange(dex).stop();                    // stop exchange
 
         asmUpgrade = address(uint160(                   // deploy new asset managemet contract
@@ -953,6 +952,7 @@ contract IntegrationsTest is DSTest, DSMath {
         DiamondExchange(dex).setConfig(b("takeProfitOnlyInDpt"), b(true), b(""));  // if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
        //-------------setup-asm------------------------------------------------------------
 
+        SimpleAssetManagement(asm).setConfig("dex", b(dex), "", "diamonds");                        // set price feed (sam as for dex)
         SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(address(cdcFeed)), "diamonds"); // set price feed (sam as for dex)
         SimpleAssetManagement(asm).setConfig("manualRate", b(cdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
         SimpleAssetManagement(asm).setConfig("decimals", b(cdc), b(18), "diamonds");                // set precision of token to 18

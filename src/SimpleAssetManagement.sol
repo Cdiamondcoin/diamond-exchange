@@ -1,10 +1,7 @@
 pragma solidity ^0.5.11;
 
-import "ds-math/math.sol";
 import "ds-auth/auth.sol";
 import "ds-token/token.sol";
-import "ds-stop/stop.sol";
-import "ds-note/note.sol";
 import "dpass/Dpass.sol";
 
 
@@ -15,8 +12,14 @@ contract TrustedFeedLike {
     function peek() external view returns (bytes32, bool);
 }
 
+/**
+* @dev ExchangeContract to get buyPrice from
+*/
+contract TrustedDiamondExchangeAsm {
+    function buyPrice(address token_, address owner_, uint256 tokenId_) external view returns (uint);
+}
 
-contract SimpleAssetManagement is DSAuth, DSStop {
+contract SimpleAssetManagement is DSAuth {
 
     event LogAudit(address sender, address custodian_, uint256 status_, bytes32 descriptionHash_, bytes32 descriptionUrl_, uint32 auditInterwal_);
     event LogConfigChange(address sender, bytes32 what, bytes32 value, bytes32 value1);
@@ -74,6 +77,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     bool public locked;                                     // variable prevents to exploit by recursively calling funcions
     address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
     bytes32 public symbol = "Asm";                          // set human readable name for contract
+    address public dex;                                     // address of exchange to get buyPrice from
 
     struct Audit {                                          // struct storing the results of an audit
         address auditor;                                    // auditor who did the last audit
@@ -217,6 +221,9 @@ contract SimpleAssetManagement is DSAuth, DSStop {
             Dpass(token).setApprovalForAll(dst, enable);
         } else if (what_ == "dust") {
             dust = uint256(value_);
+        } else if (what_ == "dex") {
+            dex = addr(value_);
+            require(dex != address(0), "asm-no-zero-dex-address-pls");
         } else {
             require(false, "asm-wrong-config-option");
         }
@@ -269,14 +276,14 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     /**
     * @dev Updates value of cdc_ token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc_ value in the system. This function should be called every time the price of cdc has been updated.
     */
-    function setCdcV(address cdc_) public stoppable {
+    function setCdcV(address cdc_) public auth {
         _updateCdcV(cdc_);
     }
 
     /**
     * @dev Updates value of a dcdc_ token. This function should be called by oracles but anyone can call it. This should be called every time the price of dcdc token was updated.
     */
-    function setTotalDcdcV(address dcdc_) public stoppable {
+    function setTotalDcdcV(address dcdc_) public auth {
         _updateTotalDcdcV(dcdc_);
     }
 
@@ -285,7 +292,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     * @param dcdc_ address the dcdc_ token we want to update the value for
     * @param custodian_ address the custodian_ whose total dcdc_ values will be updated.
     */
-    function setDcdcV(address dcdc_, address custodian_) public stoppable {
+    function setDcdcV(address dcdc_, address custodian_) public auth {
         _updateDcdcV(dcdc_, custodian_);
     }
 
@@ -337,6 +344,7 @@ contract SimpleAssetManagement is DSAuth, DSStop {
     ) external nonReentrant auth {
         uint balance;
         address custodian;
+        uint buyPrice_;
 
         require(
             dpasses[token_] || cdcs[token_] || payTokens[token_],
@@ -354,9 +362,13 @@ contract SimpleAssetManagement is DSAuth, DSStop {
                 basePrice[token_][amtOrId_],
                 custodian);
 
+            buyPrice_ = TrustedDiamondExchangeAsm(dex).buyPrice(token_, address(this), amtOrId_);
+
             dpassSoldCustV[custodian] = add(
                 dpassSoldCustV[custodian],
-                basePrice[token_][amtOrId_]);
+                buyPrice_ > 0 ?
+                    buyPrice_ :
+                    basePrice[token_][amtOrId_]);
 
             Dpass(token_).setState("valid", amtOrId_);
 

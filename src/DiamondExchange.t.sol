@@ -4084,6 +4084,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
 
     function _setConfigAsm() internal {
 
+        SimpleAssetManagement(asm).setConfig("dex", b(exchange), "", "diamonds");
         SimpleAssetManagement(asm).setConfig("overCollRatio", b(1.1 ether), "", "diamonds");
         SimpleAssetManagement(asm).setConfig("priceFeed", b(cdc), b(feed[cdc]), "diamonds");
         SimpleAssetManagement(asm).setConfig("priceFeed", b(dcdc), b(feed[dcdc]), "diamonds");
