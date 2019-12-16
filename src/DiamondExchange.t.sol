@@ -4133,15 +4133,15 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     }
 
     function _setConfigExchange() internal {
+        DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));
+        DiamondExchange(exchange).setConfig("decimals", b(cdc), b(18));
+        DiamondExchange(exchange).setConfig("decimals", b(eth), b(18));
         DiamondExchange(exchange).setConfig("canSellErc20", b(dpt), b(true));
         DiamondExchange(exchange).setConfig("canBuyErc20", b(dpt), b(true));
         DiamondExchange(exchange).setConfig("canSellErc20", b(cdc), b(true));
         DiamondExchange(exchange).setConfig("canBuyErc20", b(cdc), b(true));
         DiamondExchange(exchange).setConfig("canSellErc20", b(eth), b(true));
         DiamondExchange(exchange).setConfig("canBuyErc721", b(dpass), b(true));
-        DiamondExchange(exchange).setConfig("decimals", b(dpt), b(18));
-        DiamondExchange(exchange).setConfig("decimals", b(cdc), b(18));
-        DiamondExchange(exchange).setConfig("decimals", b(eth), b(18));
         DiamondExchange(exchange).setConfig("dpt", b(dpt), b(""));
         DiamondExchange(exchange).setConfig("cdc", b(cdc), b(""));
         DiamondExchange(exchange).setConfig("handledByAsm", b(cdc), b(true));
@@ -4157,45 +4157,45 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         DiamondExchange(exchange).setConfig("profitRate", b(profitRate), b(""));
         DiamondExchange(exchange).setConfig("wal", b(wal), b(""));
 
+        DiamondExchange(exchange).setConfig(b("decimals"), b(dai), b(18));
         DiamondExchange(exchange).setConfig(b("canSellErc20"), b(dai), b(true));
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(dai), b(feed[dai]));
         DiamondExchange(exchange).setConfig(b("rate"), b(dai), b(usdRate[dai]));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dai), b(true));
-        DiamondExchange(exchange).setConfig(b("decimals"), b(dai), b(18));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(dai), b(custodian20[dai]));
         // DiamondExchange(exchange).setConfig(b("handledByAsm"), b(dai), b(true));      // set true if token can be bougt by user and asm should handle it
 
+        DiamondExchange(exchange).setConfig(b("decimals"), b(eth), b(18));
         DiamondExchange(exchange).setConfig(b("canSellErc20"), b(eth), b(true));
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(eth), b(feed[eth]));
         DiamondExchange(exchange).setConfig(b("rate"), b(eth), b(usdRate[eth]));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(eth), b(true));
-        DiamondExchange(exchange).setConfig(b("decimals"), b(eth), b(18));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(eth), b(custodian20[eth]));
         // DiamondExchange(exchange).setConfig(b("handledByAsm"), b(eth), b(true));      // set true if token can be bougt by user and asm should handle it
 
         DiamondExchange(exchange).setConfig(b("canSellErc20"), b(cdc), b(true));
         DiamondExchange(exchange).setConfig(b("canBuyErc20"), b(cdc), b(true));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(cdc), b(custodian20[cdc]));
+        DiamondExchange(exchange).setConfig(b("decimals"), b(cdc), b(18));
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(cdc), b(feed[cdc]));
         DiamondExchange(exchange).setConfig(b("rate"), b(cdc), b(usdRate[cdc]));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(cdc), b(true));
-        DiamondExchange(exchange).setConfig(b("decimals"), b(cdc), b(18));
         DiamondExchange(exchange).setConfig(b("handledByAsm"), b(cdc), b(true));
 
+        DiamondExchange(exchange).setConfig(b("decimals"), b(dpt), b(18));
         DiamondExchange(exchange).setConfig(b("canSellErc20"), b(dpt), b(true));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(dpt), b(asm));
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(dpt), b(feed[dpt]));
         DiamondExchange(exchange).setConfig(b("rate"), b(dpt), b(usdRate[dpt]));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(dpt), b(true));
-        DiamondExchange(exchange).setConfig(b("decimals"), b(dpt), b(18));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(dpt), b(custodian20[dpt]));
         DiamondExchange(exchange).setConfig(b("takeProfitOnlyInDpt"), b(b32(takeProfitOnlyInDpt)), b(""));
 
+        DiamondExchange(exchange).setConfig(b("decimals"), b(eng), b(8));
         DiamondExchange(exchange).setConfig(b("canSellErc20"), b(eng), b(true));
         DiamondExchange(exchange).setConfig(b("priceFeed"), b(eng), b(feed[eng]));
         DiamondExchange(exchange).setConfig(b("rate"), b(eng), b(usdRate[eng]));
         DiamondExchange(exchange).setConfig(b("manualRate"), b(eng), b(true));
-        DiamondExchange(exchange).setConfig(b("decimals"), b(eng), b(8));
         DiamondExchange(exchange).setConfig(b("custodian20"), b(eng), b(custodian20[eng]));
 
         DiamondExchange(exchange).setConfig(b("liq"), b(liq), b(""));

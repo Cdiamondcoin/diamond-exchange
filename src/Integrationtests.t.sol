@@ -747,32 +747,32 @@ contract IntegrationsTest is DSTest, DSMath {
 
     function _configDexForDexUpgrade() internal {
         Liquidity(liq).approve(dpt, dexUpgrade, uint(-1));
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
         DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(cdc), b(true));           // user can sell cdc tokens
         DiamondExchange(dexUpgrade).setConfig("canBuyErc20", b(cdc), b(true));            // user can buy cdc tokens
-        DiamondExchange(dexUpgrade).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
         DiamondExchange(dexUpgrade).setConfig("priceFeed", b(cdc), b(address(cdcFeed)));  // priceFeed address is set
         DiamondExchange(dexUpgrade).setConfig("handledByAsm", b(cdc), b(true));           // make sure that cdc is minted by asset management
         DiamondExchange(dexUpgrade).setConfig(b("rate"), b(cdc), b(uint(cdcUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(cdc), b(true));          // allow using manually set prices on cdc token
 
+        DiamondExchange(dexUpgrade).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
         DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(eth), b(true));           // user can sell eth tokens
         // DiamondExchange(dexUpgrade).setConfig("canBuyErc20", b(eth), b(true));         // user CAN NOT BUY ETH ON THIS EXCHANAGE
-        DiamondExchange(dexUpgrade).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
         DiamondExchange(dexUpgrade).setConfig("priceFeed", b(eth), b(address(ethFeed)));  // priceFeed address is set
         // DiamondExchange(dexUpgrade).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
         DiamondExchange(dexUpgrade).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
         DiamondExchange(dexUpgrade).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
 
-        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(dexUpgrade).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(dexUpgrade).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
         DiamondExchange(dexUpgrade).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
         DiamondExchange(dexUpgrade).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
 
-        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(dexUpgrade).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
+        DiamondExchange(dexUpgrade).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(dexUpgrade).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
         DiamondExchange(dexUpgrade).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dexUpgrade).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
@@ -937,32 +937,32 @@ contract IntegrationsTest is DSTest, DSMath {
 
 //--------------setup-dex------------------------------------------------------------
 
+        DiamondExchange(dex).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
         DiamondExchange(dex).setConfig("canSellErc20", b(cdc), b(true));           // user can sell cdc tokens
         DiamondExchange(dex).setConfig("canBuyErc20", b(cdc), b(true));            // user can buy cdc tokens
-        DiamondExchange(dex).setConfig("decimals", b(cdc), b(18));                 // decimal precision of cdc tokens is 18
         DiamondExchange(dex).setConfig("priceFeed", b(cdc), b(address(cdcFeed)));  // priceFeed address is set
         DiamondExchange(dex).setConfig("handledByAsm", b(cdc), b(true));           // make sure that cdc is minted by asset management
         DiamondExchange(dex).setConfig(b("rate"), b(cdc), b(uint(cdcUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dex).setConfig(b("manualRate"), b(cdc), b(true));          // allow using manually set prices on cdc token
 
+        DiamondExchange(dex).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
         DiamondExchange(dex).setConfig("canSellErc20", b(eth), b(true));           // user can sell eth tokens
         // DiamondExchange(dex).setConfig("canBuyErc20", b(eth), b(true));         // user CAN NOT BUY ETH ON THIS EXCHANAGE
-        DiamondExchange(dex).setConfig("decimals", b(eth), b(18));                 // decimal precision of eth tokens is 18
         DiamondExchange(dex).setConfig("priceFeed", b(eth), b(address(ethFeed)));  // priceFeed address is set
         // DiamondExchange(dex).setConfig("handledByAsm", b(eth), b(true));        // eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
         DiamondExchange(dex).setConfig(b("rate"), b(eth), b(uint(ethUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dex).setConfig(b("manualRate"), b(eth), b(true));          // allow using manually set prices on eth token
         DiamondExchange(dex).setConfig("redeemFeeToken", b(eth), b(true));         // set eth as a token with which redeem fee can be paid
 
-        DiamondExchange(dex).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(dex).setConfig("decimals", b(dai), b(18));                 // decimal precision of dai tokens is 18
+        DiamondExchange(dex).setConfig("canSellErc20", b(dai), b(true));           // user can sell dai tokens
         DiamondExchange(dex).setConfig("priceFeed", b(dai), b(address(daiFeed)));  // priceFeed address is set
         DiamondExchange(dex).setConfig(b("rate"), b(dai), b(uint(daiUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dex).setConfig(b("manualRate"), b(dai), b(true));          // allow using manually set prices on dai token
         DiamondExchange(dex).setConfig("redeemFeeToken", b(dai), b(true));         // set dai as a token with which redeem fee can be paid
 
-        DiamondExchange(dex).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(dex).setConfig("decimals", b(dpt), b(18));                 // decimal precision of dpt tokens is 18
+        DiamondExchange(dex).setConfig("canSellErc20", b(dpt), b(true));           // user can sell dpt tokens
         DiamondExchange(dex).setConfig("priceFeed", b(dpt), b(address(dptFeed)));  // priceFeed address is set
         DiamondExchange(dex).setConfig(b("rate"), b(dpt), b(uint(dptUsdRate)));    // rate of token in base currency (since Medianizer will return false, this value will be used)
         DiamondExchange(dex).setConfig(b("manualRate"), b(dpt), b(true));          // allow using manually set prices on dpt token
