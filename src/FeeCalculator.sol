@@ -5,7 +5,7 @@ import "ds-math/math.sol";
 
 contract FeeCalculator is DSMath, DSAuth {
     uint public fee;
-    bytes32 public symbol = "Burner";                       // set human readable name for contract
+    bytes32 public name = "Fca";                       // set human readable name for contract
 
     function calculateFee(
         address sender,
@@ -16,6 +16,12 @@ contract FeeCalculator is DSMath, DSAuth {
         uint256 buyAmtOrId
     ) public view returns (uint256 feeV) {
         // add fee calculations logic here
+        sender;
+        value;
+        sellToken;
+        sellAmtOrId;
+        buyToken;
+        buyAmtOrId;
     }
 
     /**
@@ -28,11 +34,14 @@ contract FeeCalculator is DSMath, DSAuth {
         address buyToken_,
         uint256 buyAmtOrId_
     ) public view returns (uint256 sellAmtOrId_, uint256 feeDpt_, uint256 feeV_, uint256 feeSellT_) {
-        // calculate expected sell amount when user wants to buy something anc only knows how much he wants to buy from a token and whishes to know how much it will cost.
+        sellToken_;
+        sellId_;
+        buyToken_;
+        buyAmtOrId_;
+        // calculate expected sell amount when user wants to buy something and only knows how much he wants to buy from a token and whishes to know how much it will cost.
     }
 
     function setFee(uint fee_) public auth {
         fee = fee_;
     }
 }
-// TODO: write tests
