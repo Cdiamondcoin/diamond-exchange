@@ -11,12 +11,6 @@ import "dpass/Dpass.sol";
 import "./Liquidity.sol";
 
 contract Redeemer is DSAuth, DSStop, DSMath {
-    // TODO: remove all following LogTest()
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
-
     event LogRedeem(uint256 redeemId, address sender, address redeemToken_,uint256 redeemAmtOrId_, address feeToken_, uint256 feeAmt_, address payable custodian);
     address public eth = address(0xee);
     event LogTransferEth(address src, address dst, uint256 amount);

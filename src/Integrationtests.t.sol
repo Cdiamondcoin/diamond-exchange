@@ -6,7 +6,6 @@ pragma solidity ^0.5.11;
 // TODO: invalid diamond who does what
 // TODO: simple setup scenario
 // TODO: custodian adds diamond wrong this is how we correnct it
-// TODO: upgrade asm or dex functionality
 // TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
 // TODO: test for each basic use-case to demonstrate usability
 
@@ -662,8 +661,37 @@ contract IntegrationsTest is DSTest, DSMath {
         SimpleAssetManagement(asmUpgrade).setConfig("rate", b(dai), b(daiUsdRate), "diamonds");            // set USD(base currency) rate of token ( this is the price of token in USD)
         SimpleAssetManagement(asmUpgrade).setConfig("dpasses", b(dpass), b(true), "diamonds");             // enable the dpass tokens of asmUpgrade to be handled by dex
         SimpleAssetManagement(asmUpgrade).setConfig("setApproveForAll", b(dpass), b(dex), b(true));        // enable the dpass tokens of asmUpgrade to be handled by dex
-        SimpleAssetManagement(asmUpgrade).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian
-        SimpleAssetManagement(asmUpgrade).setCapCustV(custodian, uint(-1));                                // set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
+        SimpleAssetManagement(asmUpgrade).setConfig("custodians", b(custodian), b(true), "diamonds");      // setup the custodian set all custodians this way
+        SimpleAssetManagement(asmUpgrade).setConfig("custodians", b(custodian1), b(true), "diamonds");     // setup the custodian set all custodians this way
+        SimpleAssetManagement(asmUpgrade).setConfig("custodians", b(custodian2), b(true), "diamonds");     // setup the custodian set all custodians this way
+
+        // setting follosing makes sure that custodians in new contract do not get overpaid
+
+        SimpleAssetManagement(asmUpgrade).setConfig(
+            "totalPaidCustV",
+            b(custodian),
+            b(
+                SimpleAssetManagement(asm).totalPaidCustV(custodian) - 
+                SimpleAssetManagement(asm).dpassSoldCustV(custodian)),
+            "diamonds");     // setup the custodian set all custodians this way
+
+        SimpleAssetManagement(asmUpgrade).setConfig(
+            "totalPaidCustV",
+            b(custodian1),
+            b(
+                SimpleAssetManagement(asm).totalPaidCustV(custodian1) - 
+                SimpleAssetManagement(asm).dpassSoldCustV(custodian1)),
+            "diamonds");     // setup the custodian set all custodians this way
+
+        SimpleAssetManagement(asmUpgrade).setConfig(
+            "totalPaidCustV",
+            b(custodian2),
+            b(
+                SimpleAssetManagement(asm).totalPaidCustV(custodian2) - 
+                SimpleAssetManagement(asm).dpassSoldCustV(custodian2)),
+            "diamonds");     // setup the custodian set all custodians this way
+
+        SimpleAssetManagement(asmUpgrade).setCapCustV(custodian, 1000000000 ether);                        // set 1 billion total value cap. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass. In production never let the custodians have capCustV more than 20% of their current value.
         SimpleAssetManagement(asmUpgrade).setConfig("priceFeed", b(dcdc), b(address(cdcFeed)), "diamonds"); // set price feed (asmUpgrade as for dex)
         SimpleAssetManagement(asmUpgrade).setConfig("manualRate", b(dcdc), b(true), "diamonds");            // enable to use rate that is not coming from feed
         SimpleAssetManagement(asmUpgrade).setConfig("decimals", b(dcdc), b(18), "diamonds");                // set precision of token to 18

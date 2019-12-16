@@ -717,7 +717,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), amt);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amt);
-        assertEq(asm.totalPaidV(custodian), wmul(amt, usdRate[dai]));
+        assertEq(asm.totalPaidCustV(custodian), wmul(amt, usdRate[dai]));
     }
 
     function testGetTotalDpassSoldVAsm() public logs_gas {
@@ -839,7 +839,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), price1_);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amtToWithdraw);
-        assertEq(asm.totalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
+        assertEq(asm.totalPaidCustV(custodian), wmul(amtToWithdraw, usdRate[dai]));
 
     }
 
@@ -880,7 +880,7 @@ contract SimpleAssetManagementTest is DSTest, DSMath {
         asm.notifyTransferFrom(dai, user, address(asm), price1_);
 
         TrustedSASMTester(custodian).doWithdraw(dai, amtToWithdraw);
-        assertEq(asm.totalPaidV(custodian), wmul(amtToWithdraw, usdRate[dai]));
+        assertEq(asm.totalPaidCustV(custodian), wmul(amtToWithdraw, usdRate[dai]));
 
     }
 

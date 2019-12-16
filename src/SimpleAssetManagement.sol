@@ -33,11 +33,6 @@ contract SimpleAssetManagement is DSAuth {
     event LogDpassValue(uint256 totalDpassCustV, uint256 totalDpassV, address custodian);
     event LogForceUpdateCollateralDpass(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
     event LogForceUpdateCollateralDcdc(address sender, uint256 positiveV_, uint256 negativeV_, address custodian);
-    //TODO: remove LogTest
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
 
     mapping(
         address => mapping(
@@ -61,7 +56,7 @@ contract SimpleAssetManagement is DSAuth {
     mapping(address => address) public priceFeed;           // price feed address for token
     mapping(address => uint) public tokenPurchaseRate;      // the average purchase rate of a token. This is the ...
                                                             // ... price of token at which we send it to custodian
-    mapping(address => uint) public totalPaidV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
+    mapping(address => uint) public totalPaidCustV;             // total amount that has been paid to custodian for dpasses and cdc in base currency
     mapping(address => uint) public dpassSoldCustV;         // total amount of all dpass tokens that have been sold by custodian
     mapping(address => bool) public manualRate;             // if manual rate is enabled then owner can update rates if feed not available
     mapping(address => uint) public capCustV;               // maximum value of dpass and dcdc tokens a custodian is allowed to mint
@@ -185,6 +180,7 @@ contract SimpleAssetManagement is DSAuth {
             _updateTotalDcdcV(newDcdc);
         } else if (what_ == "cdcPurchaseV") {
             address cdc_ = addr(value_);
+            require(cdc_ != address(0), "asm-cdc-address-zero");
             uint addAmt_ = uint(value1_);
             uint subAmt_ = uint(value2_);
             _updateCdcPurchaseV(cdc_, addAmt_, subAmt_);
@@ -224,6 +220,10 @@ contract SimpleAssetManagement is DSAuth {
         } else if (what_ == "dex") {
             dex = addr(value_);
             require(dex != address(0), "asm-no-zero-dex-address-pls");
+        } else if (what_ == "totalPaidCustV") {                         // only use during upgrade
+            address custodian_ = addr(value_);                          // TODO: test
+            require(totalPaidCustV[custodian_] == 0,"asm-only-at-config-time");
+            totalPaidCustV[custodian_] = uint(value1_);
         } else {
             require(false, "asm-wrong-config-option");
         }
@@ -362,7 +362,7 @@ contract SimpleAssetManagement is DSAuth {
                 basePrice[token_][amtOrId_],
                 custodian);
 
-            buyPrice_ = TrustedDiamondExchangeAsm(dex).buyPrice(token_, address(this), amtOrId_);
+            buyPrice_ = TrustedDiamondExchangeAsm(dex).buyPrice(token_, address(this), amtOrId_); // TODO: test
 
             dpassSoldCustV[custodian] = add(
                 dpassSoldCustV[custodian],
@@ -571,7 +571,7 @@ contract SimpleAssetManagement is DSAuth {
 
         uint tokenPurchaseV = wmulV(tokenPurchaseRate[token_], amt_, token_);
 
-        totalPaidV[msg.sender] = add(totalPaidV[msg.sender], tokenPurchaseV);
+        totalPaidCustV[msg.sender] = add(totalPaidCustV[msg.sender], tokenPurchaseV);
         _requirePaidLessThanSold(custodian, _getCustodianCdcV(custodian));
 
         sendToken(token_, address(this), msg.sender, amt_);
@@ -853,8 +853,8 @@ contract SimpleAssetManagement is DSAuth {
                     custodianCdcV_,
                     dpassSoldCustV[custodian_]),
                 dust) >=
-                totalPaidV[custodian_]
-            , "asm-too-much-withdrawn");
+                totalPaidCustV[custodian_],
+            "asm-too-much-withdrawn");
     }
 
     /*
