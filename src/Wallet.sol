@@ -38,7 +38,6 @@ contract Wallet is DSAuth, DSStop, DSMath {
     bytes32 public symbol = "Wal";                          // set human readable name for contract
 
     function () external payable {
-        emit LogTest(msg.value);
     }
 
     function transfer(address token, address payable dst, uint256 amt) public auth returns (bool) {

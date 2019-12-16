@@ -273,19 +273,4 @@ contract DiamondExchangeExtension is DSAuth {
 
         buyV_ = dex.wmulV(buyT_, dex.getRate(buyToken_), buyToken_);
     }
-
-    function _getFeesAndSellAmt(
-        address sellToken_,
-        uint256 sellId_,
-        uint256 buyV_,
-        uint256 feeDpt_,
-        uint256 feeV_,
-        address user_
-    ) internal view returns(
-        uint sellAmtOrId_,
-        uint finalFeeDpt_,
-        uint feeDptV_,
-        uint feeSellT_
-    ) {
-    }
 }
