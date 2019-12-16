@@ -1,20 +1,10 @@
-## How to create keystore file from private key
+## Compile current cotracts
 
-### Prerequisities
+After cloning contracts from git issue:
 
-`pip install eth-account`
-
-### Code
-
-```python
-import json
-from eth_account import Account
-
-enc = Account.encrypt('YOUR PRIVATE KEY', 'YOUR PASSWORD')
-
-with open('/Users/vgaicuks/code/cdc-token/rinkeby.keystore', 'w') as f:
-    f.write(json.dumps(enc))
-
+``` bash
+git submodule update --init --remote --recursive
+dapp --use solc:0.5.11 build
 ```
 
 ## Verify contract code
@@ -36,7 +26,7 @@ solc --version
 ### Build app with selected compiler version
 
 ```bash
-dapp --use solc:0.4.25 build
+dapp --use solc:0.5.11 build
 ```
 
 ### Install another solc version
@@ -44,5 +34,25 @@ dapp --use solc:0.4.25 build
 Just use non existing version in contract project path
 
 ```bash
-dapp --use solc:0.4.25 test
+dapp --use solc:0.5.11 test
 ```
+
+## How to create keystore file from private key
+
+### Prerequisities
+
+`pip install eth-account`
+
+### Code
+
+```python
+import json
+from eth_account import Account
+
+enc = Account.encrypt('YOUR PRIVATE KEY', 'YOUR PASSWORD')
+
+with open('/Users/vgaicuks/code/cdc-token/rinkeby.keystore', 'w') as f:
+    f.write(json.dumps(enc))
+
+```
+
