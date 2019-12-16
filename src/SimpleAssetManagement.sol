@@ -237,20 +237,24 @@ contract SimpleAssetManagement is DSAuth {
 
     /**
      * @dev Set rate (price in base currency) for token.
+     * @param token_ address token to set bse currency rate for
+     * @param value_ uint256 the rate in base currency to set
      */
     function setRate(address token_, uint256 value_) public auth {
         setConfig("rate", bytes32(uint(token_)), bytes32(value_), "");
     }
 
     /**
-     * @dev Get newest rate in base currency from priceFeed for token.
+     * @dev Get newest rate in base currency from priceFeed for token. This function returns the newest token price in base currency. Burns more gas than getRate().
+     * @param token_ address token to get most up-to-date rates.
      */
     function getRateNewest(address token_) public view auth returns (uint) {
         return _getNewRate(token_);
     }
 
     /**
-     * @dev Get currently stored rate in base currency from priceFeed for token.
+     * @dev Get currently stored rate in base currency from priceFeed for token. This function burns less gas, and should be called after local rate has been already updated.
+     * @param token_ address to get rate for.
      */
     function getRate(address token_) public view auth returns (uint) {
         return rate[token_];
@@ -258,6 +262,7 @@ contract SimpleAssetManagement is DSAuth {
 
     /*
     * @dev Convert address to bytes32
+    * @param b_ bytes32 turn this value to address
     */
     function addr(bytes32 b_) public pure returns (address) {
         return address(uint256(b_));
@@ -265,13 +270,18 @@ contract SimpleAssetManagement is DSAuth {
 
     /**
     * @dev Set base price_ for a diamond. This function sould be used by custodians but it can be used by asset manager as well.
+    * @param token_ address token for whom we set baseprice.
+    * @param tokenId_ uint256 tokenid to identify token
+    * @param price_ uint256 price to set as basePrice
     */
     function setBasePrice(address token_, uint256 tokenId_, uint256 price_) public nonReentrant auth {
         _setBasePrice(token_, tokenId_, price_);
     }
 
     /**
-    * @dev Returns the current maximum value a custodian can mint from dpass and dcdc tokens.
+    * @dev Sets the current maximum value a custodian can mint from dpass and dcdc tokens.
+    * @param custodian_ address we set cap to this custodian
+    * @param capCust_ uint256 new value to set for maximum cap for custodian
     */
     function setCapCustV(address custodian_, uint256 capCustV_) public nonReentrant auth {
         require(custodians[custodian_], "asm-should-be-custodian");
@@ -280,6 +290,7 @@ contract SimpleAssetManagement is DSAuth {
 
     /**
     * @dev Updates value of cdc_ token from priceFeed. This function is called by oracles but can be executed by anyone wanting update cdc_ value in the system. This function should be called every time the price of cdc has been updated.
+    * @param cdc_ address update values for this cdc token
     */
     function setCdcV(address cdc_) public auth {
         _updateCdcV(cdc_);
@@ -287,6 +298,7 @@ contract SimpleAssetManagement is DSAuth {
 
     /**
     * @dev Updates value of a dcdc_ token. This function should be called by oracles but anyone can call it. This should be called every time the price of dcdc token was updated.
+    * @param dcdc_ address update values for this dcdc token
     */
     function setTotalDcdcV(address dcdc_) public auth {
         _updateTotalDcdcV(dcdc_);
