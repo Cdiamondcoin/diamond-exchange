@@ -148,7 +148,7 @@ contract DiamondExchangeExtension is DSAuth {
     * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dex.dpt() fee,
     */
     function getCosts(
-        address user,                                                           // user for whom we want to check the costs for
+        address user_,                                                           // user for whom we want to check the costs for
         address sellToken_,                                                     // token we want to know how much we must pay of
         uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
         address buyToken_,                                                      // the token user wants to buy
@@ -166,8 +166,8 @@ contract DiamondExchangeExtension is DSAuth {
 
         if(fca == TrustedFeeCalculatorExt(0)) {
 
-            require(user != address(0),
-                "dee-user-address-zero");
+            require(user_ != address(0),
+                "dee-user_-address-zero");
 
             require(
                 dex.canSellErc20(sellToken_) ||
@@ -184,21 +184,11 @@ contract DiamondExchangeExtension is DSAuth {
                 dex.canSellErc721(sellToken_)),
                 "dee-both-tokens-dpass");
 
-            require(dex.dpt() != address(0), "dee-dex-address-zero");
+            require(dex.dpt() != address(0), "dee-dpt-address-zero");
 
             if(dex.canBuyErc20(buyToken_)) {
 
-                buyV_ = dex.handledByAsm(buyToken_) ?                               // set buy amount to max possible
-                        asm.getAmtForSale(buyToken_) :                          // if managed by asset management get available
-                        min(                                                    // if not managed by asset management get buyV_ available
-                            DSToken(buyToken_).balanceOf(
-                                dex.custodian20(buyToken_)),
-                            DSToken(buyToken_).allowance(
-                                dex.custodian20(buyToken_), address(dex)));
-
-                buyV_ = min(buyV_, buyAmtOrId_);
-
-                buyV_ = dex.wmulV(buyV_, dex.getRate(buyToken_), buyToken_);
+                buyV_ = _getBuyV(buyToken_, buyAmtOrId_);
 
             } else {
 
@@ -216,17 +206,26 @@ contract DiamondExchangeExtension is DSAuth {
                     dex.dpt()),
                 dex.takeProfitOnlyInDpt() ? dex.profitRate() : 1 ether);
 
+            sellAmtOrId_ = min(
+                DSToken(dex.dpt()).balanceOf(user_), 
+                DSToken(dex.dpt()).allowance(user_, address(dex)));
+
             if(dex.canSellErc20(sellToken_)) {
 
-                if(Dpass(dex.dpt()).balanceOf(user) <= add(feeDpt_, dust)) {
+                if(sellAmtOrId_ <= add(feeDpt_, dust)) {
 
-                    feeDptV_ = dex.wmulV(Dpass(dex.dpt()).balanceOf(user), dex.getRate(dex.dpt()), dex.dpt());
+                    feeDptV_ = dex.wmulV(
+                        sellAmtOrId_,
+                        dex.getRate(dex.dpt()),
+                        dex.dpt());
 
-                    feeDpt_ = Dpass(dex.dpt()).balanceOf(user);
+                    feeDpt_ = sellAmtOrId_;
 
                 } else {
 
                     feeDptV_ = dex.wmulV(feeDpt_, dex.getRate(dex.dpt()), dex.dpt());
+
+                    feeDpt_ = feeDpt_;
 
                 }
 
@@ -242,11 +241,11 @@ contract DiamondExchangeExtension is DSAuth {
             } else {
 
                 sellAmtOrId_ = add(buyV_, dust) >= dex.getPrice(sellToken_, sellId_) ? 1 : 0;
-                feeDpt_ = min(feeDpt_, Dpass(dex.dpt()).balanceOf(user));
+                feeDpt_ = min(feeDpt_, Dpass(dex.dpt()).balanceOf(user_));
             }
-        } else {
 
-            return fca.getCosts(user, sellToken_, sellId_, buyToken_, buyAmtOrId_);
+        } else {
+            return fca.getCosts(user_, sellToken_, sellId_, buyToken_, buyAmtOrId_);
         }
     }
 
@@ -257,5 +256,36 @@ contract DiamondExchangeExtension is DSAuth {
         address feeToken_
     ) public view returns(uint) {
         return red.getRedeemCosts(redeemToken_, redeemAmtOrId_, feeToken_);
+    }
+
+    function _getBuyV(address buyToken_, uint256 buyAmtOrId_) internal view returns (uint buyV_) {
+        uint buyT_;
+
+        buyT_ = dex.handledByAsm(buyToken_) ?                       // set buy amount to max possible
+            asm.getAmtForSale(buyToken_) :                          // if managed by asset management get available
+            min(                                                    // if not managed by asset management get buyV_ available
+                DSToken(buyToken_).balanceOf(
+                    dex.custodian20(buyToken_)),
+                DSToken(buyToken_).allowance(
+                    dex.custodian20(buyToken_), address(dex)));
+
+        buyT_ = min(buyT_, buyAmtOrId_);
+
+        buyV_ = dex.wmulV(buyT_, dex.getRate(buyToken_), buyToken_);
+    }
+
+    function _getFeesAndSellAmt(
+        address sellToken_,
+        uint256 sellId_,
+        uint256 buyV_,
+        uint256 feeDpt_,
+        uint256 feeV_,
+        address user_
+    ) internal view returns(
+        uint sellAmtOrId_,
+        uint finalFeeDpt_,
+        uint feeDptV_,
+        uint feeSellT_
+    ) {
     }
 }

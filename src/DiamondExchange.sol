@@ -620,7 +620,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         if (fca == TrustedFeeCalculator(0)) {
 
-            return fixFee + wmul(varFee, value_);                       // calculate proportional fee locally
+            return add(fixFee, wmul(varFee, value_));                       // calculate proportional fee locally
 
         } else {
 
