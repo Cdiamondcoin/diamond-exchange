@@ -83,7 +83,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     }
 
     function balanceOf721(address token, address guy) public view returns (uint) {
-        return TrustedErci721Wallet(token).balanceOf(guy); 
+        return TrustedErci721Wallet(token).balanceOf(guy);
     }
 
     function ownerOf721(address token, uint256 tokenId) public view returns (address) {
