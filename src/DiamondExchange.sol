@@ -7,7 +7,7 @@ import "./Liquidity.sol";
 import "dpass/Dpass.sol";
 
 /**
-* @dev Contract to get ETH/USD price
+* @dev Interface to get ETH/USD price
 */
 contract TrustedFeedLikeDex {
     function peek() external view returns (bytes32, bool);
@@ -16,7 +16,7 @@ contract TrustedFeedLikeDex {
 
 
 /**
-* @dev Contract to calculate user fee based on amount
+* @dev Interface to calculate user fee based on amount
 */
 contract TrustedFeeCalculator {
 
@@ -40,6 +40,9 @@ contract TrustedFeeCalculator {
     }
 }
 
+/**
+* @dev Interface to do redeeming of tokens
+*/
 contract TrustedRedeemer {
 
 function redeem(
@@ -53,6 +56,9 @@ function redeem(
 
 }
 
+/**
+* @dev Interface for managing diamond assets
+*/
 contract TrustedAsm {
     function notifyTransferFrom(address token, address src, address dst, uint256 id721) external;
     function basePrice(address erc721, uint256 id721) external view returns(uint256);
@@ -61,12 +67,18 @@ contract TrustedAsm {
 }
 
 
+/**
+* @dev Interface ERC721 contract 
+*/
 contract TrustedErc721 {
     function transferFrom(address src, address to, uint256 amt) external;
     function ownerOf(uint256 tokenId) external view returns (address);
 }
 
 
+/**
+* @dev Interface for managing diamond assets
+*/
 contract TrustedDSToken {
     function transferFrom(address src, address dst, uint wad) external returns (bool);
     function totalSupply() external view returns (uint);
@@ -76,8 +88,7 @@ contract TrustedDSToken {
 
 
 /**
- * @title Cdc
- * @dev Cdc Exchange contract.
+ * @dev Diamond Exchange contract for events.
  */
 contract DiamondExchangeEvents {
 
@@ -97,6 +108,11 @@ contract DiamondExchangeEvents {
     event LogTransferEth(address src, address dst, uint256 val);
 }
 
+/**
+ * @title Diamond Exchange contract
+ * @dev This contract can exchange ERC721 tokens and ERC20 tokens as well. Primary 
+ * usage is to buy diamonds or buying diamond backed stablecoins.
+ */
 contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     TrustedDSToken public cdc;                              // CDC token contract
     address public dpt;                                     // DPT token contract
@@ -127,7 +143,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     address payable public liq;                             // contract providing DPT liquidity to pay for fee
     address payable public wal;                             // wallet address, where we keep all the tokens we received as fee
-    address public burner;                          // contract where accured fee of DPT is stored before being burned
+    address public burner;                                  // contract where accured fee of DPT is stored before being burned
     TrustedAsm public asm;                                  // Asset Management contract
     uint256 public fixFee;                                  // Fixed part of fee charged for buying 18 decimals precision in base currency
     uint256 public varFee;                                  // Variable part of fee charged for buying 18 decimals precision in base currency
@@ -193,7 +209,12 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Set configuration values for contract
+    * @dev Set configuration values for contract. Instead of several small functions 
+    * that bloat the abi, this monolitic function can be used to configure Diamond i
+    * Exchange contract.
+    * @param what_ bytes32 determines what change the owner(contract) wants to make.
+    * @param value_ bytes32 depending on what_ can be used to configure the system
+    * @param value1_ bytes32 depending on what_ can be used to configure the system
     */
     function setConfig(bytes32 what_, bytes32 value_, bytes32 value1_) public auth {
         if (what_ == "profitRate") {
@@ -431,8 +452,12 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /**
     * @dev Redeem token and pay fee for redeem.
+    * @param redeemToken_ address this is the token address user wants to redeem
+    * @param redeemAmtOrId_ uint256 if redeemToken_ is erc20 token this is the amount to redeem, if erc721 then this is the id
+    * @param feeToken_ address the token user wants to pay for redeem fee with
+    * @param feeAmt_ address amount user pays for redeem (note there is no function to cancel this redeem)
+    * @param custodian_ address the custodians address that user wants to get his diamonds from (if redeemToken_ is dpass, user must set the custodian of the token here)
     */
-    //TODO: test
     function redeem(
         address redeemToken_,
         uint256 redeemAmtOrId_,
@@ -467,6 +492,10 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     /**
     * @dev Тoken purchase with fee. (If user has DPT he must approve this contract,
     * otherwise transaction will fail.)
+    * @param sellToken_ address token user wants to sell
+    * @param sellAmtOrId_ uint256 if sellToken_ is erc20 token then this is the amount (if set to highest possible, it means user wants to exchange all necessary tokens in his posession to buy the buyToken_), if token is Dpass(erc721) token, then this is the tokenId
+    * @param buyToken_ address token user wants to buy
+    * @param buyAmtOrId_ uint256 if buyToken_ is erc20, then this is the amount(setting highest integer will make buy as much buyTokens: as possible), and it is tokenId otherwise 
     */
     function buyTokensWithFee (
         address sellToken_,
@@ -615,7 +644,13 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /**
     * @dev Calculate fee locally or using an external smart contract
-    * @return the fee amount in USD
+    * @return the fee amount in base currency
+    * @param sender_ address user we want to get the fee for
+    * @param value_ uint256 base currency value of transaction for which the fee will be derermined
+    * @param sellToken_ address token to be sold by user
+    * @param sellAmtOrId_ uint256 amount or id of token
+    * @param buyToken_ address token to be bought by user
+    * @param buyAmtOrId_ uint256 amount or id of buytoken
     */
     function calculateFee(
         address sender_,
@@ -841,7 +876,9 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /*
-    * @dev Token sellers can deny accepting any token_
+    * @dev Token sellers can deny accepting any token_ they want.
+    * @param token_ address token that is denied by the seller
+    * @param denyOrAccept_ bool if true then deny, accept otherwise
     */
     function setDenyToken(address token_, bool denyOrAccept_) public {
         require(canSellErc20[token_] || canSellErc721[token_], "dex-can-not-use-anyway");
@@ -850,6 +887,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /*
     * @dev Whitelist of users being able to convert tokens.
+    * @param user_ address is candidate to be whitelisted (if whitelist is enabled)
+    * @param allowed_ bool set if user_ should be allowed (uf true), or denied using system
     */
     function setKyc(address user_, bool allowed_) public auth {
         require(user_ != address(0), "asm-kyc-user-can-not-be-zero");
@@ -857,7 +896,9 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Get sell price of dpass token
+    * @dev Get marketplace price of dpass token for which users can buy the token.
+    * @param token_ address token to get the buyPrice for.
+    * @param tokenId_ uint256 token id to get buy price for.
     */
     function getBuyPrice(address token_, uint256 tokenId_) public view returns(uint256) {
         // require(canBuyErc721[token_], "dex-token-not-for-sale");
@@ -865,7 +906,10 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Get sell price of dpass token if price 0 return
+    * @dev Set marketplace price of dpass token so users can buy it on for this price.
+    * @param token_ address price is set for this token.
+    * @param tokenId_ uint256 tokenid to set price for
+    * @param price_ uint256 marketplace price to set 
     */
     function setBuyPrice(address token_, uint256 tokenId_, uint256 price_) public {
         address seller_ = msg.sender;
@@ -880,7 +924,11 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Get price of dpass token
+    * @dev Get final price of dpass token. Function tries to get rpce from marketplace 
+    * price (buyPrice) and if that is zero, then from basePrice.
+    * @param token_ address token to get price for
+    * @param tokenId_ uint256 to get price for
+    * @return final sell price that user must pay
     */
     function getPrice(address token_, uint256 tokenId_) public view returns(uint256) {
         uint basePrice_;
@@ -898,6 +946,11 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /**
     * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees.
+    * @param user_ address this is the address that will initiate buy transaction
+    * @param sellToken_ address token user wants to pay with 
+    * @param sellId_ uint256 if sellToken_ is dpass then this is the tokenId otherwise ignored
+    * @param buyToken_ address token user wants to buy
+    * @param buyAmtOrId_ uint256 amount or id of buyToken_
     * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dpt fee,
     */
     function getCosts(
@@ -1007,7 +1060,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Get exchange rate in base currency
+    * @dev Get exchange rate in base currency. This function burns small amount of gas, because it returns the locally stored exchange rate for token_. It should only be used if user is sure that the rate was recently updated.
+    * @param token_ address get rate for this token
     */
     function getLocalRate(address token_) public view auth returns(uint256) {
         return rate[token_];
@@ -1029,13 +1083,15 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /**
     * @dev Convert address to bytes32
+    * @param b_ bytes32 value to convert to address to.
     */
     function addr(bytes32 b_) public pure returns (address) {
         return address(uint256(b_));
     }
 
     /**
-    * @dev Retrieve the decimals of a token
+    * @dev Retrieve the decimals of a token. Decimals are stored in a special way internally to apply the least calculations to get precision adjusted results.
+    * @param token_ address the decimals are calculated for this token
     */
     function getDecimals(address token_) public view returns (uint8) {
         require(decimalsSet[token_], "dex-token-with-unset-decimals");
@@ -1050,9 +1106,30 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     /**
     * @dev Get token_ / quote_currency rate from priceFeed
     * Revert transaction if not valid feed and manual value not allowed
+    * @param token address get rate for this token
     */
     function getRate(address token_) public view auth returns (uint) {
         return _getNewRate(token_);
+    }
+
+    /*
+    * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base token value.
+    * @param a_ uint256 multiply this number 
+    * @param b_ uint256 multiply this number
+    * @param token_ address get results with the precision of this token
+    */
+    function wmulV(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wdiv(wmul(a_, b_), decimals[token_]);
+    }
+
+    /*
+    * @dev calculates division with decimals adjusted to match to tokens precision
+    * @param a_ uint256 divide this number
+    * @param b_ uint256 divide by this number
+    * @param token_ address get result with the precision of this token
+    */
+    function wdivT(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
+        return wmul(wdiv(a_,b_), decimals[token_]);
     }
 
     /**
@@ -1079,21 +1156,6 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             rate_ = rate[token_];
         }
-    }
-
-    /*
-    * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base
-    *      token Value
-    */
-    function wmulV(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
-        return wdiv(wmul(a_, b_), decimals[token_]);
-    }
-
-    /*
-    * @dev calculates division with decimals adjusted to match to tokens precision
-    */
-    function wdivT(uint256 a_, uint256 b_, address token_) public view returns(uint256) {
-        return wmul(wdiv(a_,b_), decimals[token_]);
     }
 
     //
