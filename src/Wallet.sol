@@ -33,12 +33,6 @@ contract TrustedErci721Wallet {
 
 
 contract Wallet is DSAuth, DSStop, DSMath {
-    // TODO: remove all following LogTest()
-    event LogTest(uint256 what);
-    event LogTest(bool what);
-    event LogTest(address what);
-    event LogTest(bytes32 what);
-
     event LogTransferEth(address src, address dst, uint256 amount);
     address public eth = address(0xee);
     bytes32 public symbol = "Wal";                          // set human readable name for contract
@@ -149,4 +143,3 @@ contract Wallet is DSAuth, DSStop, DSMath {
         return true;
     }
 }
-// TODO: write tests for erc721 functions
