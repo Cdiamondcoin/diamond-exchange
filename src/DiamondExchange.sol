@@ -888,7 +888,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     /*
     * @dev Whitelist of users being able to convert tokens.
     * @param user_ address is candidate to be whitelisted (if whitelist is enabled)
-    * @param allowed_ bool set if user_ should be allowed (uf true), or denied using system
+    * @param allowed_ bool set if user should be allowed (uf true), or denied using system
     */
     function setKyc(address user_, bool allowed_) public auth {
         require(user_ != address(0), "asm-kyc-user-can-not-be-zero");
@@ -954,18 +954,18 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     * @return the sellAmount or if sellToken is dpass 1 if sell can be made and 0 if not, and the amount of additional dpt fee,
     */
     function getCosts(
-        address user,                                                           // user for whom we want to check the costs for
+        address user_,                                                           // user_ for whom we want to check the costs for
         address sellToken_,                                                     // token we want to know how much we must pay of
         uint256 sellId_,                                                        // if sellToken_ is dpass then this is the tokenId otherwise ignored
-        address buyToken_,                                                      // the token user wants to buy
-        uint256 buyAmtOrId_                                                     // the amount user wants to buy
+        address buyToken_,                                                      // the token user_ wants to buy
+        uint256 buyAmtOrId_                                                     // the amount user_ wants to buy
     ) public view
     returns (
         uint256 sellAmtOrId_,                                                   // the calculated amount of tokens needed to be solc to get buyToken_
-        uint256 feeDpt_,                                                        // the fee paid in DPT if user has DPT ...
-                                                                                // ... (if you dont want to calculate with user DPT set user address to 0x0
+        uint256 feeDpt_,                                                        // the fee paid in DPT if user_ has DPT ...
+                                                                                // ... (if you dont want to calculate with user_ DPT set user_ address to 0x0
         uint256 feeV_,                                                          // total fee to be paid in base currency
-        uint256 feeSellT_                                                       // fee to be paid in sellTokens (this amount will be subtracted as fee from user)
+        uint256 feeSellT_                                                       // fee to be paid in sellTokens (this amount will be subtracted as fee from user_)
     ) {
         uint buyV_;
         uint dptBalance_;
@@ -973,8 +973,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         if(fca == TrustedFeeCalculator(0)) {
 
-            require(user != address(0),
-                "dex-user-address-zero");
+            require(user_ != address(0),
+                "dex-user_-address-zero");
 
             require(
                 canSellErc20[sellToken_] ||
@@ -1012,7 +1012,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
                 buyV_ = getPrice(buyToken_, buyAmtOrId_);
             }
 
-            dptBalance_ = TrustedDSToken(dpt).balanceOf(user);
+            dptBalance_ = TrustedDSToken(dpt).balanceOf(user_);
 
             feeV_ = add(
                 wmul(buyV_, varFee),
@@ -1055,7 +1055,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             }
         } else {
 
-            return fca.getCosts(user, sellToken_, sellId_, buyToken_, buyAmtOrId_);
+            return fca.getCosts(user_, sellToken_, sellId_, buyToken_, buyAmtOrId_);
         }
     }
 
@@ -1106,7 +1106,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     /**
     * @dev Get token_ / quote_currency rate from priceFeed
     * Revert transaction if not valid feed and manual value not allowed
-    * @param token address get rate for this token
+    * @param token_ address get rate for this token
     */
     function getRate(address token_) public view auth returns (uint) {
         return _getNewRate(token_);

@@ -281,7 +281,7 @@ contract SimpleAssetManagement is DSAuth {
     /**
     * @dev Sets the current maximum value a custodian can mint from dpass and dcdc tokens.
     * @param custodian_ address we set cap to this custodian
-    * @param capCust_ uint256 new value to set for maximum cap for custodian
+    * @param capCustV_ uint256 new value to set for maximum cap for custodian
     */
     function setCapCustV(address custodian_, uint256 capCustV_) public nonReentrant auth {
         require(custodians[custodian_], "asm-should-be-custodian");
