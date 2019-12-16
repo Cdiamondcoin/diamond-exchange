@@ -38,7 +38,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     bytes32 public symbol = "Wal";                          // set human readable name for contract
 
     function () external payable {
-        emit LogTest(msg.value);
+        // emit LogTest(msg.value);
     }
 
     function transfer(address token, address payable dst, uint256 amt) public auth returns (bool) {
@@ -84,7 +84,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     }
 
     function balanceOf721(address token, address guy) public view returns (uint) {
-        return TrustedErci721Wallet(token).balanceOf(guy); 
+        return TrustedErci721Wallet(token).balanceOf(guy);
     }
 
     function ownerOf721(address token, uint256 tokenId) public view returns (address) {
