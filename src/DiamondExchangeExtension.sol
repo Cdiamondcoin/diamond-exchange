@@ -37,7 +37,7 @@ contract TrustedFeeCalculatorExt {
 contract DiamondExchangeExtension is DSAuth {
 
     uint public dust = 1000;
-    bytes32 public symbol = "Dee";                          // set human readable name for contract
+    bytes32 public name = "Dee";                          // set human readable name for contract
     TrustedAsmExt public asm;
     DiamondExchange public dex;
     Redeemer public red;

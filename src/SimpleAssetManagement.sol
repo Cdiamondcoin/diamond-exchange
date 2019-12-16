@@ -71,7 +71,7 @@ contract SimpleAssetManagement is DSAuth {
     uint public dust = 1000;                                // dust value is the largest value we still consider 0 ...
     bool public locked;                                     // variable prevents to exploit by recursively calling funcions
     address public eth = address(0xee);                     // we treat eth as DSToken() wherever we can, and this is the dummy address for eth
-    bytes32 public symbol = "Asm";                          // set human readable name for contract
+    bytes32 public name = "Asm";                          // set human readable name for contract
     address public dex;                                     // address of exchange to get buyPrice from
 
     struct Audit {                                          // struct storing the results of an audit
