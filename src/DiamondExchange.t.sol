@@ -714,13 +714,13 @@ contract DiamondExchangeTest is DiamondExchangeSetup {
     }
 
     function testForFixDaiBuyFixCdcUserHasNoDptDex() public {
-        userDpt = 0 ether;              // DO NOT CHANGE THIS
+        userDpt = 0 ether;
         sendToken(dpt, user, userDpt);
 
-        address sellToken = dai;        // DO NOT CHANGE THIS
-        uint sellAmtOrId = 17 ether;    // DO NOT CHANGE THIS
-        address buyToken = cdc;         // DO NOT CHANGE THIS
-        uint buyAmtOrId = 17.79 ether;  // DO NOT CHANGE THIS
+        address sellToken = dai;
+        uint sellAmtOrId = 17 ether;
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
 
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 

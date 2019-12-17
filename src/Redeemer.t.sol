@@ -489,6 +489,18 @@ contract RedeemerTest is DiamondExchangeSetup {
                     burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
     }
 
+    function testKycRed() public {
+        Redeemer(red).setKyc(user, true);
+        Redeemer(red).setConfig("kycEnabled", b(true), "", "");
+        testRedeemCdcDaiCostRed();
+    }
+
+    function testFailKycRed() public {
+        // error Revert ("dex-you-are-not-on-kyc-list")
+        Redeemer(red).setKyc(user, false);
+        Redeemer(red).setConfig("kycEnabled", b(true), "", "");
+        testRedeemCdcDaiCostRed();
+    }
 //-------------------------------end-of-tests----------------------
 
     function forFixDaiBuyDpassUserHasNoDpt() public {

@@ -35,14 +35,14 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
 
     modifier nonReentrant {
-        require(!locked, "dex-reentrancy-detected");
+        require(!locked, "red-reentrancy-detected");
         locked = true;
         _;
         locked = false;
     }
 
-    modifier kycCheck {
-        require(!kycEnabled || kyc[msg.sender], "dex-you-are-not-on-kyc-list");
+    modifier kycCheck(address sender) {
+        require(!kycEnabled || kyc[sender], "red-you-are-not-on-kyc-list");
         _;
     }
 
@@ -69,7 +69,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
             address user_ = addr(value_);
 
-            require(user_ != address(0x0), "dex-wrong-address");
+            require(user_ != address(0x0), "red-wrong-address");
 
             kyc[user_] = uint(value1_) > 0;
         } else if (what_ == "dex") {
@@ -176,7 +176,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         address feeToken_,
         uint256 feeAmt_,
         address payable custodian_
-    ) public payable stoppable nonReentrant kycCheck returns (uint256) {
+    ) public payable stoppable nonReentrant kycCheck(sender) returns (uint256) {
 
         require(feeToken_ != eth || feeAmt_ == msg.value, "red-eth-not-equal-feeamt");
 
