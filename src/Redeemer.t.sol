@@ -501,6 +501,38 @@ contract RedeemerTest is DiamondExchangeSetup {
         Redeemer(red).setConfig("kycEnabled", b(true), "", "");
         testRedeemCdcDaiCostRed();
     }
+
+    function testGetRedeemCostsCdcRed() public {
+        address redeemToken_ = cdc;
+        uint redeemAmtOrId_ = 2 ether;
+        address feeToken_ = eth;
+        uint cost = Redeemer(red).getRedeemCosts(redeemToken_, redeemAmtOrId_, feeToken_);
+
+        assertEqDustLog(
+            "user-redeem-cost",
+            cost,
+            wdivT(
+                add(wmul(wmulV(redeemAmtOrId_, usdRate[redeemToken_], redeemToken_), varFeeRedeem), fixFeeRedeem),
+                usdRate[feeToken_],
+                feeToken_)
+        );
+    }
+
+    function testGetRedeemCostsDpassRed() public {
+        forFixDaiBuyDpassUserHasNoDpt();     // get dpass for user. id = dpassId[seller], price = dpassOwnerPrice[asm]
+
+        address feeToken_ = eth;
+        uint cost = Redeemer(red).getRedeemCosts(dpass, dpassId[seller], feeToken_);
+
+        assertEqDustLog(
+            "user-redeem-cost",
+            cost,
+            wdivT(
+                add(wmul(dpassOwnerPrice[asm], varFeeRedeem), fixFeeRedeem),
+                usdRate[feeToken_],
+                feeToken_)
+        );
+    }
 //-------------------------------end-of-tests----------------------
 
     function forFixDaiBuyDpassUserHasNoDpt() public {

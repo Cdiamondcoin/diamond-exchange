@@ -104,6 +104,13 @@ contract DiamondExchangeSetup is DSTest, DSMath, DiamondExchangeEvents, Wallet {
     bytes32 constant public ANY = bytes32(uint(-1));
     address origSellerBuyToken;
     address origSellerSellToken;
+    uint walDaiBalance;
+    uint walEthBalance;
+    uint liqDptBalance;
+    uint burnerDptBalance;
+    uint userCdcBalance;
+    uint userDaiBalance;
+    uint userEthBalance;
 
     function setUp() public {
         _createTokens();

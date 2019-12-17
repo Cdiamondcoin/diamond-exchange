@@ -2066,8 +2066,26 @@ contract DiamondExchangeTest is DiamondExchangeSetup {
             DiamondExchange(exchange).getBuyPrice(dpass, dpassId[user]),
             buyPrice);
 
+        assertEqLog(
+            "user buyPrice var ok",
+            DiamondExchange(exchange).buyPrice(dpass, user, dpassId[user]),
+            buyPrice);
+
         DiamondExchangeTester(seller)
             .doSetBuyPrice(dpass, dpassId[user], otherBuyPrice);            // anyone can set sell price, but it will only be effective, if they own the token
+
+        DiamondExchangeTester(seller)
+            .doSetBuyPrice(dpass, dpassId[seller], otherBuyPrice);            // anyone can set sell price, but it will only be effective, if they own the token
+
+        assertEqLog(
+            "cust set buy price",
+            DiamondExchange(exchange).getBuyPrice(dpass, dpassId[seller]),
+            otherBuyPrice);
+
+        assertEqLog(
+            "cust buyPrice var ok",
+            DiamondExchange(exchange).buyPrice(dpass, asm, dpassId[seller]),
+            otherBuyPrice);
 
         assertEqLog(
             "setBuyPrice() by oth don't apply",
@@ -3191,5 +3209,70 @@ contract DiamondExchangeTest is DiamondExchangeSetup {
             dpt);
 
         doExchange(dpass, dpassId[user], cdc, buyAmt);
+    }
+
+    function testRedeemFeeTokenDex() public {
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));
+
+        uint ethRedeem = 11 ether;
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        DiamondExchange(exchange)
+            .buyTokensWithFee
+            .value(sellAmtOrId)
+            (sellToken, sellAmtOrId, dpass, dpassId[seller]);
+
+        approve721(dpass, exchange, dpassId[seller]);        
+
+        walEthBalance = wal.balance;
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(address(this));
+        userEthBalance = address(this).balance;
+
+        DiamondExchange(exchange)
+        .redeem
+        .value(ethRedeem)
+        (
+            dpass,
+            dpassId[seller],
+            eth,
+            ethRedeem,
+            seller
+        );
+
+        // balances after redeem are tested in src/Redeemer.t.sol
+    }
+
+    function testFailRedeemFeeTokenDex() public {
+        //error Revert ("dex-token-not-to-pay-redeem-fee")
+        uint ethRedeem = 11 ether;
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        DiamondExchange(exchange)
+            .buyTokensWithFee
+            .value(sellAmtOrId)
+            (sellToken, sellAmtOrId, dpass, dpassId[seller]);
+
+        approve721(dpass, exchange, dpassId[seller]);        
+
+        walEthBalance = wal.balance;
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(address(this));
+        userEthBalance = address(this).balance;
+
+        DiamondExchange(exchange)
+        .redeem
+        .value(ethRedeem)
+        (
+            dpass,
+            dpassId[seller],
+            eth,
+            ethRedeem,
+            seller
+        );
     }
 }
