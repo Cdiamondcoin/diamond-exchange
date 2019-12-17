@@ -341,7 +341,7 @@ contract IntegrationsTest is DSTest, DSMath {
 
         uint redeemId =  TesterActor(user).doRedeem(                                // user redeems cdc token
                                    cdc,                                             // cdc is the token user wants to redeem
-                                   uint(DSToken(cdc).balanceOf(user)),              // user sends all cdc he has got
+                                   uint(DSToken(cdc).balanceOf(user) / 10 ** 18 * 10 ** 18),              // user sends all cdc he has got
                                    dai,                                             // user pays redeem fee in dai
                                    uint(500 ether),                                 // the amount is determined by frontend and must cover shipping cost of ...
                                                                                     // ... custodian and 3% of redeem cost for Cdiamondcoin

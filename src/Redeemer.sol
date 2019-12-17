@@ -179,7 +179,6 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     ) public payable stoppable nonReentrant kycCheck(sender) returns (uint256) {
 
         require(feeToken_ != eth || feeAmt_ == msg.value, "red-eth-not-equal-feeamt");
-
         if( asm.dpasses(redeemToken_) ) {
 
             Dpass(redeemToken_).redeem(redeemAmtOrId_);
@@ -192,6 +191,8 @@ contract Redeemer is DSAuth, DSStop, DSMath {
                     .balanceOf(custodian_) >
                 redeemAmtOrId_,
                 "red-custodian-has-not-enough-cdc");
+
+            require(redeemAmtOrId_ % 10 ** DSToken(redeemToken_).decimals() == 0, "red-cdc-integer-value-pls");
 
             DSToken(redeemToken_).transfer(address(asm), redeemAmtOrId_);     // cdc token sent to asm to be burned
 
@@ -279,6 +280,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     * add the handling fee of custodians to have a successfull redeem.
     */
     function getRedeemCosts(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_) public view returns(uint feeT_) {
+            require(asm.dpasses(redeemToken_) || redeemAmtOrId_ % 10 ** DSToken(redeemToken_).decimals() == 0, "red-cdc-integer-value-pls");
         uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
         feeT_ = _getFeeT(feeToken_, redeemTokenV_);
     }

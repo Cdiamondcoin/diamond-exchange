@@ -31,7 +31,7 @@ contract RedeemerTest is DiamondExchangeSetup {
 
         DiamondExchangeTester(user).doRedeem(
             cdc,
-            uint(DSToken(cdc).balanceOf(user)),
+            uint(DSToken(cdc).balanceOf(user) / 10 ** 18 * 10 ** 18),
             dai,
             daiRedeem,
             custodian
@@ -43,9 +43,9 @@ contract RedeemerTest is DiamondExchangeSetup {
             userDaiBalance - daiRedeem);
 
         uint daiFee = wdivT(
-                wmul(varFeeRedeem, wmulV(userCdcBalance, usdRate[cdc], cdc)) + fixFeeRedeem,
-                usdRate[dai],
-                dai);
+            wmul(varFeeRedeem, wmulV(uint(userCdcBalance / 10 ** 18 * 10 ** 18), usdRate[cdc], cdc)) + fixFeeRedeem,
+            usdRate[dai],
+            dai);
 
         assertEqLog(
             "wal-dai-balance",
@@ -61,20 +61,20 @@ contract RedeemerTest is DiamondExchangeSetup {
                 usdRate[dpt],
                 dpt);
 
-        assertEqLog(
+        assertEqDustLog(
             "liq-dpt-balance",
             DSToken(dpt).balanceOf(liq),
             liqDptBalance - dptFee);
 
-        assertEqLog(
+        assertEqDustLog(
             "burner-dpt-balance",
             DSToken(dpt).balanceOf(burner),
             burnerDptBalance + dptFee);
 
-        assertEqLog(
+        assertEqDustLog(
             "user-cdc-balance",
             DSToken(cdc).balanceOf(user),
-            0);
+            userCdcBalance - uint(userCdcBalance / 10 ** 18 * 10 ** 18));
     }
 
     function testRedeemCdcUsingEthRed() public {
@@ -98,7 +98,7 @@ contract RedeemerTest is DiamondExchangeSetup {
 
         DiamondExchangeTester(user).doRedeem(
             cdc,
-            uint(DSToken(cdc).balanceOf(user)),
+            uint(DSToken(cdc).balanceOf(user) / 10 ** 18 * 10 ** 18),
             eth,
             ethRedeem,
             custodian
@@ -110,11 +110,11 @@ contract RedeemerTest is DiamondExchangeSetup {
             userEthBalance - ethRedeem);
 
         uint ethFee = wdivT(
-                wmul(varFeeRedeem, wmulV(userCdcBalance, usdRate[cdc], cdc)) + fixFeeRedeem,
+                wmul(varFeeRedeem, wmulV(userCdcBalance / 10 ** 18 * 10 ** 18, usdRate[cdc], cdc)) + fixFeeRedeem,
                 usdRate[eth],
                 eth);
 
-        assertEqLog(
+        assertEqDustLog(
             "wal-eth-balance",
             wal.balance,
             walEthBalance + ethFee);
@@ -128,20 +128,20 @@ contract RedeemerTest is DiamondExchangeSetup {
                 usdRate[dpt],
                 dpt);
 
-        assertEqLog(
+        assertEqDustLog(
             "liq-dpt-balance",
             DSToken(dpt).balanceOf(liq),
             liqDptBalance - dptFee);
 
-        assertEqLog(
+        assertEqDustLog(
             "burner-dpt-balance",
             DSToken(dpt).balanceOf(burner),
             burnerDptBalance + dptFee);
 
-        assertEqLog(
+        assertEqDustLog(
             "user-cdc-balance",
             DSToken(cdc).balanceOf(user),
-            0);
+            userCdcBalance - uint(userCdcBalance / 10 ** 18 * 10 ** 18));
     }
 
     function testRedeemDpassRed() public {
@@ -412,43 +412,18 @@ contract RedeemerTest is DiamondExchangeSetup {
                     burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), profitRateRedeem), usdRate[dpt], dpt));
     }
 
-    function testRedeemCdcDptCostRed() public {
+    function testFailRedeemCdcDptCostRed() public {
+        //  error Revert ("red-cdc-integer-value-pls") 
         uint sendDpt = 300 ether;
         forFixDaiBuyFixCdcUserHasNoDpt();
         DSToken(dpt).transfer(user, sendDpt);
 
-        uint userDptBalance = DSToken(dpt).balanceOf(user);
-        userCdcBalance = DSToken(cdc).balanceOf(user);
-        uint walDptBalance = DSToken(dpt).balanceOf(wal);
-        liqDptBalance =  DSToken(dpt).balanceOf(liq);
-        burnerDptBalance = DSToken(dpt).balanceOf(burner);
         DiamondExchangeTester(user).doRedeem(
             cdc,
-            17 ether,
+            17.1 ether,
             dpt,
             sendDpt,
             custodian);
-
-        assertEqDustLog("user-cdc-balance-decreased",
-                    DSToken(cdc).balanceOf(user),
-                    userCdcBalance - 17 ether);
-
-        assertEqDustLog("user-dpt-balance-decreased", 
-                    DSToken(dpt).balanceOf(user),
-                    userDptBalance - sendDpt);
-
-        assertEqDustLog("wal-balance-increased", 
-                    DSToken(dpt).balanceOf(wal),
-                    walDptBalance + wdivT(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), usdRate[dpt], dpt) - 
-                    wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
-
-        assertEqDustLog("liq-balance-decreased", 
-                    DSToken(dpt).balanceOf(liq),
-                    liqDptBalance );
-
-        assertEqDustLog("burner-balance-increased", 
-                    DSToken(dpt).balanceOf(burner),
-                    burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
     }
 
     function testRedeemCdcDaiCostRed() public {
@@ -505,6 +480,23 @@ contract RedeemerTest is DiamondExchangeSetup {
     function testGetRedeemCostsCdcRed() public {
         address redeemToken_ = cdc;
         uint redeemAmtOrId_ = 2 ether;
+        address feeToken_ = eth;
+        uint cost = Redeemer(red).getRedeemCosts(redeemToken_, redeemAmtOrId_, feeToken_);
+
+        assertEqDustLog(
+            "user-redeem-cost",
+            cost,
+            wdivT(
+                add(wmul(wmulV(redeemAmtOrId_, usdRate[redeemToken_], redeemToken_), varFeeRedeem), fixFeeRedeem),
+                usdRate[feeToken_],
+                feeToken_)
+        );
+    }
+
+    function testFailGetRedeemCostsCdcNotIntegerRed() public {
+        // error Revert ("red-cdc-integer-value-pls")
+        address redeemToken_ = cdc;
+        uint redeemAmtOrId_ = 2.1 ether;
         address feeToken_ = eth;
         uint cost = Redeemer(red).getRedeemCosts(redeemToken_, redeemAmtOrId_, feeToken_);
 
