@@ -3275,4 +3275,30 @@ contract DiamondExchangeTest is DiamondExchangeSetup {
             seller
         );
     }
+
+    function testFailForFixEthBuyFixCdcUserDptNotZeroNotEnoughSmallDex() public {
+        userDpt = 1 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = eth;
+        uint sellAmtOrId = 17 ether;
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        DiamondExchange(exchange).setConfig("small", b(eth), b(sellAmtOrId + 1));
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
+
+    function testForFixEthBuyFixCdcUserDptNotZeroNotEnoughSmallDex() public {
+        userDpt = 1 ether;
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = eth;
+        uint sellAmtOrId = 17 ether;
+        address buyToken = cdc;
+        uint buyAmtOrId = 17.79 ether;
+
+        DiamondExchange(exchange).setConfig("small", b(eth), b(sellAmtOrId));
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+    }
 }

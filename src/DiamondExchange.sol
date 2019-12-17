@@ -119,6 +119,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     address public dpt;                                     // DPT token contract
 
     mapping(address => uint256) private rate;               // exchange rate for a token
+    mapping(address => uint256) public small;               // set minimum amount of sellAmtOrId_
     mapping(address => bool) public manualRate;             // manualRate is allowed for a token (if feed invalid)
 
     mapping(address => TrustedFeedLikeDex)
@@ -371,6 +372,17 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             custodian20[addr(value_)] = address(uint160(addr(value1_)));
 
+        } else if (what_ == "small") {
+            address token = addr(value_);
+            uint256 value = uint256(value1_);
+
+            require(
+                canSellErc20[token] ||
+                canBuyErc20[token],
+                "dex-token-not-allowed-small");
+
+            small[token] = value;
+
         } else if (what_ == "decimals") {
 
             address token_ = addr(value_);
@@ -522,6 +534,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         uint buyT_;
 
         require(!denyToken[sellToken_][buyToken_], "dex-cant-use-this-token-to-buy");
+        require(small[sellToken_] <= sellAmtOrId_, "dex-trade-value-too-small");
 
         _updateRates(sellToken_, buyToken_);    // update currency rates
 
