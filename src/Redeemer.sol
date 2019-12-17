@@ -222,7 +222,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     function setKyc(address user_, bool enable_) public auth {
         setConfig(
             "kyc",
-            bytes32(uint(a_)), 
+            bytes32(uint(user_)), 
             enable_ ? bytes32(uint(1)) : bytes32(uint(0)),
             "");
     }
