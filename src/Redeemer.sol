@@ -270,7 +270,13 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
     /**
     * @dev Calculate costs for redeem. These are only concerning the fees the system charges.
-    * Delivery costs charged by custodians are additional to these.
+    * Delivery costs charged by custodians are additional to these and must be added to the i
+    * cost returned here.
+    * @param redeemToken_ address token that will be redeemed. Cdc or dpass token address required.
+    * @param redeemAmtOrId_ uint256 amount of token to be redeemed
+    * @param feeToken_ address token that will be used to pay fee.
+    * @return amount of fee token that must be sent as fee to system. Above this value users must 
+    * add the handling fee of custodians to have a successfull redeem.
     */
     function getRedeemCosts(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_) public view returns(uint feeT_) {
         uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
@@ -295,17 +301,15 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     * @dev Calculate  amount of feeTokens to be paid as fee.
     */
     function _getFeeT(address feeToken_, uint256 redeemTokenV_) internal view returns (uint) {
-        return add(
+        return 
             dex.wdivT(
-                fixFee,
+                add(
+                    wmul(
+                        varFee,
+                        redeemTokenV_),
+                    fixFee),
                 dex.getLocalRate(feeToken_),
-                feeToken_),
-            dex.wdivT(
-                wmul(
-                    varFee,
-                    redeemTokenV_),
-                dex.getLocalRate(feeToken_),
-                feeToken_));
+                feeToken_);
     }
 
     /**
