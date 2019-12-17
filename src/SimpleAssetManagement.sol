@@ -204,14 +204,14 @@ contract SimpleAssetManagement is DSAuth {
             bool enable = uint(value1_) > 0;
             require(dpass != address(0), "asm-dpass-address-zero");
             dpasses[dpass] = enable;
-        } else if (what_ == "approve") {                            // TODO: remove this once we operate as dao
+        } else if (what_ == "approve") {
             address token = addr(value_);
             address dst = addr(value1_);
             uint value = uint(value2_);
             require(decimalsSet[token],"asm-no-decimals-set-for-token");
             require(dst != address(0), "asm-dst-zero-address");
             DSToken(token).approve(dst, value);
-        }  else if (what_ == "setApproveForAll") {                  // TODO: remove this once operate as dao
+        }  else if (what_ == "setApproveForAll") {
             address token = addr(value_);
             address dst = addr(value1_);
             bool enable = uint(value2_) > 0;

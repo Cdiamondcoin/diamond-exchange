@@ -254,7 +254,6 @@ contract DiamondExchangeExtension is DSAuth {
         }
     }
 
-    // TODO: test
     function getRedeemCosts(
         address redeemToken_,
         uint256 redeemAmtOrId_,

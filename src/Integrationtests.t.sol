@@ -1026,10 +1026,9 @@ contract IntegrationsTest is DSTest, DSMath {
         dpt = address(new DSToken("DPT"));
         dai = address(new DSToken("DAI"));
         eth = address(0xee);
-        eng = address(new DSToken("ENG"));   // TODO: make sure it is 8 decimals
+        eng = address(new DSToken("ENG"));
 
         cdc = address(new Cdc("BR,VS,G,0.05", "CDC"));
-        // TODO: change to Cdc() from DSToken() below
         cdc1 = address(new Cdc("BR,VS,F,1.00", "CDC1"));
         cdc2 = address(new Cdc("BR,VS,E,2.00", "CDC2"));
 
@@ -1421,7 +1420,6 @@ contract TrustedSASMTester is Wallet {
 
 
 contract DiamondExchangeTester is Wallet, DSTest {
-    // TODO: remove all following LogTest()
     event LogTest(uint256 what);
     event LogTest(bool what);
     event LogTest(address what);

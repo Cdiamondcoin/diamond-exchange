@@ -5,6 +5,7 @@ import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "./Liquidity.sol";
 import "dpass/Dpass.sol";
+import "./Redeemer.sol";
 
 /**
 * @dev Interface to get ETH/USD price
@@ -275,7 +276,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             require(varFee <= 1 ether, "dex-var-fee-too-high");
 
-        } else if (what_ == "redeemFeeToken") {         // TODO: test
+        } else if (what_ == "redeemFeeToken") {
 
             address token = addr(value_);
             require(token != address(0), "dex-zero-address-redeemfee-token");
@@ -915,7 +916,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
         address seller_ = msg.sender;
         require(canBuyErc721[token_], "dex-token-not-for-sale");
 
-        if (                                                                //TODO: test
+        if (
             msg.sender == Dpass(token_).getCustodian(tokenId_) &&
             address(asm) == Dpass(token_).ownerOf(tokenId_)
         ) seller_ = address(asm);

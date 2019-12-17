@@ -83,7 +83,6 @@ contract TokenUser {
 
 
 contract WalletTest is DSTest, DSMath {
-    // TODO: remove all following LogTest()
     event LogTest(uint256 what);
     event LogTest(bool what);
     event LogTest(address what);

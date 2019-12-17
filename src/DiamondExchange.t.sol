@@ -3963,7 +3963,7 @@ contract DiamondExchangeTest is DSTest, DSMath, DiamondExchangeEvents, Wallet {
         dpt = address(new DSToken("DPT"));
         dai = address(new DSToken("DAI"));
         eth = address(0xee);
-        eng = address(new DSToken("ENG"));   // TODO: make sure it is 8 decimals
+        eng = address(new DSToken("ENG"));
     }
 
     function _setErc20Tokens() internal {
@@ -4396,7 +4396,6 @@ contract DptTester {
 
 
 contract DiamondExchangeTester is Wallet, DSTest {
-    // TODO: remove all following LogTest()
     event LogTest(uint256 what);
     event LogTest(bool what);
     event LogTest(address what);
@@ -4651,7 +4650,3 @@ contract TrustedDiamondExchange {
         uint256 amount
     ) external returns(bool);
 }
-// TODO: tasts for liqBuysDpt where liwuidity contract buys dpt for us and sends to burner
-
-
-
