@@ -236,7 +236,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
             rate[token] = value;
 
-        } else if (what_ == "kyc") {
+        } else if (what:_ == "kyc") {
 
             address user_ = addr(value_);
 

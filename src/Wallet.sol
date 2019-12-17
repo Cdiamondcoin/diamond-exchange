@@ -6,7 +6,9 @@ import "ds-token/token.sol";
 import "ds-stop/stop.sol";
 import "ds-note/note.sol";
 
-
+/**
+* @dev Interface to ERC20 tokens.
+*/
 contract TrustedErc20Wallet {
     function totalSupply() public view returns (uint);
     function balanceOf(address guy) public view returns (uint);
@@ -19,6 +21,9 @@ contract TrustedErc20Wallet {
     ) public returns (bool);
 }
 
+/**
+* @dev Interface to ERC721 tokens.
+*/
 contract TrustedErci721Wallet {
     function balanceOf(address guy) public view returns (uint);
     function ownerOf(uint256 tokenId) public view returns (address);
@@ -31,7 +36,10 @@ contract TrustedErci721Wallet {
     function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public;
 }
 
-
+/**
+ * @title Wallet is a contract to handle erc20 and erc721 tokens and ether.
+ * @dev This token is used to store and transfer tokens that were paid as fee by users.
+ */
 contract Wallet is DSAuth, DSStop, DSMath {
     event LogTransferEth(address src, address dst, uint256 amount);
     address public eth = address(0xee);

@@ -30,13 +30,20 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     uint redeemId;                                          // id of the redeem transaction user can refer to
     uint dust = 1000;                                       // dust value to handle round-off errors
 
-    bytes32 public name = "Red";                          // set human readable name for contract
+    bytes32 public name = "Red";                            // set human readable name for contract
+    bool kycEnabled;                                        // if true then user must be on the kyc list in order to use the system
+    mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
 
     modifier nonReentrant {
         require(!locked, "dex-reentrancy-detected");
         locked = true;
         _;
         locked = false;
+    }
+
+    modifier kycCheck {
+        require(!kycEnabled || kyc[msg.sender], "dex-you-are-not-on-kyc-list");
+        _;
     }
 
     function () external payable {
@@ -49,6 +56,22 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
             asm = SimpleAssetManagement(address(uint160(addr(value_))));
 
+        } else if (what_ == "fixFee") {
+
+            fixFee = uint256(value_);
+
+        } else if (what_ == "varFee") {
+
+            varFee = uint256(value_);
+            require(varFee <= 1 ether, "red-var-fee-too-high");
+
+        } else if (what_ == "kyc") {
+
+            address user_ = addr(value_);
+
+            require(user_ != address(0x0), "dex-wrong-address");
+
+            kyc[user_] = uint(value1_) > 0;
         } else if (what_ == "dex") {
 
             require(addr(value_) != address(0x0), "red-zero-red-address");
@@ -67,22 +90,13 @@ contract Redeemer is DSAuth, DSStop, DSMath {
 
             wal = address(uint160(addr(value_)));
 
-        } else if (what_ == "fixFee") {
-
-            fixFee = uint256(value_);
-
-        } else if (what_ == "varFee") {
-
-            varFee = uint256(value_);
-            require(varFee <= 1 ether, "red-var-fee-too-high");
-
         } else if (what_ == "profitRate") {
 
             profitRate = uint256(value_);
 
             require(profitRate <= 1 ether, "red-profit-rate-out-of-range");
 
-        }  else if (what_ == "dcdcOfCdc") {
+        } else if (what_ == "dcdcOfCdc") {
 
             require(address(asm) != address(0), "red-setup-asm-first");
 
@@ -124,6 +138,10 @@ contract Redeemer is DSAuth, DSStop, DSMath {
                 Liquidity(liq).burn(dpt, burner, 0);            // check if liq does have the proper burn function
             }
 
+        } else if (what_ == "kycEnabled") {
+
+            kycEnabled = uint(value_) > 0;
+
         } else if (what_ == "dust") {
             dust = uint256(value_);
             require(dust <= 1 ether, "red-pls-decrease-dust");
@@ -139,7 +157,18 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     function addr(bytes32 b_) public pure returns (address) {
         return address(uint256(b_));
     }
-    // TODO: test
+
+    /*
+    * @dev Pay redeem costs and redeem for diamond. Using this funcitn is non-reversible.
+    * @param sender_ address ethereum account of user who wants to redeem
+    * @param redeemToken_ address token address that user wants to redeem token can be both 
+    * dpass and cdc tokens
+    * @param redeemAmtOrId_ uint256 if token is cdc then represents amount, and if dpass then id of diamond
+    * @param feeToken_ address token to pay fee with. This token can only be erc20.
+    * @param feeAmt_ uint256 amount of token to be paid as redeem fee.
+    * @param custodian_ address custodian to get diamond from. If token is dpass, then custodian must match 
+    * the custodian of dpass token id, if cdc then any custodian can be who has enough matching dcdc tokens.
+    */
     function redeem(
         address sender,
         address redeemToken_,
@@ -147,7 +176,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         address feeToken_,
         uint256 feeAmt_,
         address payable custodian_
-    ) public payable stoppable nonReentrant returns (uint256) {
+    ) public payable stoppable nonReentrant kycCheck returns (uint256) {
 
         require(feeToken_ != eth || feeAmt_ == msg.value, "red-pls-send-eth");
 
@@ -179,13 +208,35 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         uint feeToCustodian_ = _sendFeeToCdiamondCoin(redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_);
 
         _sendToken(feeToken_, address(this), custodian_, feeToCustodian_);
-        
+
         emit LogRedeem(++redeemId, sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
 
         return redeemId;
     }
 
-    function _sendFeeToCdiamondCoin(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_, uint256 feeAmt_) internal returns (uint feeToCustodianT_){
+    /**
+    * @dev Put user on whitelist to redeem diamonds.
+    * @param user_ address the ethereum account to enable
+    * @param enable_ bool if true enables, otherwise disables user to use redeem
+    */
+    function setKyc(address user_, bool enable_) public auth {
+        setConfig(
+            "kyc",
+            bytes32(uint(a_)), 
+            enable_ ? bytes32(uint(1)) : bytes32(uint(0)),
+            "");
+    }
+
+    /**
+    * @dev send token or ether to destination
+    */
+    function _sendFeeToCdiamondCoin(
+        address redeemToken_,
+        uint256 redeemAmtOrId_,
+        address feeToken_,
+        uint256 feeAmt_
+    ) internal returns (uint feeToCustodianT_){
+
         uint profitV_;
         uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
 
@@ -216,12 +267,19 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         require(add(feeAmt_,dust) >= feeT_, "red-not-enough-fee-sent");
         feeToCustodianT_ = sub(feeAmt_, feeT_);
     }
-    
+
+    /**
+    * @dev Calculate costs for redeem. These are only concerning the fees the system charges.
+    * Delivery costs charged by custodians are additional to these.
+    */
     function getRedeemCosts(address redeemToken_, uint256 redeemAmtOrId_, address feeToken_) public view returns(uint feeT_) {
         uint redeemTokenV_ = _calcRedeemTokenV(redeemToken_, redeemAmtOrId_);
         feeT_ = _getFeeT(feeToken_, redeemTokenV_);
     }
 
+    /**
+    * @dev Calculdate the base currency value of redeem token if it is an erc20 or if it is an erc721 token.
+    */
     function _calcRedeemTokenV(address redeemToken_, uint256 redeemAmtOrId_) internal view returns(uint redeemTokenV_) {
         if(asm.dpasses(redeemToken_)) {
             redeemTokenV_ = asm.basePrice(redeemToken_, redeemAmtOrId_);
@@ -233,6 +291,9 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         }
     }
 
+    /**
+    * @dev Calculate  amount of feeTokens to be paid as fee.
+    */
     function _getFeeT(address feeToken_, uint256 redeemTokenV_) internal view returns (uint) {
         return add(
             dex.wdivT(
@@ -241,14 +302,14 @@ contract Redeemer is DSAuth, DSStop, DSMath {
                 feeToken_),
             dex.wdivT(
                 wmul(
-                    varFee, 
+                    varFee,
                     redeemTokenV_),
                 dex.getLocalRate(feeToken_),
                 feeToken_));
     }
 
     /**
-    * @dev send token or ether to destination
+    * @dev send token or ether to destination.
     */
     function _sendToken(
         address token,

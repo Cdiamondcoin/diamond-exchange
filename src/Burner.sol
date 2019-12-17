@@ -6,21 +6,27 @@ import "ds-token/token.sol";
 
 /**
  * @title DPT token burner
- * @dev The place where DPT are stored before be burned
+ * @dev The place where DPT are stored before being burned
  */
 contract Burner is DSAuth {
     DSToken public token;
-    bytes32 public name = "Burner";                       // set human readable name for contract
+    bytes32 public name = "Burner";
 
     constructor(DSToken token_) public {
         token = token_;
-        // token.approve(token.owner());
     }
 
+    /**
+    * @dev Burn sertain amount of token.
+    * @param amount_ uint256 amount to be burnt.
+    */
     function burn(uint amount_) public auth {
         token.burn(amount_);
     }
 
+    /**
+    * @dev Burn all tokens.
+    */
     function burnAll() public auth {
         uint totalAmount = token.balanceOf(address(this));
         burn(totalAmount);

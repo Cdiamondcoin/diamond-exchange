@@ -636,7 +636,7 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /*
-    * @dev calculates division with decimals adjusted to match to tokens precision
+    * @dev calculates division with the result's decimals adjusted to match to token's precision
     * @param a_ uint256 number that will be numerator with decimals considered
     * @param b_ uint256 number that will be denominator with decimals considered
     * @param token_ address token whose decimals the result will have
@@ -646,7 +646,8 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /*
-    * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dpass tokens at custodian.
+    * @dev function should only be used in case of unexpected events at custodian!! 
+    * It will update the system collateral value and collateral value of dpass tokens at custodian.
     * @param positiveV_ uint256 this value will be added to custodian's total dpass collateral value.
     * @param negativeV_ uint256 this value will be subtracted from custodian's total dpass collateral value.
     * @param custodian_ uint256 custodian for whom changes are made.
@@ -658,7 +659,8 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /*
-    * @dev function should only be used in case of unexpected events at custodian!! It will update the system collateral value and collateral value of dcdc tokens of custodian.
+    * @dev function should only be used in case of unexpected events at custodian!! 
+    * It will update the system collateral value and collateral value of dcdc tokens of custodian.
     * @param positiveV_ uint256 this value will be added to custodian's total dcdc collateral value.
     * @param negativeV_ uint256 this value will be subtracted from custodian's total dcdc collateral value.
     * @param custodian_ uint256 custodian for whom changes are made.
@@ -670,7 +672,7 @@ contract SimpleAssetManagement is DSAuth {
 
 
     /**
-    * @dev Set base price_ for a diamond.
+    * @dev Set base price_ for a diamond. Base price is the total price of diamonds.
     */
     function _setBasePrice(address token_, uint256 tokenId_, uint256 price_) internal {
         bytes32 state_;
@@ -698,6 +700,9 @@ contract SimpleAssetManagement is DSAuth {
         require(msg.value > 0, "asm-check-the-function-signature");
     }
 
+    /*
+    * @dev Burn cdc tokens and update cdc variables.
+    */
     function _burn(address token_, uint256 amt_) internal {
         require(cdcs[token_], "asm-token-is-not-cdc");
         DSToken(token_).burn(amt_);
@@ -706,7 +711,7 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /**
-    * @dev Get exchange rate for a token
+    * @dev Get exchange rate for a token, and store it.
     */
     function _updateRate(address token_) internal returns (uint256 rate_) {
         require((rate_ = _getNewRate(token_)) > 0, "asm-updateRate-rate-gt-zero");
@@ -805,7 +810,7 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /**
-    * @dev Get token_ / quote_currency rate from priceFeed
+    * @dev Get token_ base currency rate from priceFeed
     * Revert transaction if not valid feed and manual value not allowed
     */
     function _getNewRate(address token_) private view returns (uint rate_) {
@@ -878,7 +883,8 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /**
-    * @dev The total value paid to custodian must be less then the total value of current cdc share, and dpass sold.
+    * @dev The total value paid to custodian (using withdraw()) must be less then the total value of current cdc 
+    * share, and dpass sold.
     */
     function _requirePaidLessThanSold(address custodian_, uint256 custodianCdcV_) internal view {
         require(
@@ -894,7 +900,8 @@ contract SimpleAssetManagement is DSAuth {
     /*
     * @dev This function will revert if custodian has reached his value cap (capCustV - custodian capacity
     * value in base currency). Asset management enables to limit how much total worth
-    * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians, and avoid some custodian fraud cases.
+    * of diamonds each custodian can mint. This helps to avoid overexposure to some custodians, and avoid some 
+    * custodian fraud cases.
     */
     function _requireCapCustV(address custodian_) internal view {
         if(capCustV[custodian_] != uint(-1))
@@ -949,7 +956,7 @@ contract SimpleAssetManagement is DSAuth {
     }
 
     /**
-    * @dev send token or ether to destination
+    * @dev Send token or ether to destination.
     */
     function sendToken(
         address token,

@@ -3,10 +3,17 @@ pragma solidity ^0.5.11;
 import "ds-auth/auth.sol";
 import "ds-math/math.sol";
 
+/**
+ * @title Fee calculator contract.
+ * @dev This contract can be used by Diamond Exchange to calculate fee if fee to enable a flexible fee structure.
+ */
 contract FeeCalculator is DSMath, DSAuth {
     uint public fee;
     bytes32 public name = "Fca";                       // set human readable name for contract
 
+    /**
+    * @dev Calculates how much of a certain token user must spend in order to buy certain amount of token with fees.
+    */
     function calculateFee(
         address sender,
         uint256 value,
@@ -26,7 +33,7 @@ contract FeeCalculator is DSMath, DSAuth {
     }
 
     /**
-    * @dev calculates how much of a certain token user must spend in order to buy certain amount of token with fees
+    * @dev Returns how much user must sell of his tokens to buy the desired amount of tokens he wants to buy.
     */
     function getCosts(
         address user_,                                                           // user for whom we want to check the costs for
@@ -46,7 +53,10 @@ contract FeeCalculator is DSMath, DSAuth {
         feeSellT_;
         // calculate expected sell amount when user wants to buy something and only knows how much he wants to buy from a token and whishes to know how much it will cost.
     }
-
+    
+    /**
+     * @dev Set fixed fee.
+     */
     function setFee(uint fee_) public auth {
         fee = fee_;
     }

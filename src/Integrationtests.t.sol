@@ -1,20 +1,5 @@
 pragma solidity ^0.5.11;
 
-// TODO: show how to introduce new buy token (denyToken, feeds, etc)
-// TODO: user sells diamonds
-// TODO: setup scenario
-// TODO: invalid diamond who does what
-// TODO: simple setup scenario
-// TODO: custodian adds diamond wrong this is how we correnct it
-// TODO: scenario, when theft is at custodian, how to recover from it, make a testcase of how to zero his collateral, and what to do with dpass tokens, dcdc tokens of him
-// TODO: test for each basic use-case to demonstrate usability
-
-// TODO: quickly growing new custodian gets too much CDC value and others no money for their purchase
-
-// TODO: user puts his dpass for sale.
-// TODO: oracle update CDC price must set cdc values as well
-// TODO: lazy custodian looses money because prices went up and has less cdc from sale
-
 import "ds-test/test.sol";
 import "ds-auth/auth.sol";
 import "ds-math/math.sol";
@@ -33,6 +18,11 @@ import "./Dcdc.sol";
 import "./FeeCalculator.sol";
 import "./Redeemer.sol";
 
+/**
+ * @title Integrations Tests contract
+ * @dev This contract we simulate basic use cases of system. The purpose of it is to show how different components
+ * cooperate. Also upgrade of main contracts are simulated here to demonstrate feasibility.
+ */
 contract IntegrationsTest is DSTest, DSMath {
 
     event LogTest(uint256 what);
@@ -140,11 +130,11 @@ contract IntegrationsTest is DSTest, DSMath {
         assertEqLog("cdc-minted-to-user", DSToken(cdc).balanceOf(user), 1 ether);
     }
 
-    function testFail1MintCdcInt() public {         // use-case 1. Mint CDC - failure if tehere is no collateral
+    function testFail1MintCdcInt() public {         // use-case 1. Mint CDC - failure if there is no collateral
 
         SimpleAssetManagement(asm)
             .mint(cdc, user, 1 ether);              // mint 1 CDC token to user
-                                                    // usually we do not directly mint CDC to user, but use notiryTransferFrom() function from dex to mint to user
+                                                    // usually we do not directly mint CDC to user, but use asm.notiryTransferFrom() function from dex to mint to user
     }
 
     function test2MintDpassInt() public returns(uint id) {              // use-case 2. Mint Dpass
@@ -186,7 +176,7 @@ contract IntegrationsTest is DSTest, DSMath {
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        TesterActor(custodian)            // **Mint some dpass diamond so that we can print cdc
+        TesterActor(custodian)                      // **Mint some dpass diamond so that we can print cdc
             .doMintDpass(
             dpass,
             custodian,
@@ -226,16 +216,16 @@ contract IntegrationsTest is DSTest, DSMath {
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, dex, uint(-1));    // user must approve dex in order to trade
+            .doApprove(dai, dex, uint(-1));         // user must approve dex in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        DiamondExchange(dex).setConfig(        // before any token can be sold on dex, we must tell ...
+        DiamondExchange(dex).setConfig(             // before any token can be sold on dex, we must tell ...
             "canBuyErc721",                         // ... dex that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
 
-        id = TesterActor(custodian)            // **Mint some dpass diamond so that we can sell it
+        id = TesterActor(custodian)                 // **Mint some dpass diamond so that we can sell it
             .doMintDpass(
             dpass,
             custodian,
@@ -275,11 +265,11 @@ contract IntegrationsTest is DSTest, DSMath {
         DSToken(dai).transfer(user, daiPaid);       // send 4000 DAI to user, so he can use it to buy CDC
 
         TesterActor(user)
-            .doApprove(dai, dex, uint(-1));    // user must approve dex in order to trade
+            .doApprove(dai, dex, uint(-1));         // user must approve dex in order to trade
 
         Dpass(dpass).setCccc("BR,IF,D,5.00", true); // enable a cccc value diamonds can have only cccc values that are enabled first
 
-        DiamondExchange(dex).setConfig(        // before any token can be sold on dex, we must tell ...
+        DiamondExchange(dex).setConfig(             // before any token can be sold on dex, we must tell ...
             "canBuyErc721",                         // ... dex that users are allowed to buy it. ...
             b(dpass),                               // .... This must be done only once at configuration time.
             b(true));
@@ -487,10 +477,6 @@ contract IntegrationsTest is DSTest, DSMath {
         logUint("burner-dpt-balance", DSToken(dpt).balanceOf(burner), 18);
         assertEqLog("buyer-user-is-now-owner", Dpass(dpass).ownerOf(id), user1);
 
-    }
-
-    function test9CurrencyExchangesWork() public {
-       // TODO: start from here
     }
 
     function testUpgradeAsmInt() public {               // testing of upgrading of exchange contract (dex)
