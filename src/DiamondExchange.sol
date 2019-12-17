@@ -487,6 +487,8 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
         if(feeToken_ == eth) {
 
+            _sendToken(feeToken_, redeemer, msg.sender, sub(msg.value, min(feeAmt_,msg.value)));
+
             return TrustedRedeemer(redeemer)
                 .redeem
                 .value(min(msg.value, feeAmt_))
