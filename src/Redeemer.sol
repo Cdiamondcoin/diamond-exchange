@@ -178,7 +178,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
         address payable custodian_
     ) public payable stoppable nonReentrant kycCheck returns (uint256) {
 
-        require(feeToken_ != eth || feeAmt_ == msg.value, "red-pls-send-eth");
+        require(feeToken_ != eth || feeAmt_ == msg.value, "red-eth-not-equal-feeamt");
 
         if( asm.dpasses(redeemToken_) ) {
 

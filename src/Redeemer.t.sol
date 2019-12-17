@@ -1,6 +1,517 @@
 pragma solidity ^0.5.11;
-import "ds-test/test.sol";
+import "./DiamondExchangeSetup.t.sol";
 
-contract RedeemerTest is DSTest {
-    // tests can be found in src/DiamondExhcange.t.sol
+contract RedeemerTest is DiamondExchangeSetup {
+
+    uint walDaiBalance;
+    uint walEthBalance;
+    uint liqDptBalance;
+    uint burnerDptBalance;
+    uint userCdcBalance;
+    uint userDaiBalance;
+    uint userEthBalance;
+
+    function testRedeemCdcRed() public {
+        uint daiRedeem = 61 ether;
+        uint daiPaid = 101 ether;
+        uint mintDcdc = 997 ether;
+        DiamondExchangeTester(custodian).doMintDcdc(asm, dcdc, custodian, mintDcdc);
+        DiamondExchangeTester(user).doBuyTokensWithFee(
+            dai,
+            daiPaid,
+            cdc,
+            uint(-1)
+        );
+
+        walDaiBalance = DSToken(dai).balanceOf(wal);
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(user);
+        userDaiBalance = DSToken(dai).balanceOf(user);
+
+        DiamondExchangeTester(user).doRedeem(
+            cdc,
+            uint(DSToken(cdc).balanceOf(user)),
+            dai,
+            daiRedeem,
+            custodian
+        );
+
+        assertEqLog(
+            "user-dai-balance",
+            DSToken(dai).balanceOf(user),
+            userDaiBalance - daiRedeem);
+
+        uint daiFee = wdivT(
+                wmul(varFeeRedeem, wmulV(userCdcBalance, usdRate[cdc], cdc)) + fixFeeRedeem,
+                usdRate[dai],
+                dai);
+
+        assertEqLog(
+            "wal-dai-balance",
+            DSToken(dai).balanceOf(wal),
+            walDaiBalance + daiFee);
+
+        uint dptFee = takeProfitOnlyInDpt ? wdivT(
+            wmul(wmulV(daiFee, usdRate[dai], dai), profitRateRedeem),
+                usdRate[dpt],
+                dpt):
+            wdivT(
+                wmulV(daiFee, usdRate[dai], dai), 
+                usdRate[dpt],
+                dpt);
+
+        assertEqLog(
+            "liq-dpt-balance",
+            DSToken(dpt).balanceOf(liq),
+            liqDptBalance - dptFee);
+
+        assertEqLog(
+            "burner-dpt-balance",
+            DSToken(dpt).balanceOf(burner),
+            burnerDptBalance + dptFee);
+
+        assertEqLog(
+            "user-cdc-balance",
+            DSToken(cdc).balanceOf(user),
+            0);
+    }
+
+    function testRedeemCdcUsingEthRed() public {
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));
+        uint ethRedeem = 61 ether;
+        uint ethPaid = 101 ether;
+        uint mintDcdc = 997 ether;
+        DiamondExchangeTester(custodian).doMintDcdc(asm, dcdc, custodian, mintDcdc);
+        DiamondExchangeTester(user).doBuyTokensWithFee(
+            eth,
+            ethPaid,
+            cdc,
+            uint(-1)
+        );
+
+        walEthBalance = wal.balance;
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(user);
+        userEthBalance = user.balance;
+
+        DiamondExchangeTester(user).doRedeem(
+            cdc,
+            uint(DSToken(cdc).balanceOf(user)),
+            eth,
+            ethRedeem,
+            custodian
+        );
+
+        assertEqLog(
+            "user-eth-balance",
+            user.balance,
+            userEthBalance - ethRedeem);
+
+        uint ethFee = wdivT(
+                wmul(varFeeRedeem, wmulV(userCdcBalance, usdRate[cdc], cdc)) + fixFeeRedeem,
+                usdRate[eth],
+                eth);
+
+        assertEqLog(
+            "wal-eth-balance",
+            wal.balance,
+            walEthBalance + ethFee);
+
+        uint dptFee = takeProfitOnlyInDpt ? wdivT(
+            wmul(wmulV(ethFee, usdRate[eth], eth), profitRateRedeem),
+                usdRate[dpt],
+                dpt):
+            wdivT(
+                wmulV(ethFee, usdRate[eth], eth), 
+                usdRate[dpt],
+                dpt);
+
+        assertEqLog(
+            "liq-dpt-balance",
+            DSToken(dpt).balanceOf(liq),
+            liqDptBalance - dptFee);
+
+        assertEqLog(
+            "burner-dpt-balance",
+            DSToken(dpt).balanceOf(burner),
+            burnerDptBalance + dptFee);
+
+        assertEqLog(
+            "user-cdc-balance",
+            DSToken(cdc).balanceOf(user),
+            0);
+    }
+
+    function testRedeemDpassRed() public {
+        
+        uint daiRedeem = 11 ether;
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        DiamondExchange(exchange)
+            .buyTokensWithFee
+            .value(sellAmtOrId)
+            (sellToken, sellAmtOrId, dpass, dpassId[seller]);
+
+        approve721(dpass, exchange, dpassId[seller]);        
+
+        walDaiBalance = DSToken(dai).balanceOf(wal);
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(address(this));
+        userDaiBalance = DSToken(dai).balanceOf(address(this));
+
+        uint redeemId = DiamondExchange(exchange).redeem(
+            dpass,
+            dpassId[seller],
+            dai,
+            daiRedeem,
+            seller
+        );
+
+        assertEq(
+            Dpass(dpass).getState(dpassId[seller]),
+            b("redeemed"));
+
+        assertEqLog(
+            "redeem-id-1",
+            redeemId,
+            1);
+
+        assertEqDustLog(
+            "user-dai-balance",
+            DSToken(dai).balanceOf(address(this)),
+            userDaiBalance - daiRedeem);
+
+        uint daiFee = wdivT(
+                wmul(varFeeRedeem, dpassOwnerPrice[asm]) + fixFeeRedeem,
+                usdRate[dai],
+                dai);
+
+        assertEqDustLog(
+            "wal-dai-balance",
+            DSToken(dai).balanceOf(wal),
+            walDaiBalance + daiFee);
+
+        uint dptFee = takeProfitOnlyInDpt ? wdivT(
+            wmul(wmulV(daiFee, usdRate[dai], dai), profitRateRedeem),
+                usdRate[dpt],
+                dpt):
+            wdivT(
+                wmulV(daiFee, usdRate[dai], dai), 
+                usdRate[dpt],
+                dpt);
+
+        assertEqDustLog(
+            "liq-dpt-balance",
+            DSToken(dpt).balanceOf(liq),
+            liqDptBalance - dptFee);
+
+        assertEqDustLog(
+            "burner-dpt-balance",
+            DSToken(dpt).balanceOf(burner),
+            burnerDptBalance + dptFee);
+
+        assertEqDustLog(
+            "user-dpass-balance",
+            Dpass(dpass).balanceOf(address(this)),
+            0);
+    }
+
+    function testRedeemDpassUsingEthRed() public {
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));
+
+        uint ethRedeem = 11 ether;
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        DiamondExchange(exchange)
+            .buyTokensWithFee
+            .value(sellAmtOrId)
+            (sellToken, sellAmtOrId, dpass, dpassId[seller]);
+
+        approve721(dpass, exchange, dpassId[seller]);        
+
+        walEthBalance = wal.balance;
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(address(this));
+        userEthBalance = address(this).balance;
+
+        uint redeemId = DiamondExchange(exchange)
+        .redeem
+        .value(ethRedeem)
+        (
+            dpass,
+            dpassId[seller],
+            eth,
+            ethRedeem,
+            seller
+        );
+
+        assertEq(
+            Dpass(dpass).getState(dpassId[seller]),
+            b("redeemed"));
+
+        assertEqLog(
+            "redeem-id-1",
+            redeemId,
+            1);
+
+        assertEqDustLog(
+            "user-eth-balance",
+            address(this).balance,
+            userEthBalance - ethRedeem);
+
+        uint ethFee = wdivT(
+                wmul(varFeeRedeem, dpassOwnerPrice[asm]) + fixFeeRedeem,
+                usdRate[eth],
+                eth);
+
+        assertEqDustLog(
+            "wal-eth-balance",
+            wal.balance,
+            walEthBalance + ethFee);
+
+        uint dptFee = takeProfitOnlyInDpt ? wdivT(
+            wmul(wmulV(ethFee, usdRate[eth], eth), profitRateRedeem),
+                usdRate[dpt],
+                dpt):
+            wdivT(
+                wmulV(ethFee, usdRate[eth], eth), 
+                usdRate[dpt],
+                dpt);
+
+        assertEqDustLog(
+            "liq-dpt-balance",
+            DSToken(dpt).balanceOf(liq),
+            liqDptBalance - dptFee);
+
+        assertEqDustLog(
+            "burner-dpt-balance",
+            DSToken(dpt).balanceOf(burner),
+            burnerDptBalance + dptFee);
+
+        assertEqDustLog(
+            "user-dpass-balance",
+            Dpass(dpass).balanceOf(address(this)),
+            0);
+    }
+
+    function testFailRedeemDpassUsingEthReimburseExcessEthRed() public {
+        DiamondExchange(exchange).setConfig("redeemFeeToken", b(eth), b(true));
+
+        uint origEthRedeem = 12 ether;
+        uint ethRedeem = 11 ether;
+        require(origEthRedeem > ethRedeem, "test-red-orig-should-gt-curr");
+        address sellToken = eth;
+        uint sellAmtOrId = 16.5 ether;
+
+        DiamondExchange(exchange)
+            .buyTokensWithFee
+            .value(sellAmtOrId)
+            (sellToken, sellAmtOrId, dpass, dpassId[seller]);
+
+        approve721(dpass, exchange, dpassId[seller]);        
+
+        walEthBalance = wal.balance;
+        liqDptBalance = DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        userCdcBalance = DSToken(cdc).balanceOf(address(this));
+        userEthBalance = address(this).balance;
+
+        DiamondExchange(exchange)
+        .redeem
+        .value(ethRedeem)
+        (
+            dpass,
+            dpassId[seller],
+            eth,
+            origEthRedeem,
+            seller
+        );
+    }
+
+    function testRedeemDpassDptCostRed() public {
+        uint sendDpt = 300 ether;
+        forFixDaiBuyDpassUserHasNoDpt();
+        DSToken(dpt).transfer(user, sendDpt);
+
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[seller]);
+
+        uint userDptBalance = DSToken(dpt).balanceOf(user);
+        uint walDptBalance = DSToken(dpt).balanceOf(wal);
+        liqDptBalance =  DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        DiamondExchangeTester(user).doRedeem(
+            dpass,
+            dpassId[seller],
+            dpt,
+            sendDpt,
+            seller);
+
+        assertEqLog("owner-of-dpas-is-redeem",
+                    Dpass(dpass).ownerOf(dpassId[seller]),
+                    red);
+
+        assertEqDustLog("user-balance-decreased", 
+                    DSToken(dpt).balanceOf(user),
+                    userDptBalance - sendDpt);
+
+        assertEqDustLog("wal-balance-increased", 
+                    DSToken(dpt).balanceOf(wal),
+                    walDptBalance + wdivT(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), usdRate[dpt], dpt) - 
+                    wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), profitRateRedeem), usdRate[dpt], dpt));
+
+        assertEqDustLog("liq-balance-decreased", 
+                    DSToken(dpt).balanceOf(liq),
+                    liqDptBalance );
+
+        assertEqDustLog("burner-balance-increased", 
+                    DSToken(dpt).balanceOf(burner),
+                    burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), profitRateRedeem), usdRate[dpt], dpt));
+    }
+
+    function testRedeemDpassDaiCostRed() public {
+        uint sendDai = 300 ether;
+        forFixDaiBuyDpassUserHasNoDpt();     // get dpass for user
+
+        DiamondExchangeTester(user).doApprove721(dpass, exchange, dpassId[seller]);
+
+        userDaiBalance = DSToken(dai).balanceOf(user);
+        walDaiBalance = DSToken(dai).balanceOf(wal);
+        liqDptBalance =  DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        DiamondExchangeTester(user).doRedeem(
+            dpass,
+            dpassId[seller],
+            dai,
+            sendDai,
+            seller);
+
+        assertEqLog("owner-of-dpas-is-redeem",
+                    Dpass(dpass).ownerOf(dpassId[seller]),
+                    red);
+
+        assertEqDustLog("user-balance-decreased", 
+                    DSToken(dai).balanceOf(user),
+                    userDaiBalance - sendDai);
+
+        assertEqDustLog("wal-balance-increased", 
+                    DSToken(dai).balanceOf(wal),
+                    walDaiBalance + wdivT(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), usdRate[dai], dai));
+
+        assertEqDustLog("liq-balance-decreased", 
+                    DSToken(dpt).balanceOf(liq),
+                    liqDptBalance - wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), profitRateRedeem), usdRate[dpt], dpt));
+
+        assertEqDustLog("burner-balance-increased", 
+                    DSToken(dpt).balanceOf(burner),
+                    burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, dpassOwnerPrice[asm]), profitRateRedeem), usdRate[dpt], dpt));
+    }
+
+    function testRedeemCdcDptCostRed() public {
+        uint sendDpt = 300 ether;
+        forFixDaiBuyFixCdcUserHasNoDpt();
+        DSToken(dpt).transfer(user, sendDpt);
+
+        uint userDptBalance = DSToken(dpt).balanceOf(user);
+        userCdcBalance = DSToken(cdc).balanceOf(user);
+        uint walDptBalance = DSToken(dpt).balanceOf(wal);
+        liqDptBalance =  DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        DiamondExchangeTester(user).doRedeem(
+            cdc,
+            17 ether,
+            dpt,
+            sendDpt,
+            custodian);
+
+        assertEqDustLog("user-cdc-balance-decreased",
+                    DSToken(cdc).balanceOf(user),
+                    userCdcBalance - 17 ether);
+
+        assertEqDustLog("user-dpt-balance-decreased", 
+                    DSToken(dpt).balanceOf(user),
+                    userDptBalance - sendDpt);
+
+        assertEqDustLog("wal-balance-increased", 
+                    DSToken(dpt).balanceOf(wal),
+                    walDptBalance + wdivT(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), usdRate[dpt], dpt) - 
+                    wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
+
+        assertEqDustLog("liq-balance-decreased", 
+                    DSToken(dpt).balanceOf(liq),
+                    liqDptBalance );
+
+        assertEqDustLog("burner-balance-increased", 
+                    DSToken(dpt).balanceOf(burner),
+                    burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
+    }
+
+    function testRedeemCdcDaiCostRed() public {
+        uint sendDai = 300 ether;
+        forFixDaiBuyFixCdcUserHasNoDpt();     // get dpass for user
+
+
+        userDaiBalance = DSToken(dai).balanceOf(user);
+        walDaiBalance = DSToken(dai).balanceOf(wal);
+        userCdcBalance = DSToken(cdc).balanceOf(user);
+        liqDptBalance =  DSToken(dpt).balanceOf(liq);
+        burnerDptBalance = DSToken(dpt).balanceOf(burner);
+        DiamondExchangeTester(user).doRedeem(
+            cdc,
+            17 ether,
+            dai,
+            sendDai,
+            custodian);
+
+        assertEqDustLog("user-cdc-balance-decreased",
+                    DSToken(cdc).balanceOf(user),
+                    userCdcBalance - 17 ether);
+
+        assertEqDustLog("user-balance-decreased", 
+                    DSToken(dai).balanceOf(user),
+                    userDaiBalance - sendDai);
+
+        assertEqDustLog("wal-balance-increased", 
+                    DSToken(dai).balanceOf(wal),
+                    walDaiBalance + wdivT(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), usdRate[dai], dai));
+
+        assertEqDustLog("liq-balance-decreased", 
+                    DSToken(dpt).balanceOf(liq),
+                    liqDptBalance - wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
+
+        assertEqDustLog("burner-balance-increased", 
+                    DSToken(dpt).balanceOf(burner),
+                    burnerDptBalance + wdivT(wmul(fixFeeRedeem + wmul(varFeeRedeem, wmul(usdRate[cdc], 17 ether)), profitRateRedeem), usdRate[dpt], dpt));
+    }
+
+//-------------------------------end-of-tests----------------------
+
+    function forFixDaiBuyDpassUserHasNoDpt() public {
+
+        userDpt = 0 ether;              // DO NOT CHANGE THIS
+        sendToken(dpt, user, userDpt);  // DO NOT CHANGE THIS
+
+        address sellToken = dai;
+        uint sellAmtOrId = 13.94 ether;// the minimum value user has to pay // DO NOT CHANGE THIS
+
+        doExchange(sellToken, sellAmtOrId, dpass, dpassId[seller]);
+    }
+
+    function forFixDaiBuyFixCdcUserHasNoDpt() public {
+        userDpt = 0 ether;              // DO NOT CHANGE THIS
+        sendToken(dpt, user, userDpt);
+
+        address sellToken = dai;        // DO NOT CHANGE THIS
+        uint sellAmtOrId = 17 ether;    // DO NOT CHANGE THIS
+        address buyToken = cdc;         // DO NOT CHANGE THIS
+        uint buyAmtOrId = 17.79 ether;  // DO NOT CHANGE THIS
+
+        doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+
+    }
 }
