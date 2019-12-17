@@ -293,7 +293,7 @@ seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb fixFee) $(etb 
 # tell redeemer the variable fee, or fee percent
 seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb varFee) $(etb 0.03) $empty $empty
 # tell redeemer the profitRate (should be same as we set in exchange), the rate of profit belonging to dpt owners
-seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 0.1) $empty $empty
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 1) $empty $empty
 # do a match between cdc and matching dcdc token
 seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dcdcOfCdc) $(atb $cdc) $(atb $dcdc) $empty
 # set dpt token address for redeemer
