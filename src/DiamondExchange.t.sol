@@ -3298,7 +3298,7 @@ contract DiamondExchangeTest is DiamondExchangeSetup {
         address buyToken = cdc;
         uint buyAmtOrId = 17.79 ether;
 
-        DiamondExchange(exchange).setConfig("small", b(eth), b(sellAmtOrId));
+        DiamondExchange(exchange).setConfig("smallest", b(eth), b(sellAmtOrId));
         doExchange(sellToken, sellAmtOrId, buyToken, buyAmtOrId);
     }
 }
