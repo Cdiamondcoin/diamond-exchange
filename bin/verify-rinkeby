@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+./bin/verify-contracts Dcdc Dcdc-flatt.sol $dcdc -a 42522c56532c472c302e3035000000000000000000000000000000000000000044434443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+./bin/verify-contracts DiamondExchangeExtension DiamondExchangeExtension-flatt.sol $dee
+./bin/verify-contracts DiamondExchange DiamondExchange-flatt.sol $dex
+./bin/verify-contracts SimpleAssetManagement SimpleAssetManagement-flatt.sol $asm
+./bin/verify-contracts Redeemer Redeemer-flatt.sol $red
+./bin/verify-contracts CdcAuthority CdcAuthority-flatt.sol $guard
+./bin/verify-contracts Liquidity Liquidity-flatt.sol $liq
+./bin/verify-contracts Wallet Wallet-flatt.sol $wal
+./bin/verify-contracts Burner Burner-flatt.sol $burner -a $(seth --to-bytes32 $(seth --to-uint256 $dpt))
+
+./bin/verify-contracts TestFeedLike TestFeedLike-flatt.sol $ethPriceFeed -a 00000000000000000000000000000000000000000000000796e3ea3f8ab000000000000000000000000000000000000000000000000000000000000000000001
+./bin/verify-contracts TestFeedLike TestFeedLike-flatt.sol $dptPriceFeed -a 000000000000000000000000000000000000000000000000a688906bd8b000000000000000000000000000000000000000000000000000000000000000000001
+./bin/verify-contracts TestFeedLike TestFeedLike-flatt.sol $cdcPriceFeed -a 000000000000000000000000000000000000000000000003cb71f51fc55800000000000000000000000000000000000000000000000000000000000000000001
+
+./bin/verify-contracts DSToken DSToken-flatt.sol $cdc -a 4344430000000000000000000000000000000000000000000000000000000000
+./bin/verify-contracts DSToken DSToken-flatt.sol $dpt -a 4450540000000000000000000000000000000000000000000000000000000000

@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+import os
+import argparse
+import requests
+import env_file
+
+
+def main(guid):
+    """
+    Examples:
+    https://etherscan.io/apis#contracts
+    https://rinkeby.etherscan.io/sourcecode-demo.html
+    """
+    custom_header = {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'
+    }
+
+    url = os.environ['ETHERSCAN_URL']
+    data = {
+        'guid': guid,
+        'module': 'contract',
+        'action': 'checkverifystatus',
+    }
+
+    http = requests.session()
+    req = http.get(url, data=data, headers=custom_header)
+    print(req.content)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Get contract verify status')
+    parser.add_argument('guid', type=str, help='GUID of contract verification')
+
+    args = parser.parse_args()
+    env_file.load(path='.env')
+
+    main(args.guid)

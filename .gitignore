@@ -6,3 +6,4 @@ keystore
 env
 rinkeby.keystore
 .soliumrc.json
+.env
