@@ -3,7 +3,7 @@
 After cloning contracts from git issue:
 
 ``` bash
-git submodule update --init --remote --recursive
+git submodule update --init --recursive --merge --remote
 dapp --use solc:0.5.11 build
 ```
 
