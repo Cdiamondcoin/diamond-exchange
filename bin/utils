@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+
+# address to bytes32
+function atb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $1))
+}
+
+# text to bytes32
+function ttb() {
+    echo $(seth --to-bytes32 $(seth --from-ascii $1))
+}
+
+# number to bytes32
+function ntb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $1))
+}
+
+# eth to bytes32
+function etb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei $1 eth)))
+}
+
+# eth to wei
+function etw() {
+    echo $(seth --to-wei $1 eth)
+}
+
+# wei to eth
+function wte() {
+    echo $(seth --from-wei $1)
+}
+
+# hex to bytes32
+function htb() {
+    echo $(seth --to-bytes32 $1)
+}
+
+# hex to uint256
+function htu() {
+    echo $(seth --to-uint256 $1)
+}
+
+function toKeccak () {
+    # echo $(python3 -c "from Crypto.Hash import keccak; v = keccak.new(digest_bits=256).update(b'$1').hexdigest(); print(f'0x{v}')")
+    echo $(seth keccak $1)
+}
+}
+
+# bytes32 to bytes $2
+function toBytes () {
+    echo $(python3 -c "b = $2 * 2; print('$1'[:b])")
+}
+
+function hashify () {
+    echo $(python3 -c "from hashlib import sha256; hash = b'$1';  print(f'0x{sha256(hash).hexdigest()}')")
+}
+
+function ute () {
+    echo $(seth --from-wei $(seth --to-dec $1))
+}

@@ -3,7 +3,7 @@
 After cloning contracts from git issue:
 
 ``` bash
-git submodule update --init --remote --recursive
+git submodule update --init --recursive --merge --remote
 dapp --use solc:0.5.11 build
 ```
 
@@ -56,3 +56,13 @@ with open('/Users/vgaicuks/code/cdc-token/rinkeby.keystore', 'w') as f:
 
 ```
 
+# Deploy to rinkeby testnet
+
+1. setup .env file
+2. setup ETH_FROM and ETH_PASSWORD
+3. ``. bin/deploy-rinkeby``
+4. deploy Dpass
+    1. ``. bin/deploy-rinkeby``
+    2. ``. bin/verify-rinkeby``
+5. setup deployed contracs addresses
+6. ``. bin/setup-asm-rinkeby``

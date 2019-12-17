@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+
+import os
+import argparse
+import requests
+import env_file
+
+
+def main(name, file_name, address, constuctor_args=''):
+    """
+    Examples:
+    https://etherscan.io/apis#contracts
+    https://rinkeby.etherscan.io/sourcecode-demo.html
+
+    Rinkeby example:
+    https://rinkeby.etherscan.io/apis#contracts
+    """
+    custom_header = {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'
+    }
+
+    # name = 'DSToken'
+    # file_name = 'DSToken-flatt.sol'
+    # address = '0xfc1fb94f35502d34f25900944d83f66d50cf2b09'
+
+    file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'out', file_name)
+    with open(file, 'r') as f:
+        contract_content = f.read()
+
+    url = os.environ['ETHERSCAN_URL']
+    data = {
+        'apikey': os.environ['ETHERSCAN_API_KEY'],
+        'module': 'contract',
+        'action': 'verifysourcecode',
+        'contractaddress': address,
+        'sourceCode': contract_content,
+        'codeformat': 'solidity-single-file',
+        'contractname': name,
+        'compilerversion': 'v0.5.11+commit.c082d0b4',
+        'optimizationUsed': '1',
+        'runs': '200',
+        'constructorArguements': constuctor_args,
+        'licenseType': '7',
+        'evmversion': ''
+    }
+
+    # print(f"address={address}")
+    # print(f"contract_content={contract_content}")
+    # print(f"name={name}")
+    # print(f"constuctor_args={constuctor_args}")
+
+    http = requests.session()
+    req = http.post(url, data=data, headers=custom_header)
+    print(req.content)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Verify contract on etherscan')
+    parser.add_argument('name', type=str, help='Name of contract')
+    parser.add_argument('file_name', type=str, help='Flatten contract source code')
+    parser.add_argument('address', type=str, help='Address of contract')
+    parser.add_argument('-a', '--arguments', type=str, help='Constructor arguments in bytecode')
+
+    args = parser.parse_args()
+
+    env_file.load(path='.env')
+
+    main(args.name, args.file_name, args.address, args.arguments)

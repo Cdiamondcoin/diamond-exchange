@@ -11,8 +11,8 @@ set -x
 ## Settings for test networks like Rinkeby, Kovan, Ropsten
 
 ## Internal settings (do not touch these unless you know what you are doing!!)
+export $(grep -v '^#' .env | xargs)
 export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
-export ETH_RPC_URL=https://rinkeby.infura.io/v3/47706a887c1245319e35b5e507c7f097
 export ETH_KEYSTORE="$(pwd)"
 
 # export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize --optimize-runs 1"}
@@ -42,6 +42,8 @@ hevm flatten --source-file src/Dcdc.sol --json-file out/dapp.sol.json > out/Dcdc
 hevm flatten --source-file src/CdcAuthority.sol --json-file out/dapp.sol.json > out/CdcAuthority-flatt.sol
 hevm flatten --source-file src/DiamondExchange.sol --json-file out/dapp.sol.json > out/DiamondExchange-flatt.sol
 hevm flatten --source-file src/SimpleAssetManagement.sol --json-file out/dapp.sol.json > out/SimpleAssetManagement-flatt.sol
+hevm flatten --source-file src/DiamondExchangeExtension.sol --json-file out/dapp.sol.json > out/DiamondExchangeExtension-flatt.sol
+hevm flatten --source-file src/Redeemer.sol --json-file out/dapp.sol.json > out/Redeemer-flatt.sol
 
 ################################################################################
 # max is 24576
@@ -54,10 +56,12 @@ export SUPPLY=10000000000000000000000000000
 dpt=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii DPT)))
 echo -e "DPT DEPLOYED AT: $dpt"
 seth send $dpt "mint(uint)" $(seth --to-uint256 $SUPPLY)
+seth send $dpt "setName(bytes32)" $(seth --to-bytes32 $(seth --from-ascii DPT))
 
 # CDC
 cdc=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii CDC)))
-echo -e "CDC DEPLOYED AT: $CDC"
+echo -e "CDC DEPLOYED AT: $cdc"
+seth send $cdc "setName(bytes32)" $(seth --to-bytes32 $(seth --from-ascii CDC))
 
 # ETH feed
 export RATE=140
@@ -89,6 +93,7 @@ export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
 export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
 dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
 echo -e "DCDC DEPLOYED AT: $dcdc"
+seth send $dcdc "setName(bytes32)" $(seth --to-bytes32 $(seth --from-ascii DCDC))
 
 export guard=$(dapp create CdcAuthority)
 echo -e "Guard DEPLOYED AT: $guard"
@@ -98,6 +103,9 @@ echo -e "Redeemer DEPLOYED AT: $red"
 
 export dex=$(dapp create DiamondExchange)
 echo -e "DiamondExchange DEPLOYED AT: $dex"
+
+export dee=$(dapp create DiamondExchangeExtension)
+echo -e "DEE DEPLOYED AT: $dee"
 
 export asm=$(dapp create SimpleAssetManagement)
 echo -e "ASM DEPLOYED AT: $asm"
@@ -115,8 +123,9 @@ echo -e "export burner=$burner"
 echo -e "export dcdc=$dcdc"
 echo -e "export guard=$guard"
 echo -e "export dex=$dex"
+echo -e "export dee=$dee"
 echo -e "export asm=$asm"
-
+echo -e "export red=$red"
 
 # ===================== END =========================
 # # enable CdcExchange to manage Cdc tokens
