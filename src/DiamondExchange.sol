@@ -69,7 +69,7 @@ contract TrustedAsm {
 
 
 /**
-* @dev Interface ERC721 contract 
+* @dev Interface ERC721 contract
 */
 contract TrustedErc721 {
     function transferFrom(address src, address to, uint256 amt) external;
@@ -111,7 +111,7 @@ contract DiamondExchangeEvents {
 
 /**
  * @title Diamond Exchange contract
- * @dev This contract can exchange ERC721 tokens and ERC20 tokens as well. Primary 
+ * @dev This contract can exchange ERC721 tokens and ERC20 tokens as well. Primary
  * usage is to buy diamonds or buying diamond backed stablecoins.
  */
 contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
@@ -210,7 +210,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Set configuration values for contract. Instead of several small functions 
+    * @dev Set configuration values for contract. Instead of several small functions
     * that bloat the abi, this monolitic function can be used to configure Diamond i
     * Exchange contract.
     * @param what_ bytes32 determines what change the owner(contract) wants to make.
@@ -485,9 +485,20 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
             require(false, "dex-token-can-not-be-redeemed");
         }
 
-        _sendToken(feeToken_, msg.sender, redeemer, feeAmt_);
+        if(feeToken_ == eth) {
 
-        return TrustedRedeemer(redeemer).redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
+            return TrustedRedeemer(redeemer)
+                .redeem
+                .value(min(msg.value, feeAmt_))
+                (msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
+
+        } else {
+
+            _sendToken(feeToken_, msg.sender, redeemer, feeAmt_);
+
+            return TrustedRedeemer(redeemer)
+            .redeem(msg.sender, redeemToken_, redeemAmtOrId_, feeToken_, feeAmt_, custodian_);
+        }
     }
 
     /**
@@ -496,7 +507,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     * @param sellToken_ address token user wants to sell
     * @param sellAmtOrId_ uint256 if sellToken_ is erc20 token then this is the amount (if set to highest possible, it means user wants to exchange all necessary tokens in his posession to buy the buyToken_), if token is Dpass(erc721) token, then this is the tokenId
     * @param buyToken_ address token user wants to buy
-    * @param buyAmtOrId_ uint256 if buyToken_ is erc20, then this is the amount(setting highest integer will make buy as much buyTokens: as possible), and it is tokenId otherwise 
+    * @param buyAmtOrId_ uint256 if buyToken_ is erc20, then this is the amount(setting highest integer will make buy as much buyTokens: as possible), and it is tokenId otherwise
     */
     function buyTokensWithFee (
         address sellToken_,
@@ -910,7 +921,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     * @dev Set marketplace price of dpass token so users can buy it on for this price.
     * @param token_ address price is set for this token.
     * @param tokenId_ uint256 tokenid to set price for
-    * @param price_ uint256 marketplace price to set 
+    * @param price_ uint256 marketplace price to set
     */
     function setBuyPrice(address token_, uint256 tokenId_, uint256 price_) public {
         address seller_ = msg.sender;
@@ -925,7 +936,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
     }
 
     /**
-    * @dev Get final price of dpass token. Function tries to get rpce from marketplace 
+    * @dev Get final price of dpass token. Function tries to get rpce from marketplace
     * price (buyPrice) and if that is zero, then from basePrice.
     * @param token_ address token to get price for
     * @param tokenId_ uint256 to get price for
@@ -1000,7 +1011,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     /*
     * @dev calculates multiple with decimals adjusted to match to 18 decimal precision to express base token value.
-    * @param a_ uint256 multiply this number 
+    * @param a_ uint256 multiply this number
     * @param b_ uint256 multiply this number
     * @param token_ address get results with the precision of this token
     */
