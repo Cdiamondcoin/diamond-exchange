@@ -223,7 +223,6 @@ contract SimpleAssetManagement is DSAuth {
             dust = uint256(value_);
         } else if (what_ == "dex") {
             dex = addr(value_);
-            require(dex != address(0), "asm-no-zero-dex-address-pls");
         } else if (what_ == "totalPaidCustV") {                         // only use during upgrade
             address custodian_ = addr(value_);
             require(custodians[custodian_], "asm-not-a-custodian");
