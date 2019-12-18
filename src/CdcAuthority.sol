@@ -9,5 +9,4 @@ import "ds-guard/guard.sol";
  */
 contract CdcAuthority is DSGuard {
     bytes32 public name = "Authority";
-    bytes32 public name = "Authority";
 }
