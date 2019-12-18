@@ -46,6 +46,7 @@ hevm flatten --source-file src/Redeemer.sol --json-file out/dapp.sol.json > out/
 ################################################################################
 # max is 24576
 # DATA=$(seth --to-hexdata out/DiamondExchange.bin) && echo $((${#DATA} / 2 - 1))
+# DATA=$(seth --to-hexdata out/SimpleAssetManagement.bin) && echo $((${#DATA} / 2 - 1))
 ################################################################################
 
 # DPT
