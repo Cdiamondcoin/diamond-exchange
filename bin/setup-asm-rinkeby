@@ -9,8 +9,6 @@ export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
 export ETH_KEYSTORE="$(pwd)"
 export ETH_GAS=8000000
 export ETH_GAS_PRICE=20000000000
-export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
-export ETH_PASSWORD=~/.eth-pwd
 
 # echo -e "===================== ######################## =========================="
 # echo -e "=====================       Addresses          ==========================="
@@ -223,6 +221,9 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc721) $(atb $d
 # user can sell dpass
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc721) $(atb $dpass) $true
 
+# This will make sure that users can not buy ultra small amount of CDC
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $cdc) $(etb 0.00009)
+
 #----------------------------------------setup-asm------------------------------------------------------------
 
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dex) $(atb $dex) $empty $empty
@@ -255,6 +256,8 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $e
 
 # make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRatio) $(etb 1.05) $empty $domain
+# It must be less than overcollratio
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRemoveRatio) $(etb 1.02) $empty $domain
 # enable the dpass tokens of asm to be handled by dex
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dpasses) $(atb $dpass) $true $domain
 # enable the dpass tokens of asm to be handled by dex

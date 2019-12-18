@@ -28,8 +28,6 @@ export ETH_GAS=9965875
 export ETH_GAS_PRICE=20000000000
 
 # export ETH_FROM=$(seth rpc eth_coinbase)
-export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
-export ETH_PASSWORD=~/.eth-pwd
 
 dapp build --extract
 
