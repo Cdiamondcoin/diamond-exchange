@@ -17,22 +17,22 @@ export custodian=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export eth=0x00000000000000000000000000000000000000ee
 
 # Deployed contracts
-export dpass=0x29d49939bb6df3f2a66b8af4c4c57b20c456e03f
+export dpass=0x9ec059b5fc9643528ccac10cb2d042b0376c95c8
 
-export dpt=0x891f67a10d302244a07e741be58e29d50a631bbb
-export cdc=0x87d726c9fbd4704c9707a82f888464dcbf28eb29
-export ethPriceFeed=0xc55e4dd9699eeb90a1847b03984b5fcd143c4747
-export dptPriceFeed=0x6fcf359753f979fba25828cb4a8724f1c4198f16
-export cdcPriceFeed=0x843e098c09e68c87f1d982b4748ecacbc4542d42
-export liq=0xa3737dc62af82136750723503872ee64b58fea8a
-export wal=0x905454ac5c161d6a69ba5ad96a5e41de09088a09
-export burner=0x81a437cca017692b6e29b5b2b00ff539a20cf98e
-export dcdc=0x032e07ce39ff44956da5fc9f86d9e0074b5de4f6
-export guard=0x28c29e1c37043fc64fcb3d165ab6ee317b281d4a
-export dex=0x67da64ec71d1b0f6a9a2219f3622a53d3d1cff7f
-export dee=0xf5a48d2ba925a6900b669b9a9849b702e7a1d0a0
-export asm=0x83fea4088c40a1f50bfcfabc61b1ed18ba2a1fe6
-export red=0xe9f20cdd37f73c20462d6571ee5f1019cdeb21c9
+export dpt=0x3d6450059b66698df2dc31f5e4586612c9b44e10
+export cdc=0x6b7eb04069b544d66e355a85c089af8aeeab9640
+export ethPriceFeed=0xe2ef24ed668d77d7ef764b9b570936827cf75bb5
+export dptPriceFeed=0x9cd79e365da61ed4ee28d146b2ddc541d6609da2
+export cdcPriceFeed=0x5b1315a9f53d7c7535597d7718120361b4c2ed9d
+export liq=0x5d52f74d27c15551818616a62a5e8941d8294939
+export wal=0x96b8654a17dfce6656591a9654e8fa36913a18ac
+export burner=0xc4aff618fdeb020e277974b66d11c0b161b91060
+export dcdc=0x57cc77cf35045bfb962f40a6eb9aff812466232a
+export guard=0x40ee8545373109ebf5d6dfac420ebbf96d09bf76
+export dex=0xa937f6be23cc0349646305aaff4e73055de3555a
+export dee=0x5004b781f3fcc7b0b91c41d558a8205d639eae8b
+export asm=0x01950a69f00c0e300c0b80cbd23694622eb6a2e4
+export red=0xb056e309826e3166668c3ac74bb81d2c6eabe612
 
 # address to bytes32
 function atb() {
@@ -221,7 +221,7 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc721) $(atb $
 # This will make sure that users can not sell ultra small amount of tokens
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $cdc) $(etb 0.00009)
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $eth) $(etb 0.00009)
-
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $dpt) $(etb 0.00009)
 #----------------------------------------setup-asm------------------------------------------------------------
 
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dex) $(atb $dex) $empty $empty
