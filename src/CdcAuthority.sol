@@ -8,5 +8,6 @@ import "ds-guard/guard.sol";
  * @dev Permissions whitelist with address-level granularity
  */
 contract CdcAuthority is DSGuard {
-    bytes32 public name = "Aut";
+    bytes32 public name = "Authority";
+    bytes32 public name = "Authority";
 }

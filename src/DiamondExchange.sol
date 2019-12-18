@@ -157,6 +157,7 @@ contract DiamondExchange is DSAuth, DSStop, DiamondExchangeEvents {
 
     uint256 public dust = 10000;                            // Numbers below this amount are considered 0. Can only be used ...
     bytes32 public name = "Dex";                            // set human readable name for contract
+    bytes32 public symbol = "Dex";                          // set human readable name for contract
                                                             // ... along with 18 decimal precisions numbers.
 
     bool liqBuysDpt;                                        // if true then liq contract is called directly to buy necessary dpt, otherwise we...

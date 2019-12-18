@@ -11,6 +11,7 @@ import "ds-token/token.sol";
 contract Burner is DSAuth {
     DSToken public token;
     bytes32 public name = "Burner";
+    bytes32 public symbol = "Burner";
 
     constructor(DSToken token_) public {
         token = token_;

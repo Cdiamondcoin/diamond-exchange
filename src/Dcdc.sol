@@ -14,6 +14,7 @@ contract Dcdc is DSToken {
     bytes32 public cccc;
     bool public stopTransfers = true;
     bool public isInteger;
+    bytes32 public name;
 
     /**
     * @dev Constructor.
@@ -24,6 +25,7 @@ contract Dcdc is DSToken {
     constructor(bytes32 cccc_, bytes32 symbol_, bool isInteger_) DSToken(symbol_) public {
         cccc = cccc_;
         isInteger = isInteger_;
+        name = symbol_;
     }
 
     modifier integerOnly(uint256 num) {

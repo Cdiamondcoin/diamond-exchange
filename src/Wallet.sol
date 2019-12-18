@@ -44,6 +44,7 @@ contract Wallet is DSAuth, DSStop, DSMath {
     event LogTransferEth(address src, address dst, uint256 amount);
     address public eth = address(0xee);
     bytes32 public name = "Wal";                          // set human readable name for contract
+    bytes32 public symbol = "Wal";                        // set human readable name for contract
 
     function () external payable {
     }

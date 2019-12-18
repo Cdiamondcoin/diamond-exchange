@@ -10,6 +10,7 @@ import "ds-math/math.sol";
 contract FeeCalculator is DSMath, DSAuth {
     uint public fee;
     bytes32 public name = "Fca";                       // set human readable name for contract
+    bytes32 public symbol = "Fca";                       // set human readable name for contract
 
     /**
     * @dev Calculates how much of a certain token user must spend in order to buy certain amount of token with fees.

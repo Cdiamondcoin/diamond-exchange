@@ -31,6 +31,7 @@ contract Redeemer is DSAuth, DSStop, DSMath {
     uint dust = 1000;                                       // dust value to handle round-off errors
 
     bytes32 public name = "Red";                            // set human readable name for contract
+    bytes32 public symbol = "Red";                          // set human readable name for contract
     bool kycEnabled;                                        // if true then user must be on the kyc list in order to use the system
     mapping(address => bool) public kyc;                    // kyc list of users that are allowed to exchange tokens
 
