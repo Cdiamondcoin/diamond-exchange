@@ -130,9 +130,6 @@ seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $de
 
 # Permissions to custodian
 # seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRate(address)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRateNewest(address)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "burn(address,address,uint256)")
-seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mint(address,address,uint256)")
 seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "burnDcdc(address,address,uint256)")
 seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")
 seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDcdc(address,address,uint256)")
@@ -221,8 +218,9 @@ seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc721) $(atb $d
 # user can sell dpass
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc721) $(atb $dpass) $true
 
-# This will make sure that users can not buy ultra small amount of CDC
+# This will make sure that users can not sell ultra small amount of tokens
 seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $cdc) $(etb 0.00009)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $eth) $(etb 0.00009)
 
 #----------------------------------------setup-asm------------------------------------------------------------
 
@@ -255,9 +253,9 @@ seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $e
 
 
 # make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
-seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRatio) $(etb 1.05) $empty $domain
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRatio) $(etb 1.20) $empty $domain
 # It must be less than overcollratio
-seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRemoveRatio) $(etb 1.02) $empty $domain
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRemoveRatio) $(etb 1.1) $empty $domain
 # enable the dpass tokens of asm to be handled by dex
 seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dpasses) $(atb $dpass) $true $domain
 # enable the dpass tokens of asm to be handled by dex
