@@ -5,5 +5,6 @@ out/
 keystore
 env
 rinkeby.keystore
+mainnet.keystore
 .soliumrc.json
 .env

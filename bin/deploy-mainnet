@@ -15,18 +15,11 @@ export $(grep -v '^#' .env | xargs)
 export ETH_RPC_PORT=${ETH_RPC_PORT:-"8545"}
 export ETH_KEYSTORE="$(pwd)"
 
-# export SOLC_FLAGS="--optimize --optimize-runs 1"
 export SOLC_FLAGS="--optimize"
-# export ETH_GAS=${ETH_GAS:-"8000000"}
-# https://ethstats.net/ 9965875
-# https://www.rinkeby.io/#stats 7006834
 export ETH_GAS=9965875
 
 # 1000000000 wei = 1 gwei
-# export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
 export ETH_GAS_PRICE=20000000000
-
-# export ETH_FROM=$(seth rpc eth_coinbase)
 
 dapp build --extract
 
@@ -49,12 +42,7 @@ hevm flatten --source-file src/Redeemer.sol --json-file out/dapp.sol.json > out/
 ################################################################################
 
 # DPT
-# 10 mln
-export SUPPLY=10000000000000000000000000000
-dpt=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii DPT)))
-echo -e "DPT DEPLOYED AT: $dpt"
-seth send $dpt "mint(uint)" $(seth --to-uint256 $SUPPLY)
-seth send $dpt "setName(bytes32)" $(seth --to-bytes32 $(seth --from-ascii DPT))
+export dpt=0x10c71515602429c19d53011ea7040b87a4894838
 
 # CDC
 cdc=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii CDC)))
@@ -62,13 +50,11 @@ echo -e "CDC DEPLOYED AT: $cdc"
 seth send $cdc "setName(bytes32)" $(seth --to-bytes32 $(seth --from-ascii CDC))
 
 # ETH feed
-export RATE=140
-export FEED_VALID=true
-ethPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
-echo -e "ETH Price Fedd DEPLOYED AT: $ethPriceFeed"
+export ethPriceFeed=0x729D19f657BD0614b4985Cf1D82531c67569197B # MakerDAO pricefeed address
 
 # DPT feed
 export RATE=12
+export FEED_VALID=true
 dptPriceFeed=$(dapp create TestFeedLike $(seth --to-uint256 $(seth --to-wei $RATE eth)) $FEED_VALID)
 echo -e "DPT Price Fedd DEPLOYED AT: $dptPriceFeed"
 
@@ -87,7 +73,7 @@ echo -e "Wallet DEPLOYED AT: $wal"
 burner=$(dapp create Burner "$dpt")
 echo -e "Burner DEPLOYED AT: $burner"
 
-export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
+export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VSS1,E,0.05"))
 export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
 dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
 echo -e "DCDC DEPLOYED AT: $dcdc"
@@ -124,16 +110,3 @@ echo -e "export dex=$dex"
 echo -e "export dee=$dee"
 echo -e "export asm=$asm"
 echo -e "export red=$red"
-
-# ===================== END =========================
-# # enable CdcExchange to manage Cdc tokens
-# seth send $CDC "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-
-# # enable CdcExchange to manage DPT tokens (for fee)
-# seth send $DPT "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-
-# # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
-
-# # Get data from price feed
-# # seth call 0x97e4b0634971c2b286eab779bb672cf69fe525d2 "peek()(bytes32, bool)"
-# # seth --to-fix 18 $(seth --to-dec RESPONSE)

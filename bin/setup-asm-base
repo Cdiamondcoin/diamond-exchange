@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+set -ex
+
+# address to bytes32
+function atb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $1))
+}
+
+# text to bytes32
+function ttb() {
+    echo $(seth --to-bytes32 $(seth --from-ascii $1))
+}
+
+# number to bytes32
+function ntb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $1))
+}
+
+# eth to bytes32
+function etb() {
+    echo $(seth --to-bytes32 $(seth --to-uint256 $(seth --to-wei $1 eth)))
+}
+
+# eth to wei
+function etw() {
+    echo $(seth --to-wei $1 eth)
+}
+
+# wei to eth
+function wte() {
+    echo $(seth --from-wei $1)
+}
+
+# hex to bytes32
+function htb() {
+    echo $(seth --to-bytes32 $1)
+}
+
+# hex to uint256
+function htu() {
+    echo $(seth --to-uint256 $1)
+}
+
+function toKeccak () {
+    echo $(seth keccak $1)
+}
+
+function sigTob () {
+    echo $(seth --to-bytes32 $(seth sig $1))
+}
+
+export true=$(ntb 1)
+export false=$(ntb 0)
+export empty=$(ttb "")
+export b18=$(ntb 18)
+
+# export any=$(seth call $guard "ANY()")
+export any="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+export uAny=$(htu $any)
+export bAny=$(htb $any)
+export domain=$(ttb diamonds)
+
+# TODO: setup allowTokenPair?
+
+#----------------------------------------setup-liquidity--------------------------------------------------------
+
+seth send $liq "approve(address,address,uint)" $dpt $dex $uAny
+seth send $liq "approve(address,address,uint)" $dpt $red $uAny
+
+#----------------------------------------setup-guard------------------------------------------------------------
+seth send $burner "setAuthority(address)" $guard
+seth send $wal "setAuthority(address)" $guard
+seth send $asm "setAuthority(address)" $guard
+seth send $dex "setAuthority(address)" $guard
+seth send $liq "setAuthority(address)" $guard
+
+seth send $dpt "setAuthority(address)" $guard
+seth send $cdc "setAuthority(address)" $guard
+seth send $dcdc "setAuthority(address)" $guard
+seth send $dpass "setAuthority(address)" $guard
+seth send $red "setAuthority(address)" $guard
+
+# caller, toContract, permissions
+seth send $guard "permit(address,address,bytes32)" $asm $cdc $bAny
+seth send $guard "permit(address,address,bytes32)" $asm $dcdc $bAny
+seth send $guard "permit(address,address,bytes32)" $asm $dpass $bAny
+seth send $guard "permit(address,address,bytes32)" $dex $asm $bAny
+seth send $guard "permit(address,address,bytes32)" $dex $liq $bAny
+
+seth send $guard "permit(address,address,bytes32)" $red $liq $bAny
+seth send $guard "permit(address,address,bytes32)" $red $asm $bAny
+seth send $guard "permit(address,address,bytes32)" $red $dex $bAny
+
+# TODO:
+seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "getRate(address)")
+seth send $guard "permit(bytes32,bytes32,bytes32)" $bAny $(seth --to-bytes32 $dex) $(sigTob "getLocalRate(address)")
+
+# Permissions to custodian
+# seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "getRate(address)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "burnDcdc(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDpass(address,address,bytes3,bytes16,bytes8,bytes20,uint24,bytes32,bytes8,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "mintDcdc(address,address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "withdraw(address,uint256)")
+seth send $guard "permit(address,address,bytes32)" $custodian $asm $(sigTob "setStateDpass(address,uint256,bytes8)")
+
+seth send $guard "permit(address,address,bytes32)" $custodian $dpass $(sigTob "linkOldToNewToken(uint256,uint256)")
+
+#----------------------------------------setup-dex------------------------------------------------------------
+# decimal precision of cdc tokens is 18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $cdc) $(ntb 18)
+# decimal precision of eth tokens is 18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $eth) $(ntb 18)
+# decimal precision of dpt tokens is 18
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $dpt) $(ntb 18)
+
+# user can sell cdc tokens
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc20) $(atb $cdc) $true
+# user can buy cdc tokens
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc20) $(atb $cdc) $true
+# priceFeed address is set
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $cdc) $(atb $cdcPriceFeed)
+# make sure that cdc is minted by asset management
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb handledByAsm) $(atb $cdc) $true
+# rate of token in base currency (since Medianizer will return false, this value will be used)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb rate) $(atb $cdc) $(etb 70)
+# allow using manually set prices on cdc token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $cdc) $true
+
+
+# user can sell eth tokens
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc20) $(atb $eth) $true
+# user CAN NOT BUY ETH ON THIS EXCHANAGE
+# seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc20) $(atb $cdc) $true
+# priceFeed address is set
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $eth) $(atb $ethPriceFeed)
+# eth SHOULD NEVER BE DECLARED AS handledByAsm, because it can not be minted
+# seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb handledByAsm) $(atb $cdc) $true
+# rate of token in base currency (since Medianizer will return false, this value will be used)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb rate) $(atb $eth) $(etb 146)
+# allow using manually set prices on eth token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $eth) $true
+
+
+# user can sell dpt tokens
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc20) $(atb $dpt) $true
+# priceFeed address is set
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $dpt) $(atb $dptPriceFeed)
+# rate of token in base currency (since Medianizer will return false, this value will be used)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb rate) $(atb $dpt) $(etb 12)
+# allow using manually set prices on dpt token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $dpt) $true
+
+
+# tell exhcange which one is the DPT token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb dpt) $(atb $dpt) $empty
+# set liquidity contract
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb liq) $(atb $liq) $empty
+# set burner contract to burn profit of dpt owners
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb burner) $(atb $burner) $empty
+# set asset management contract
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb asm) $(atb $asm) $empty
+# set wallet to store cost part of fee received from users
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb wal) $(atb $wal) $empty
+# tell exhcange which one is the CDC token
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb cdc) $(atb $cdc) $empty
+# set dpt as a token with which redeem fee can be paid
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb redeemFeeToken)  $(atb $dpt) $true
+# set cdc as a token with which redeem fee can be paid
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb redeemFeeToken) $(atb $cdc) $true
+# set eth as a token with which redeem fee can be paid
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb redeemFeeToken) $(atb $eth) $true
+
+
+# fixed part of fee that is independent of purchase value
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb fixFee) $(etb 0) $empty
+# percentage value defining how much of purchase value if paid as fee value between 0 - 1 ether
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb varFee) $(etb 0.03) $empty
+# percentage value telling how much of total fee goes to profit of DPT owners
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 1) $empty
+# if set true only profit part of fee is withdrawn from user in DPT, if false the total fee will be taken from user in DPT
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb takeProfitOnlyInDpt) $true $empty
+
+# user can buy dpass
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canBuyErc721) $(atb $dpass) $true
+# user can sell dpass
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb canSellErc721) $(atb $dpass) $true
+
+# This will make sure that users can not sell ultra small amount of tokens
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $cdc) $(etb 0.00009)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $eth) $(etb 0.00009)
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb smallest) $(atb $dpt) $(etb 0.00009)
+#----------------------------------------setup-asm------------------------------------------------------------
+
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dex) $(atb $dex) $empty $empty
+
+# set price feed (same as for exchange)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $cdc) $(atb $cdcPriceFeed) $domain
+# enable to use rate that is not coming from feed
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $cdc) $true $domain
+# set precision of token to 18
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $cdc) $b18 $domain
+# allow cdc to be used as means of payment for services
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb payTokens) $(atb $cdc) $true $domain
+# tell asm that cdc is indeed a cdc token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb cdcs) $(atb $cdc) $true $domain
+# set rate for token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $cdc) $(etb 70) $domain
+
+
+# set price feed (same as for exchange)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $eth) $(atb $ethPriceFeed) $domain
+# enable eth to pay with
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb payTokens) $(atb $eth) $true $domain
+# enable to set rate of eth manually if feed is dowh (as is current situations)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $eth) $true $domain
+# set precision of token to 18
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $eth) $b18 $domain
+# set USD(base currency) rate of token ( this is the price of token in USD)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $eth) $(etb 146) $domain
+
+
+# make sure that the value of dpass + dcdc tokens is at least 1.1 times the value of cdc tokens.
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRatio) $(etb 1.20) $empty $domain
+# It must be less than overcollratio
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb overCollRemoveRatio) $(etb 1.1) $empty $domain
+# enable the dpass tokens of asm to be handled by dex
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dpasses) $(atb $dpass) $true $domain
+# enable the dpass tokens of asm to be handled by dex
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb setApproveForAll) $(atb $dpass) $(atb $dex) $true
+# setup the custodian
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb custodians) $(atb $custodian) $true $domain
+# set unlimited total value. If custodian total value of dcdc and dpass minted value reaches this value, then custodian can no longer mint neither dcdc nor dpass
+# seth send $asm "setCapCustV(address,uint)" $custodian $uAny
+# Robert: you should put like 10M usd
+seth send $asm "setCapCustV(address,uint)" $custodian $(seth --to-uint256 $(etw 10000000))
+
+
+# set price feed (same as for exchange)
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb priceFeed) $(atb $dcdc) $(atb $cdcPriceFeed) $domain
+# enable to use rate that is not coming from feed
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb manualRate) $(atb $dcdc) $true $domain
+# set precision of token to 18
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb decimals) $(atb $dcdc) $b18 $domain
+# tell asm that dcdc is indeed a dcdc token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dcdcs) $(atb $dcdc) $true $domain
+# set rate for token
+seth send $asm "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb rate) $(atb $dcdc) $(etb 70) $domain
+
+#----------------------------------------setup-redeemer------------------------------------------------------------
+
+# tell redeemer the address of asset management
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb asm) $(atb $asm) $empty $empty
+# tell redeemer the address of exchange
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dex) $(atb $dex) $empty $empty
+# tell redeemer the address of burner
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb burner) $(atb $burner) $empty $empty
+# tell redeemer the address of wallet
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb wal) $(atb $wal) $empty $empty
+# tell redeemer the fixed fee in base currency that is taken from total redeem fee is 0
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb fixFee) $(etb 0) $empty $empty
+# tell redeemer the variable fee, or fee percent
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb varFee) $(etb 0.03) $empty $empty
+# tell redeemer the profitRate (should be same as we set in exchange), the rate of profit belonging to dpt owners
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb profitRate) $(etb 1) $empty $empty
+# do a match between cdc and matching dcdc token
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dcdcOfCdc) $(atb $cdc) $(atb $dcdc) $empty
+# set dpt token address for redeemer
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dpt) $(atb $dpt) $empty $empty
+# set liquidity contract address for redeemer
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb liq) $(atb $liq) $empty $empty
+# set if liquidity contract should buy dpt on the fly for sending as fee
+seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb liqBuysDpt) $true $empty $empty
+# it is optional to set dust, its default value is 1000
+# seth send $red "setConfig(bytes32,bytes32,bytes32,bytes32)" $(ttb dust) $(ntb 1000) $empty $empty
+# set wallet to store cost part of fee received from users
+seth send $dex "setConfig(bytes32,bytes32,bytes32)" $(ttb redeemer) $(atb $red) $empty
+
+seth send $dee "setConfig(bytes32,bytes32,bytes32)" $(ttb asm) $(atb $asm) $empty
+seth send $dee "setConfig(bytes32,bytes32,bytes32)" $(ttb dex) $(atb $dex) $empty
+seth send $dee "setConfig(bytes32,bytes32,bytes32)" $(ttb red) $(atb $red) $empty
+
+set +ex
