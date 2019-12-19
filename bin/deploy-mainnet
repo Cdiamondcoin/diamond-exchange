@@ -73,7 +73,7 @@ echo -e "Wallet DEPLOYED AT: $wal"
 burner=$(dapp create Burner "$dpt")
 echo -e "Burner DEPLOYED AT: $burner"
 
-export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VSS1,E,0.05"))
+export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VVS-VS,F-G,0.05"))
 export bDcdcName=$(seth --to-bytes32 $(seth --from-ascii DCDC))
 dcdc=$(dapp create Dcdc $cccc $bDcdcName 1)
 echo -e "DCDC DEPLOYED AT: $dcdc"
